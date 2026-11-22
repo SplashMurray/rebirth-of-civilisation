@@ -19,6 +19,7 @@ static void autoplay(GameUI& ui, int turns) {
     for (int i = 0; i < turns && !g.gameOver; i++) {
         g.popups.clear();
         g.aiTurn(g.player);
+        if (g.civs[g.player].evoGoal < 0) g.setEvoGoal(g.player, g.aiChooseTrait(g.player));
         ui.endTurnNow();
         ui.nukeT = -1;
     }

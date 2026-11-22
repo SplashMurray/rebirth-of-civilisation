@@ -10,6 +10,7 @@ static const int CIV_FERAL = 1;    // feral packs and rogue machines (barbarians
 static const int FIRST_PRIMATE_CIV = 2;
 static const int PROLOGUE_TURNS = 6;  // the war happens at the end of turn 6 (2034)
 static const int MAX_TURNS = 340;
+static const int MAX_STRANDS = 2;      // evolutionary strands a species may commit to
 
 struct Tile {
     uint8_t terrain = T_OCEAN;
@@ -99,9 +100,12 @@ struct Civ {
     int ruinsExcavated = 0;
     int nameIdx = 0;
     int yieldBonusPct = 0;  // difficulty handicap for AI
-    int evolution = 0;      // points towards the next evolutionary trait
-    int evoStage = 0;       // number of traits gained
-    int evoPerTurn = 0;
+    // evolution
+    std::vector<uint8_t> traits;            // per trait: gained?
+    int evoGoal = -1;                       // trait being evolved towards
+    std::vector<int> evoPool, evoRate;      // per pressure category
+    int battles = 0;                        // fights this turn (conflict pressure)
+    TraitFx fx;                             // summed trait effects (derived, not saved)
 };
 
 struct Notification {
@@ -136,6 +140,7 @@ struct Pt { int x, y; };
 struct Pressure {
     std::string name;
     int value;
+    int cat;  // PressureCat
     std::string why;
 };
 
@@ -215,9 +220,22 @@ public:
     int researchTurns(int c) const;
 
     // ---- evolution
-    bool hasTrait(int c, int t) const { return civs[c].evoStage > t; }
+    bool hasTrait(int c, int t) const { return t >= 0 && t < (int)civs[c].traits.size() && civs[c].traits[t]; }
+    int traitCount(int c) const;
+    bool capstoneTaken(int c) const;
+    int strandsStarted(int c) const;
+    bool strandStarted(int c, int strand) const;
+    bool canEvolve(int c, int t) const;          // prerequisites met (cost aside)
+    bool affordable(int c, int t) const;
+    int evolveTurns(int c, int t) const;         // -1 = this species lacks a needed pressure
+    std::string traitBlocker(int c, int t) const;
+    void setEvoGoal(int c, int t);
+    void gainTrait(int c, int t);
+    void refreshTraitFx(int c);
+    int aiChooseTrait(int c);
+    int bestFitStrand(int c) const;
     std::vector<Pressure> evolutionPressures(int c) const;
-    int evolutionRate(int c) const;
+    std::vector<int> evolutionRates(int c) const;
     void processEvolution(int c);
 
     // ---- traditions

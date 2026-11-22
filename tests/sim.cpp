@@ -85,7 +85,7 @@ int main(int argc, char** argv) {
                     CHECK(h.turn == g.turn && h.units.size() == g.units.size() && h.cities.size() == g.cities.size(), "roundtrip mismatch");
                     CHECK(h.civs.size() == g.civs.size() && h.civs[3].techs == g.civs[3].techs && h.tiles.size() == g.tiles.size(), "roundtrip mismatch 2");
                     CHECK(h.rng.s == g.rng.s, "rng mismatch");
-                    CHECK(h.civs[3].evoStage == g.civs[3].evoStage, "evolution not saved");
+                    CHECK(h.civs[3].traits == g.civs[3].traits && h.civs[3].evoPool == g.civs[3].evoPool, "evolution not saved");
                 }
                 std::fflush(stdout);
             }

@@ -28,20 +28,26 @@
 
 * **Hex map**, randomly generated, with grassland, plains, desert, tundra, snow, coast and ocean, plus forest, jungle, hills, mountains and resources. Small, Standard and Large sizes (4, 6 or 8 primate civilisations).
 * **Eight playable primates**, each with its own bonuses, a unique unit and a preferred starting terrain (see below).
-* **Evolution: from grunts to grammar.** At the start your species cannot learn deliberately: it **earns no science at all** until it evolves an **Enlarged Neocortex**. Even then it cannot speak, so only the most basic discoveries are possible: **Fire, Foraging and Stone Tools**, then Cooking and Woodcraft. *Evolutionary pressures* earn Evolution points, and the points unlock traits in order:
+* **Evolution: a branching tree driven by real pressures.** At the start your species cannot learn deliberately and **earns no science at all** until it evolves an **Enlarged Neocortex**. Four kinds of *evolutionary pressure* fill four separate pools every turn:
 
-  | Trait | Effect |
+  | Pressure | Comes from |
   |---|---|
-  | **Enlarged Neocortex** | **Science is earned at all**; required for Awakening-era technologies |
-  | Expressive Gestures | +1 Culture per city |
-  | Proto-Speech | +10% Science |
-  | **Speech** | **Required for every Tribal-era technology**; +1 Science per city |
-  | **Advanced Speech** | **Required for every Ancient-era technology**; +15% Culture |
-  | Abstract Thought | Required for Classical-era technologies and beyond; +15% Science |
-  | Extended Childhood | +10% Food |
-  | Collective Learning | +10% Science |
+  | **Social** | Group living (cities), crowding (population), shared stories (culture) |
+  | **Ecological** | Survival, ranging over a large territory, harsh lands (tundra, desert, mountains), the nuclear winter after the Fall |
+  | **Conflict** | Being at war, battles fought, feral predators near your settlements |
+  | **Mutation** | Fallout in your lands and on your units, plus fading background radiation after the Fall |
 
-  The pressures are survival, group living (cities), crowding (population), conflict with rivals, predators near your settlements, a harsh climate, shared stories (culture), the **nuclear winter** after the Fall and **radiation-driven mutation** from fallout in your lands. Gibbons, Bonobos and other social or vocal species evolve faster. Science earned while you wait for a trait is stored, not lost. Press `V` to open the Evolution screen.
+  On the Evolution screen (`V`) you **choose** which trait to evolve towards, and it develops once your pools can pay its cost. Every trait needs particular pressures:
+
+  | Strand | Traits (final adaptation in bold) | Mainly needs |
+  |---|---|---|
+  | Brain and Language (required) | Enlarged Neocortex, Expressive Gestures, Proto-Speech, **Speech** (Tribal techs), **Advanced Speech** (Ancient techs), Abstract Thought (Classical onwards) | Social, Ecological |
+  | Tool Brain | Precision Grip, Spatial Reasoning, **Master Toolmakers** (+20% Production) | Ecological |
+  | Social Brain | Pair Bonding, Extended Childhood, **Collective Learning** (+Science, +Culture) | Social |
+  | Predator Brain | Pack Hunters, Ambush Instinct, **Apex Predators** (+combat, cheaper armies) | Conflict |
+  | Mutant Line | Radiation Tolerance, Accelerated Healing, **Fallout-Adapted** (fallout no longer harms your land) | Mutation |
+
+  A species may commit to **only two strands** and can have **only one final adaptation**. Because each strand needs its own pressure, a peaceful species will struggle to become Apex Predators, and only those living beside the irradiated ruins can become Fallout-Adapted. Each primate leans towards one strand (Bonobos and Gibbons Social, Gorillas and Baboons Predator, Snow Monkeys Mutant, the others Tool), and social or vocal species evolve faster. Science earned while you wait for a language trait is stored, not lost.
 * **Turn-based economy** with Food, Production, Science and Culture. **Gold is not available at the start.** Your people only learn the value of money when they research **Currency**; from then on cities earn Gold, which buys units and buildings.
 * **47 technologies across 9 eras** (Awakening, Tribal, Ancient, Classical, Kingdoms, Reclamation, Industrial, Modern, Rebirth), shown as a scrollable tech tree. You can click any technology to set it as a research goal.
 * **Human ruins as a source of technology.** Every ruin holds up to four layers of salvage that unlock as you advance:
@@ -119,7 +125,7 @@
 
 | | |
 |---|---|
-| ![Evolution](docs/screenshots/04b_evolution_start.png) | ![Early tech tree](docs/screenshots/04c_tech_start.png) |
+| ![Evolution tree](docs/screenshots/11b_evolution_mid.png) | ![Early tech tree](docs/screenshots/04c_tech_start.png) |
 | ![Start](docs/screenshots/04_start_map.png) | ![The Fall](docs/screenshots/07_fall_popup.png) |
 | ![Excavating ruins](docs/screenshots/09_unit_panel.png) | ![Tech tree](docs/screenshots/10_tech_tree.png) |
 | ![City screen](docs/screenshots/13_city_midgame.png) | ![Late game](docs/screenshots/16_lategame.png) |

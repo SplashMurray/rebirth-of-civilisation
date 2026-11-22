@@ -77,7 +77,7 @@ void Game::beginTurn(int c) {
             if (ci && ci->owner == c) heal = 25;
             else if (at(u.x, u.y).owner == c) heal = 15;
             if (const PrimateDef* pd = primate(c)) heal += pd->healBonus;
-            if (c >= FIRST_PRIMATE_CIV) heal += policyPct(c, PolicyEffect::Heal);
+            if (c >= FIRST_PRIMATE_CIV) heal += policyPct(c, PolicyEffect::Heal) + civs[c].fx.heal;
             for (auto& hc : cities)
                 if (hc.alive && hc.owner == c && dist(hc.x, hc.y, u.x, u.y) <= 1) {
                     int h = buildingIndex("Hospital");
@@ -318,6 +318,7 @@ void Game::processUnitsEndOfTurn(int c) {
             int dmg = 8 * fo;
             const PrimateDef* pd = primate(c);
             if (pd && pd->falloutResist) dmg /= 2;
+            if (civs[c].fx.falloutHalf) dmg /= 2;
             if (policyPct(c, PolicyEffect::Heal) > 0) dmg /= 2;
             u.hp -= dmg;
             if (u.hp <= 0) {
@@ -339,6 +340,8 @@ void Game::cityBombard(City& city) {
     double D = unitStrength(*target, false, false, target->x, target->y);
     int dmg = combatDamage(A, D);
     target->hp -= dmg;
+    civs[city.owner].battles++;
+    civs[target->owner].battles++;
     std::string msg = city.name + " bombarded " + (target->owner == player ? "your " : civs[target->owner].adjective + " ") +
                       g_units[target->type].name + " (-" + std::to_string(dmg) + ")";
     if (target->hp <= 0) {

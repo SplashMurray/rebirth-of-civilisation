@@ -104,13 +104,52 @@ struct TechDef {
 };
 
 // ---------------------------------------------------------------- evolution
-enum TraitId { TR_NEOCORTEX, TR_GESTURES, TR_PROTO_SPEECH, TR_SPEECH, TR_ADV_SPEECH, TR_ABSTRACT, TR_CHILDHOOD, TR_COLLECTIVE, TR_COUNT };
+// Four kinds of evolutionary pressure. Each trait needs points of particular kinds,
+// so a species can only follow a strand if its life actually exerts that pressure.
+enum PressureCat { PC_SOCIAL, PC_ECOLOGY, PC_CONFLICT, PC_MUTATION, PC_COUNT };
+extern const char* PRESSURE_NAMES[PC_COUNT];
+extern const char* PRESSURE_ABBR[PC_COUNT];
+
+enum Strand { ST_TRUNK, ST_TOOL, ST_SOCIAL, ST_PREDATOR, ST_MUTANT, ST_COUNT };
+extern const char* STRAND_NAMES[ST_COUNT];
+
+enum TraitId {
+    TR_NEOCORTEX, TR_GESTURES, TR_PROTO_SPEECH, TR_SPEECH, TR_ADV_SPEECH, TR_ABSTRACT,
+    TR_GRIP, TR_SPATIAL, TR_TOOLMAKERS,
+    TR_PAIRBOND, TR_CHILDHOOD, TR_COLLECTIVE,
+    TR_PACK, TR_AMBUSH, TR_APEX,
+    TR_RADTOL, TR_HEALING, TR_FALLOUT_ADAPTED,
+    TR_COUNT
+};
+
+// Effects of traits (summed per civilisation)
+struct TraitFx {
+    int food = 0, prod = 0, sci = 0, cult = 0;   // percentages
+    int flatSci = 0, flatCult = 0, flatProd = 0; // per city
+    int combat = 0, heal = 0, milCost = 0, workFaster = 0;
+    bool falloutHalf = false, falloutYields = false;
+    TraitFx& operator+=(const TraitFx& o) {
+        food += o.food; prod += o.prod; sci += o.sci; cult += o.cult;
+        flatSci += o.flatSci; flatCult += o.flatCult; flatProd += o.flatProd;
+        combat += o.combat; heal += o.heal; milCost += o.milCost; workFaster += o.workFaster;
+        falloutHalf = falloutHalf || o.falloutHalf;
+        falloutYields = falloutYields || o.falloutYields;
+        return *this;
+    }
+};
+
 struct TraitDef {
     std::string name;
-    int cost;
+    int strand;
+    int tier;
+    int cost[PC_COUNT];
+    std::vector<int> prereqs;
+    bool capstone;               // only one capstone trait per species
     std::string effect;
     std::string flavor;
+    TraitFx fx;
 };
+
 extern const char* ERA_NAMES[];
 static const int NUM_ERAS = 9;
 
@@ -146,6 +185,7 @@ struct PrimateDef {
     int startBias;           // 0 jungle,1 forest,2 plains,3 coast,4 tundra,5 hills
     std::vector<std::string> cityNames;
     int evoPct = 0;          // evolution speed bonus
+    int evoLean = 0;         // evolutionary strand this species naturally favours (AI and description)
 };
 
 // ---------------------------------------------------------------- tables

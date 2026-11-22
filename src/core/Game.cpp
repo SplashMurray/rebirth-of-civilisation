@@ -105,7 +105,7 @@ int Game::score(int c) const {
     for (auto t : cv.techs) if (t) s += 5;
     for (size_t b = 0; b < g_buildings.size(); b++)
         if (g_buildings[b].wonder && wonderCity[b] >= 0 && cities[wonderCity[b]].owner == c) s += 25;
-    s += cv.policiesAdopted * 8 + cv.ruinsExcavated * 5 + cv.evoStage * 5;
+    s += cv.policiesAdopted * 8 + cv.ruinsExcavated * 5 + traitCount(c) * 5;
     return s;
 }
 
@@ -278,66 +278,224 @@ int Game::researchTurns(int c) const {
 std::vector<Pressure> Game::evolutionPressures(int c) const {
     std::vector<Pressure> out;
     const Civ& cv = civs[c];
-    out.push_back({"Survival", 2, "Every generation, the cleverest survive."});
     int nc = 0, pop = 0;
     for (auto& ci : cities) if (ci.alive && ci.owner == c) { nc++; pop += ci.pop; }
-    if (nc) out.push_back({"Group living", nc, "Living in larger, settled groups rewards communication (+1 per city)."});
-    if (pop / 4) out.push_back({"Crowding", pop / 4, "Dense populations compete for status and mates (+1 per 4 population)."});
+    // social
+    out.push_back({"Group living", std::min(8, 1 + nc), PC_SOCIAL, "Living in larger, settled groups rewards communication (+1, +1 per city, up to +8)."});
+    if (pop / 3) out.push_back({"Crowding", std::min(8, pop / 3), PC_SOCIAL, "Dense populations compete for status and mates (+1 per 3 population, up to +8)."});
+    int stories = std::min(6, cv.culturePerTurn / 3);
+    if (stories) out.push_back({"Shared stories", stories, PC_SOCIAL, "Culture rewards those who speak and remember (+1 per 3 Culture per turn, up to +6)."});
+    // ecological
+    out.push_back({"Survival", 2, PC_ECOLOGY, "Every generation, the cleverest at finding food survive."});
+    int land = 0, harsh = 0;
+    for (int y = 0; y < H; y++)
+        for (int x = 0; x < W; x++) {
+            const Tile& t = at(x, y);
+            if (t.owner != c || isWater(x, y)) continue;
+            land++;
+            if (t.terrain == T_TUNDRA || t.terrain == T_SNOW || t.terrain == T_DESERT || t.mountain) harsh++;
+        }
+    if (land / 12) out.push_back({"Wide ranging", std::min(5, land / 12), PC_ECOLOGY, "Mastering a large territory (+1 per 12 land tiles, up to +5)."});
+    if (harsh / 4) out.push_back({"Harsh climate", std::min(3, harsh / 4), PC_ECOLOGY, "Cold, drought and mountains in your lands (+1 per 4 harsh tiles, up to +3)."});
     if (warHappened && turn <= PROLOGUE_TURNS + 30)
-        out.push_back({"Nuclear winter", 3, "The dark, cold years after the Fall cull the weak (lasts 30 turns)."});
+        out.push_back({"Nuclear winter", 3, PC_ECOLOGY, "The dark, cold years after the Fall cull the weak (lasts 30 turns)."});
+    // conflict
+    bool war = false;
+    for (int o = FIRST_PRIMATE_CIV; o < (int)civs.size(); o++) if (cv.war[o] && civs[o].alive) war = true;
+    if (war) out.push_back({"War", 3, PC_CONFLICT, "Being at war with rival primates."});
+    if (cv.battles) out.push_back({"Battles", std::min(4, cv.battles), PC_CONFLICT, "Each fight your people took part in this turn (up to +4)."});
+    int beasts = 0;
+    for (auto& u : units) {
+        if (!u.alive || u.owner != CIV_FERAL) continue;
+        bool near = false;
+        for (auto& ci : cities) if (ci.alive && ci.owner == c && dist(ci.x, ci.y, u.x, u.y) <= 4) near = true;
+        if (near) beasts++;
+    }
+    if (beasts) out.push_back({"Predators", std::min(3, beasts), PC_CONFLICT, "Feral packs prowling near your settlements (up to +3)."});
+    // mutation
     int fall = 0;
     for (auto& t : tiles) if (t.owner == c && t.fallout) fall++;
     for (auto& u : units) if (u.alive && u.owner == c && at(u.x, u.y).fallout) fall += 2;
-    if (fall) out.push_back({"Radiation mutations", std::min(3, (fall + 1) / 2), "Fallout in your lands drives mutation (up to +3)."});
-    bool war = false;
-    for (int o = FIRST_PRIMATE_CIV; o < (int)civs.size(); o++) if (cv.war[o] && civs[o].alive) war = true;
-    if (war) out.push_back({"Conflict", 2, "War with rival primates demands cunning and coordination."});
-    bool beasts = false;
-    for (auto& u : units) {
-        if (!u.alive || u.owner != CIV_FERAL) continue;
-        for (auto& ci : cities) if (ci.alive && ci.owner == c && dist(ci.x, ci.y, u.x, u.y) <= 4) beasts = true;
-    }
-    if (beasts) out.push_back({"Predators", 1, "Feral packs prowling near your settlements."});
-    if (cv.capital >= 0 && cities[cv.capital].alive) {
-        int harsh = 0;
-        const City& cap = cities[cv.capital];
-        for (auto& p : ring(cap.x, cap.y, 2)) {
-            int tr = at(p.x, p.y).terrain;
-            if (tr == T_TUNDRA || tr == T_SNOW || tr == T_DESERT) harsh++;
-        }
-        if (harsh >= 5) out.push_back({"Harsh climate", 1, "Surviving cold or drought around your capital requires planning."});
-    }
-    int stories = std::min(5, cv.culturePerTurn / 4);
-    if (stories) out.push_back({"Shared stories", stories, "Culture rewards those who can speak and remember (+1 per 4 Culture per turn, up to +5)."});
+    if (fall) out.push_back({"Radiation", std::min(4, (fall + 1) / 2), PC_MUTATION, "Fallout in your lands and on your units drives mutation (up to +4)."});
+    if (warHappened && turn <= PROLOGUE_TURNS + 40)
+        out.push_back({"Background radiation", 1, PC_MUTATION, "The whole planet is still mildly radioactive (lasts 40 turns)."});
     return out;
 }
 
-int Game::evolutionRate(int c) const {
-    int sum = 0;
-    for (auto& p : evolutionPressures(c)) sum += p.value;
-    if (const PrimateDef* pd = primate(c)) sum = applyPct(sum, pd->evoPct);
-    return sum;
+std::vector<int> Game::evolutionRates(int c) const {
+    std::vector<int> r(PC_COUNT, 0);
+    for (auto& p : evolutionPressures(c)) r[p.cat] += p.value;
+    if (const PrimateDef* pd = primate(c))
+        for (auto& v : r) v = applyPct(v, pd->evoPct);
+    return r;
+}
+
+int Game::traitCount(int c) const {
+    int n = 0;
+    for (auto t : civs[c].traits) n += t;
+    return n;
+}
+
+bool Game::capstoneTaken(int c) const {
+    for (size_t t = 0; t < g_traits.size(); t++) if (g_traits[t].capstone && hasTrait(c, (int)t)) return true;
+    return false;
+}
+
+int Game::strandsStarted(int c) const {
+    int n = 0;
+    for (int st = ST_TOOL; st < ST_COUNT; st++) {
+        for (size_t t = 0; t < g_traits.size(); t++)
+            if (g_traits[t].strand == st && hasTrait(c, (int)t)) { n++; break; }
+    }
+    return n;
+}
+
+bool Game::strandStarted(int c, int st) const {
+    for (size_t t = 0; t < g_traits.size(); t++)
+        if (g_traits[t].strand == st && hasTrait(c, (int)t)) return true;
+    return false;
+}
+
+bool Game::canEvolve(int c, int t) const {
+    if (t < 0 || t >= (int)g_traits.size() || hasTrait(c, t)) return false;
+    for (int p : g_traits[t].prereqs) if (!hasTrait(c, p)) return false;
+    if (g_traits[t].capstone && capstoneTaken(c)) return false;
+    int st = g_traits[t].strand;
+    if (st != ST_TRUNK && !strandStarted(c, st) && strandsStarted(c) >= MAX_STRANDS) return false;
+    return true;
+}
+
+bool Game::affordable(int c, int t) const {
+    for (int k = 0; k < PC_COUNT; k++) if (civs[c].evoPool[k] < g_traits[t].cost[k]) return false;
+    return true;
+}
+
+int Game::evolveTurns(int c, int t) const {
+    std::vector<int> r = civs[c].evoRate;
+    if (r.empty() || turn == 1) r = evolutionRates(c);
+    int turns = 0;
+    for (int k = 0; k < PC_COUNT; k++) {
+        int need = g_traits[t].cost[k] - civs[c].evoPool[k];
+        if (need <= 0) continue;
+        if (r[k] <= 0) return -1;
+        turns = std::max(turns, (need + r[k] - 1) / r[k]);
+    }
+    return turns;
+}
+
+std::string Game::traitBlocker(int c, int t) const {
+    if (hasTrait(c, t)) return "Already evolved";
+    for (int p : g_traits[t].prereqs) if (!hasTrait(c, p)) return "Requires " + g_traits[p].name;
+    if (g_traits[t].capstone && capstoneTaken(c)) return "Your species has already specialised (only one final adaptation)";
+    if (g_traits[t].strand != ST_TRUNK && !strandStarted(c, g_traits[t].strand) && strandsStarted(c) >= MAX_STRANDS)
+        return "Your species has already committed to two strands";
+    if (evolveTurns(c, t) < 0) {
+        std::vector<int> r = evolutionRates(c);
+        for (int k = 0; k < PC_COUNT; k++)
+            if (g_traits[t].cost[k] > civs[c].evoPool[k] && r[k] <= 0)
+                return std::string("Your people face no ") + PRESSURE_NAMES[k] + " pressure";
+    }
+    return "";
+}
+
+void Game::refreshTraitFx(int c) {
+    TraitFx f;
+    for (size_t t = 0; t < g_traits.size(); t++) if (hasTrait(c, (int)t)) f += g_traits[t].fx;
+    civs[c].fx = f;
+}
+
+void Game::setEvoGoal(int c, int t) {
+    if (t >= 0 && !canEvolve(c, t)) return;
+    civs[c].evoGoal = t;
+}
+
+void Game::gainTrait(int c, int t) {
+    Civ& cv = civs[c];
+    const TraitDef& tr = g_traits[t];
+    for (int k = 0; k < PC_COUNT; k++) cv.evoPool[k] -= tr.cost[k];
+    cv.traits[t] = 1;
+    refreshTraitFx(c);
+    if (cv.evoGoal == t) cv.evoGoal = -1;
+    notify(c, "Evolution: your people have developed " + tr.name + ".");
+    std::string extra;
+    if (tr.capstone) extra = "\n\nThis is your species' final adaptation. The other evolutionary paths are now closed.";
+    popup(c, POP_EVOLUTION, "Evolution: " + tr.name, tr.flavor + "\n\n" + tr.effect + "." + extra);
+    if (t == TR_SPEECH)
+        for (int o = FIRST_PRIMATE_CIV; o < (int)civs.size(); o++)
+            if (o != c && civs[o].alive && civs[o].met[c]) notify(o, "The " + cv.name + " have learned to speak.");
+    if (cv.research < 0 && cv.goal >= 0) {
+        int n = nextTowardGoal(c, cv.goal);
+        if (n >= 0) setResearch(c, n);
+    }
+}
+
+int Game::bestFitStrand(int c) const {
+    // the unstarted strand whose final adaptation this species' pressures would reach soonest
+    static const int MAIN[ST_COUNT] = {PC_SOCIAL, PC_ECOLOGY, PC_SOCIAL, PC_CONFLICT, PC_MUTATION};
+    std::vector<int> r = evolutionRates(c);
+    int best = -1;
+    double bt = 1e9;
+    for (int st = ST_TOOL; st < ST_COUNT; st++) {
+        if (strandStarted(c, st)) continue;
+        int cap = -1;
+        for (size_t t = 0; t < g_traits.size(); t++) if (g_traits[t].strand == st && g_traits[t].capstone) cap = (int)t;
+        int k = MAIN[st];
+        int rate = r[k] - (k == PC_MUTATION && warHappened && turn <= PROLOGUE_TURNS + 40 ? 1 : 0);  // ignore fading background radiation
+        if (rate <= 0 || cap < 0) continue;
+        double turns = (double)std::max(0, g_traits[cap].cost[k] - civs[c].evoPool[k]) / rate;
+        if (turns < bt) { bt = turns; best = st; }
+    }
+    return best;
+}
+
+int Game::aiChooseTrait(int c) {
+    // prefer the language trunk (it gates science), but grab other strands when this species' pressures favour them
+    int best = -1;
+    double bestS = 1e18;
+    const PrimateDef* pd = primate(c);
+    int aggr = pd ? pd->aggression : 5;
+    for (size_t t = 0; t < g_traits.size(); t++) {
+        if (!canEvolve(c, (int)t)) continue;
+        int turns = evolveTurns(c, (int)t);
+        if (turns < 0) continue;
+        double s = turns + 1;
+        const TraitDef& tr = g_traits[t];
+        if (tr.strand == ST_TRUNK) s *= 0.55;
+        if (tr.strand != ST_TRUNK && !strandStarted(c, tr.strand)) {
+            // commit deliberately: first the species' natural leaning, later whatever its pressures support best
+            bool ok = pd && tr.strand == pd->evoLean;
+            if (!ok && turn >= 30) {
+                bool leanStalled = true;  // the natural leaning lacks the pressure it needs?
+                if (pd && strandStarted(c, pd->evoLean)) leanStalled = false;
+                if (pd && leanStalled)
+                    for (size_t k = 0; k < g_traits.size(); k++)
+                        if (g_traits[k].strand == pd->evoLean && g_traits[k].tier == 1) {
+                            int lt = evolveTurns(c, (int)k);
+                            leanStalled = lt < 0 || lt > 20;
+                        }
+                if (strandsStarted(c) >= 1 || leanStalled) ok = tr.strand == bestFitStrand(c);
+            }
+            if (!ok) continue;
+        }
+        if (tr.strand == ST_PREDATOR) s *= 1.3 - aggr * 0.05;
+        if (pd && tr.strand == pd->evoLean) s *= 0.6;
+        if (tr.capstone) s *= 0.8;
+        s *= 0.9 + 0.2 * rng.unit();
+        if (s < bestS) { bestS = s; best = (int)t; }
+    }
+    return best;
 }
 
 void Game::processEvolution(int c) {
     Civ& cv = civs[c];
-    cv.evoPerTurn = evolutionRate(c);
-    if (cv.evoStage >= (int)g_traits.size()) return;
-    cv.evolution += cv.evoPerTurn;
-    while (cv.evoStage < (int)g_traits.size() && cv.evolution >= g_traits[cv.evoStage].cost) {
-        cv.evolution -= g_traits[cv.evoStage].cost;
-        const TraitDef& tr = g_traits[cv.evoStage];
-        cv.evoStage++;
-        notify(c, "Evolution: your people have developed " + tr.name + ".");
-        popup(c, POP_EVOLUTION, "Evolution: " + tr.name, tr.flavor + "\n\n" + tr.effect + ".");
-        for (int o = FIRST_PRIMATE_CIV; o < (int)civs.size(); o++)
-            if (o != c && civs[o].alive && civs[o].met[c] && cv.evoStage == TR_SPEECH + 1)
-                notify(o, "The " + cv.name + " have learned to speak.");
-    }
-    if (cv.evoStage >= (int)g_traits.size()) cv.evolution = 0;
-    if (cv.research < 0 && cv.goal >= 0) {
-        int n = nextTowardGoal(c, cv.goal);
-        if (n >= 0) setResearch(c, n);
+    cv.evoRate = evolutionRates(c);
+    for (int k = 0; k < PC_COUNT; k++) cv.evoPool[k] += cv.evoRate[k];
+    cv.battles = 0;
+    for (int guard = 0; guard < 4; guard++) {
+        if (!cv.player && (cv.evoGoal < 0 || !canEvolve(c, cv.evoGoal))) cv.evoGoal = aiChooseTrait(c);
+        if (cv.evoGoal >= 0 && !canEvolve(c, cv.evoGoal)) cv.evoGoal = -1;
+        if (cv.evoGoal < 0 || !affordable(c, cv.evoGoal)) break;
+        gainTrait(c, cv.evoGoal);
     }
 }
 
@@ -395,7 +553,9 @@ Yields Game::tileYields(int c, int x, int y) const {
         if (hasTech(c, ID.tDeciphering)) y0.sci += 1;
         if (hasTech(c, ID.tComputing)) y0.sci += 2;
     }
-    if (t.fallout >= 2) { y0 = Yields(); }
+    bool adapted = c >= FIRST_PRIMATE_CIV && civs[c].fx.falloutYields;
+    if (adapted) {}
+    else if (t.fallout >= 2) { y0 = Yields(); }
     else if (t.fallout == 1) { y0.food = std::max(0, y0.food - 1); y0.prod = std::max(0, y0.prod - 1); }
     if (c < 0 || !hasGold(c)) y0.gold = 0;
     return y0;
@@ -472,13 +632,11 @@ void Game::computeCity(City& city) {
     total.sci += policyPct(c, PolicyEffect::FlatSci);
     // evolutionary traits
     if (c >= FIRST_PRIMATE_CIV) {
-        if (hasTrait(c, TR_GESTURES)) total.cult += 1;
-        if (hasTrait(c, TR_PROTO_SPEECH)) pct.sci += 10;
-        if (hasTrait(c, TR_SPEECH)) total.sci += 1;
-        if (hasTrait(c, TR_ADV_SPEECH)) pct.cult += 15;
-        if (hasTrait(c, TR_ABSTRACT)) pct.sci += 15;
-        if (hasTrait(c, TR_CHILDHOOD)) pct.food += 10;
-        if (hasTrait(c, TR_COLLECTIVE)) pct.sci += 10;
+        const TraitFx& f = civs[c].fx;
+        total.cult += f.flatCult;
+        total.sci += f.flatSci;
+        total.prod += f.flatProd;
+        pct.food += f.food; pct.prod += f.prod; pct.sci += f.sci; pct.cult += f.cult;
     }
     total.cult += policyPct(c, PolicyEffect::FlatCult);
     if (pd) {
@@ -650,6 +808,7 @@ int Game::buildCost(int c, int kind, int id) const {
             const PrimateDef* pd = primate(c);
             if (pd) pct += pd->militaryCostPct;
             pct -= policyPct(c, PolicyEffect::UnitCost);
+            if (c >= FIRST_PRIMATE_CIV) pct -= civs[c].fx.milCost;
         }
         if (d.cls == UnitClass::Settler) pct -= policyPct(c, PolicyEffect::SettlerCost);
         return std::max(5, applyPct(d.cost, pct));
@@ -970,6 +1129,7 @@ int Game::unitStrength(const Unit& u, bool attacking, bool rangedAtk, int x, int
     if (const PrimateDef* pd = primate(u.owner)) pct += pd->combatPct;
     if (u.owner >= FIRST_PRIMATE_CIV) {
         pct += policyPct(u.owner, PolicyEffect::Combat);
+        pct += civs[u.owner].fx.combat;
         if (ownsWonderSpecial(u.owner, BSpecial::CombatBonus)) pct += 10;
     }
     if (!attacking && !water) {
@@ -996,6 +1156,9 @@ CombatResult Game::attack(Unit& u, int tx, int ty) {
     const UnitDef& d = g_units[u.type];
     bool ranged = d.ranged();
     res.happened = true;
+    civs[u.owner].battles++;
+    if (const City* tc = cityAt(tx, ty)) civs[tc->owner].battles++;
+    for (auto& o : units) if (o.alive && o.x == tx && o.y == ty && o.owner != u.owner) { civs[o.owner].battles++; break; }
     std::string an = (u.owner == player ? "Your " : civs[u.owner].adjective + " ") + d.name;
     City* city = cityAt(tx, ty);
     if (city && atWar(u.owner, city->owner)) {
@@ -1125,6 +1288,7 @@ bool Game::canDecon(const Unit& u) const {
 int Game::workTurns(const Unit& u, int base) const {
     int t = base;
     if (u.type == ID.uTinkerer) t -= 2;
+    if (u.owner >= FIRST_PRIMATE_CIV) t -= civs[u.owner].fx.workFaster;
     return std::max(1, t);
 }
 

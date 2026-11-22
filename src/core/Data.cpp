@@ -18,6 +18,9 @@ std::vector<TraitDef> g_traits;
 std::vector<std::string> g_humanCityNames;
 DataIds ID;
 
+const char* PRESSURE_NAMES[PC_COUNT] = {"Social", "Ecological", "Conflict", "Mutation"};
+const char* PRESSURE_ABBR[PC_COUNT] = {"Soc", "Eco", "Con", "Mut"};
+const char* STRAND_NAMES[ST_COUNT] = {"Brain and Language", "Tool Brain", "Social Brain", "Predator Brain", "Mutant Line"};
 const char* ERA_NAMES[] = {"Awakening", "Tribal", "Ancient", "Classical", "Kingdoms",
                            "Reclamation", "Industrial", "Modern", "Rebirth"};
 const char* RUIN_TIER_TECH[RUIN_TIERS] = {"Salvaging", "Deciphering", "Reverse Engineering", "Computing"};
@@ -176,7 +179,7 @@ void initData() {
         {"Rebirth", 15, {"Genetics", "Rocketry"}, "Civilisation reborn - wiser than the last."},
     };
     static const int ERA_BY_COL[] = {0, 0, 1, 1, 2, 2, 3, 3, 4, 5, 5, 6, 6, 7, 7, 8};
-    static const int COST_BY_COL[] = {25, 50, 90, 150, 240, 360, 520, 730, 1000, 1350, 1800, 2350, 3000, 3800, 4700, 5800};
+    static const int COST_BY_COL[] = {25, 50, 90, 150, 270, 400, 600, 860, 1200, 1640, 2200, 2880, 3700, 4700, 5800, 7200};
     {
         int rowCount[16] = {0};
         for (auto& t : g_techs) {
@@ -240,25 +243,72 @@ void initData() {
     };
 
     // ------------------------------------------------------------ evolution
+    // name, strand, tier, cost {Social, Ecology, Conflict, Mutation}, prereqs, capstone, effect, flavour
     g_traits = {
-        {"Enlarged Neocortex", 20, "Science can now be earned. Unlocks Awakening-era technologies",
+        // the trunk: brain and language. Every species must climb it for science.
+        {"Enlarged Neocortex", ST_TRUNK, 0, {0, 15, 0, 0}, {}, false,
+         "Science can now be earned. Unlocks Awakening-era technologies",
          "Generation by generation the forebrain grows. For the first time your primates can learn deliberately - to experiment, "
-         "to remember what worked and to plan ahead. Until now, nothing could be researched."},
-        {"Expressive Gestures", 20, "+1 Culture in every city",
+         "to remember what worked and to plan ahead."},
+        {"Expressive Gestures", ST_TRUNK, 1, {10, 0, 0, 0}, {TR_NEOCORTEX}, false, "+1 Culture in every city",
          "Pointing, beckoning, a raised hand for silence. The troop begins to share what it means."},
-        {"Proto-Speech", 35, "+10% Science",
+        {"Proto-Speech", ST_TRUNK, 2, {20, 0, 0, 0}, {TR_GESTURES}, false, "+10% Science",
          "Calls grow more varied: a cry for snake, another for eagle, another for food. Each sound means one thing."},
-        {"Speech", 70, "Unlocks Tribal-era technologies. +1 Science in every city",
+        {"Speech", ST_TRUNK, 3, {40, 10, 0, 0}, {TR_PROTO_SPEECH}, false, "Unlocks Tribal-era technologies. +1 Science in every city",
          "The throat and the brain have changed. Sounds combine into words, and words name everything. Ideas can now be taught."},
-        {"Advanced Speech", 140, "Unlocks Ancient-era technologies. +15% Culture",
+        {"Advanced Speech", ST_TRUNK, 4, {75, 0, 0, 0}, {TR_SPEECH}, false, "Unlocks Ancient-era technologies. +10% Culture",
          "Grammar, tense and question. The troop can speak of yesterday and tomorrow, of what is and what might be."},
-        {"Abstract Thought", 230, "Unlocks Classical-era technologies and beyond. +15% Science",
+        {"Abstract Thought", ST_TRUNK, 5, {110, 50, 0, 0}, {TR_ADV_SPEECH}, false, "Unlocks Classical-era technologies and beyond. +10% Science",
          "Numbers without objects, rules without examples. Minds that can reason about the reasoning of others."},
-        {"Extended Childhood", 400, "+10% Food",
-         "Young ones stay with their mothers for years, learning everything the troop knows."},
-        {"Collective Learning", 620, "+10% Science",
+        // the tool brain: shaped by the land itself
+        {"Precision Grip", ST_TOOL, 1, {0, 30, 0, 0}, {TR_NEOCORTEX}, false, "+10% Production. Gatherers work 1 turn faster",
+         "An opposable thumb that can pinch as well as grasp. Fine work becomes possible."},
+        {"Spatial Reasoning", ST_TOOL, 2, {20, 90, 0, 0}, {TR_GRIP, TR_SPEECH}, false, "+1 Production in every city, +10% Production",
+         "Seeing the tool inside the stone before the first blow is struck."},
+        {"Master Toolmakers", ST_TOOL, 3, {40, 220, 0, 0}, {TR_SPATIAL, TR_ABSTRACT}, true, "+20% Production, +2 Production in every city",
+         "Tools that make tools. Your species becomes the great builders of the new world."},
+        // the social brain: shaped by living together
+        {"Pair Bonding", ST_SOCIAL, 1, {40, 0, 0, 0}, {TR_GESTURES}, false, "+10% Food",
+         "Partners share food and raise young together. Families become the bedrock of the troop."},
+        {"Extended Childhood", ST_SOCIAL, 2, {120, 20, 0, 0}, {TR_PAIRBOND, TR_SPEECH}, false, "+10% Food, +5% Culture",
+         "Young ones stay with their parents for years, learning everything the troop knows."},
+        {"Collective Learning", ST_SOCIAL, 3, {280, 0, 0, 0}, {TR_CHILDHOOD, TR_ABSTRACT}, true, "+12% Science, +10% Culture",
          "Knowledge now grows faster than any single mind. Each generation begins where the last left off."},
+        // the predator brain: shaped by violence
+        {"Pack Hunters", ST_PREDATOR, 1, {0, 0, 20, 0}, {TR_NEOCORTEX}, false, "+10% combat strength",
+         "Hunting together, flanking and driving prey. Every member knows their part."},
+        {"Ambush Instinct", ST_PREDATOR, 2, {0, 20, 60, 0}, {TR_PACK, TR_SPEECH}, false, "+10% combat strength, units heal +5 HP per turn",
+         "Patience, stillness and the sudden strike. Wounds are licked and warriors return."},
+        {"Apex Predators", ST_PREDATOR, 3, {0, 0, 150, 0}, {TR_AMBUSH, TR_ADV_SPEECH}, true, "+15% combat strength, military units cost 15% less",
+         "Nothing on Earth hunts your kind any longer. Your kind hunts everything."},
+        // the mutant line: shaped by the poison of the old world
+        {"Radiation Tolerance", ST_MUTANT, 1, {0, 0, 0, 12}, {TR_NEOCORTEX}, false, "Units take half damage from fallout",
+         "Those who survived the poison passed something on to their children."},
+        {"Accelerated Healing", ST_MUTANT, 2, {0, 0, 0, 40}, {TR_RADTOL}, false, "Units heal +10 HP per turn",
+         "Cells that repair themselves at astonishing speed. A strange gift of the radiation."},
+        {"Fallout-Adapted", ST_MUTANT, 3, {0, 40, 0, 110}, {TR_HEALING}, true, "Fallout no longer reduces tile yields. +10% Food and Production",
+         "Your people thrive where the humans died. The glowing wastelands are now your gardens."},
     };
+    {
+        auto fx = [](int t) -> TraitFx& { return g_traits[t].fx; };
+        fx(TR_GESTURES).flatCult = 1;
+        fx(TR_PROTO_SPEECH).sci = 10;
+        fx(TR_SPEECH).flatSci = 1;
+        fx(TR_ADV_SPEECH).cult = 10;
+        fx(TR_ABSTRACT).sci = 10;
+        fx(TR_GRIP).prod = 10; fx(TR_GRIP).workFaster = 1;
+        fx(TR_SPATIAL).flatProd = 1; fx(TR_SPATIAL).prod = 10;
+        fx(TR_TOOLMAKERS).prod = 20; fx(TR_TOOLMAKERS).flatProd = 2;
+        fx(TR_PAIRBOND).food = 10;
+        fx(TR_CHILDHOOD).food = 10; fx(TR_CHILDHOOD).cult = 5;
+        fx(TR_COLLECTIVE).sci = 12; fx(TR_COLLECTIVE).cult = 10;
+        fx(TR_PACK).combat = 10;
+        fx(TR_AMBUSH).combat = 10; fx(TR_AMBUSH).heal = 5;
+        fx(TR_APEX).combat = 15; fx(TR_APEX).milCost = 15;
+        fx(TR_RADTOL).falloutHalf = true;
+        fx(TR_HEALING).heal = 10;
+        fx(TR_FALLOUT_ADAPTED).falloutYields = true; fx(TR_FALLOUT_ADAPTED).food = 10; fx(TR_FALLOUT_ADAPTED).prod = 10;
+    }
 
     // ------------------------------------------------------------ units
     // name, abbr, cost, str, rstr, range, moves, tech, class, replaces, primate, desc
@@ -376,7 +426,11 @@ void initData() {
 
     // evolutionary aptitude: social and vocal species evolve language faster
     static const int EVO[] = {10, 20, 10, 0, 0, 10, 25, 0};
-    for (size_t i = 0; i < g_primates.size() && i < 8; i++) g_primates[i].evoPct = EVO[i];
+    static const int LEAN[] = {ST_TOOL, ST_SOCIAL, ST_TOOL, ST_PREDATOR, ST_PREDATOR, ST_TOOL, ST_SOCIAL, ST_MUTANT};
+    for (size_t i = 0; i < g_primates.size() && i < 8; i++) {
+        g_primates[i].evoPct = EVO[i];
+        g_primates[i].evoLean = LEAN[i];
+    }
     ID.tCooking = techIndex("Cooking");
     ID.uElder = unitIndex("Elder Troop");
     ID.uGatherer = unitIndex("Gatherer");

@@ -5,7 +5,7 @@
 #include <sstream>
 
 namespace {
-const int SAVE_VERSION = 4;
+const int SAVE_VERSION = 5;
 
 struct Archive {
     bool writing;
@@ -122,7 +122,7 @@ void ioGame(Archive& a, Game& g) {
         a.io(c.policies); a.io(c.policiesAdopted);
         a.io(c.explored); a.io(c.visible); a.io(c.war); a.io(c.met); a.io(c.warSince);
         a.io(c.capital); a.io(c.ruinsExcavated); a.io(c.nameIdx); a.io(c.yieldBonusPct);
-        a.io(c.evolution); a.io(c.evoStage); a.io(c.evoPerTurn);
+        a.io(c.traits); a.io(c.evoGoal); a.io(c.evoPool); a.io(c.evoRate); a.io(c.battles);
     }
     long long nu = (long long)g.units.size();
     a.num(nu);
@@ -179,6 +179,7 @@ bool Game::load(const std::string& path) {
     if (!a.ok || tmp.W <= 0 || (int)tmp.tiles.size() != tmp.W * tmp.H) return false;
     *this = tmp;
     resDirty = true;
+    for (size_t c = 0; c < civs.size(); c++) refreshTraitFx((int)c);
     popups.clear();
     nukeAnimPending = false;
     for (auto& c : cities) if (c.alive) computeCity(c);

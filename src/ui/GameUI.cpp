@@ -239,7 +239,7 @@ void GameUI::renderSetup() {
         cv->text(x + 58, y + 20, p.name, 19, C_TEXT, AL_LEFT, true);
         cv->text(x + 58, y + 44, p.leader, 13, C_DIM);
         cv->text(x + 12, y + 70, p.ability, 15, C_GOLD, AL_LEFT, true);
-        int ty = textBlock(x + 12, y + 92, cw - 24, p.abilityDesc + (p.evoPct ? " Evolves +" + std::to_string(p.evoPct) + "% faster." : ""), 13, C_TEXT, 3);
+        int ty = textBlock(x + 12, y + 92, cw - 24, p.abilityDesc + (p.evoPct ? " Evolves +" + std::to_string(p.evoPct) + "% faster." : "") + " Leans towards the " + STRAND_NAMES[p.evoLean] + ".", 13, C_TEXT, 3);
         textBlock(x + 12, ty + 6, cw - 24, p.flavor, 12, C_DIM, 2);
         hot(x, y, cw, ch, [this, i] { setupPrimate = i; });
     }
@@ -359,13 +359,22 @@ void GameUI::renderTopBar() {
         item(compact ? "Sci: none" : "Science: none", rgb(110, 130, 160),
              "Your primates' brains cannot yet learn deliberately, so no science is earned. Evolve an Enlarged Neocortex first (see Evolution).",
              [this] { overlay = OV_EVO; });
-    if (me.evoStage < (int)g_traits.size())
-        item((compact ? "Evo " : "Evolution ") + std::to_string(me.evolution) + "/" + std::to_string(g_traits[me.evoStage].cost) + " (+" +
-                 std::to_string(g.evolutionRate(g.player)) + ")",
-             rgb(130, 220, 150), "Next evolutionary trait: " + g_traits[me.evoStage].name + " - " + g_traits[me.evoStage].effect + ".\n" + pressureTip(g.player),
-             [this] { overlay = OV_EVO; });
-    else
-        item(compact ? "Evolved" : "Fully evolved", rgb(130, 220, 150), "Your species has gained every evolutionary trait.", [this] { overlay = OV_EVO; });
+    {
+        std::string label, tip = pressureTip(g.player);
+        Color col = rgb(130, 220, 150);
+        if (me.evoGoal >= 0) {
+            int tt = g.evolveTurns(g.player, me.evoGoal);
+            label = (compact ? "" : "Evolving: ") + g_traits[me.evoGoal].name + (tt < 0 ? " (stalled)" : " (" + std::to_string(tt) + ")");
+            if (tt < 0) col = rgb(240, 150, 110);
+            tip = "Evolving towards " + g_traits[me.evoGoal].name + ": " + g_traits[me.evoGoal].effect + ".\n" + tip;
+        } else {
+            bool any = false;
+            for (int t = 0; t < TR_COUNT; t++) if (g.canEvolve(g.player, t)) any = true;
+            label = any ? "Choose Evolution" : "Fully evolved";
+            col = any ? rgb(255, 190, 110) : rgb(130, 220, 150);
+        }
+        item(label, col, tip, [this] { overlay = OV_EVO; });
+    }
     if (g.hasGold(g.player))
         item("Gold " + std::to_string(me.gold) + " (" + fmtPct(me.goldPerTurn) + ")", C_GOLD, "Gold in the treasury (per turn). Spend it to buy units and buildings in your cities.");
     else
@@ -395,7 +404,10 @@ void GameUI::renderTopBar() {
         bool any = false;
         for (size_t t = 0; t < g_techs.size(); t++) if (g.canResearch(g.player, (int)t)) any = true;
         if (!any && !g.hasTrait(g.player, TR_NEOCORTEX)) rs = "No science until Enlarged Neocortex";
-        else if (!any && me.evoStage < (int)g_traits.size()) rs = "Awaiting " + g_traits[me.evoStage].name + " (" + std::to_string(me.scienceBank) + " science stored)";
+        else if (!any) {
+            int need = !g.hasTrait(g.player, TR_SPEECH) ? TR_SPEECH : !g.hasTrait(g.player, TR_ADV_SPEECH) ? TR_ADV_SPEECH : TR_ABSTRACT;
+            rs = "Awaiting " + g_traits[need].name + " (" + std::to_string(me.scienceBank) + " science stored)";
+        }
     }
     double frac = me.research >= 0 ? (double)me.techProgress[me.research] / g_techs[me.research].cost : 0;
     int rw = std::min(300, limit - x);
@@ -648,6 +660,9 @@ std::string GameUI::endTurnPrompt(int& action) const {
         for (size_t t = 0; t < g_techs.size(); t++)
             if (g.canResearch(g.player, (int)t)) { action = 1; return "Choose Research"; }
     }
+    if (me.evoGoal < 0)
+        for (int t = 0; t < TR_COUNT; t++)
+            if (g.canEvolve(g.player, t)) { action = 5; return "Choose Evolution"; }
     for (size_t p = 0; p < g_policies.size(); p++)
         if (g.canAdopt(g.player, (int)p)) { action = 2; return "Choose Tradition"; }
     for (auto& c : g.cities)
@@ -663,6 +678,7 @@ void GameUI::endTurnButton() {
     switch (action) {
         case 1: overlay = OV_TECH; break;
         case 2: overlay = OV_POLICY; break;
+        case 5: overlay = OV_EVO; break;
         case 3:
             for (auto& c : g.cities)
                 if (c.alive && c.owner == g.player && c.buildKind == BK_NONE) { openCity(c.id); break; }
@@ -1020,61 +1036,126 @@ void GameUI::renderDiplomacy() {
 }
 
 // ============================================================ evolution
+static Color catColor(int k) {
+    static const Color C[PC_COUNT] = {{232, 150, 210}, {124, 212, 110}, {240, 112, 92}, {214, 232, 64}};
+    return C[k];
+}
+
 std::string GameUI::pressureTip(int c) {
-    std::string s = "Evolutionary pressures this turn:";
-    for (auto& p : game->evolutionPressures(c)) s += "\n  +" + std::to_string(p.value) + " " + p.name;
-    if (const PrimateDef* pd = game->primate(c))
-        if (pd->evoPct) s += "\n  +" + std::to_string(pd->evoPct) + "% " + pd->plural + " aptitude";
+    Game& g = *game;
+    const Civ& cv = g.civs[c];
+    std::vector<int> r = g.evolutionRates(c);
+    std::string s = "Evolution pools:";
+    for (int k = 0; k < PC_COUNT; k++)
+        s += std::string("\n  ") + PRESSURE_NAMES[k] + " " + std::to_string(cv.evoPool[k]) + " (+" + std::to_string(r[k]) + " per turn)";
+    s += "\nOpen the Evolution screen (V) to choose what to evolve.";
     return s;
 }
 
 void GameUI::renderEvolution() {
     Game& g = *game;
     const Civ& me = g.civs[g.player];
-    int pw = std::min(1040, W - 40), ph = std::min(640, H - TOP - 30);
-    int px = (W - pw) / 2, py = TOP + 14;
+    int pw = std::min(1180, W - 30), ph = std::min(700, H - TOP - 16);
+    int px = (W - pw) / 2, py = TOP + 8;
     panel(px, py, pw, ph);
-    cv->text(px + 20, py + 14, "Evolution", 26, rgb(130, 220, 150), AL_LEFT, true);
-    button(px + pw - 40, py + 12, 28, 28, "X", true, [this] { overlay = OV_NONE; });
-    textBlock(px + 20, py + 50, pw - 40,
-              "Your species is still evolving. Pressures on survival reshape brain, throat and society, earning Evolution points. "
-              "Without an Enlarged Neocortex no science is earned at all; without Speech there can be no teaching, and without Advanced Speech no real science.",
-              13, C_DIM, 3);
-    // trait chain
-    int n = (int)g_traits.size();
-    int gap = 8, cw = (pw - 40 - gap * (n - 1)) / n, ch = 200;
-    int y = py + 100;
-    for (int i = 0; i < n; i++) {
-        const TraitDef& t = g_traits[i];
-        int x = px + 20 + i * (cw + gap);
-        bool has = i < me.evoStage, cur = i == me.evoStage;
-        Color bg = has ? rgb(36, 80, 52) : cur ? rgb(44, 60, 52) : rgb(32, 34, 42);
-        cv->fillRect(x, y, cw, ch, bg);
-        cv->rect(x, y, cw, ch, has ? rgb(110, 200, 130) : cur ? rgb(200, 240, 200) : rgb(70, 74, 86), cur ? 2 : 1);
-        if (i + 1 < n) cv->line(x + cw, y + ch / 2, x + cw + gap, y + ch / 2, rgb(110, 140, 120), 2);
-        int ty = textBlock(x + 8, y + 8, cw - 16, t.name, 14, has ? rgb(200, 250, 210) : C_TEXT, 2, true);
-        cv->text(x + 8, ty + 2, has ? "Gained" : std::to_string(t.cost) + " points", 11, has ? rgb(130, 220, 150) : C_DIM);
-        textBlock(x + 8, ty + 22, cw - 16, t.effect, 12, i == TR_NEOCORTEX || i == TR_SPEECH || i == TR_ADV_SPEECH || i == TR_ABSTRACT ? C_GOLD : rgb(210, 220, 230), 2);
-        if (cur) {
-            bar(x + 8, y + ch - 20, cw - 16, 8, (double)me.evolution / t.cost, rgb(110, 210, 130));
-            int left = t.cost - me.evolution, rate = std::max(1, g.evolutionRate(g.player));
-            cv->text(x + 8, y + ch - 38, std::to_string(me.evolution) + "/" + std::to_string(t.cost) + " - " + std::to_string((left + rate - 1) / rate) + " turns", 11, C_TEXT);
+    cv->text(px + 20, py + 12, "Evolution", 24, rgb(130, 220, 150), AL_LEFT, true);
+    button(px + pw - 40, py + 10, 28, 28, "X", true, [this] { overlay = OV_NONE; });
+    cv->text(px + 170, py + 18, "Pressures fill four pools; each trait needs particular kinds. Commit to at most two strands - and only one final adaptation.", 13, C_DIM);
+    std::vector<int> rate = g.evolutionRates(g.player);
+    std::vector<Pressure> pres = g.evolutionPressures(g.player);
+    // ---- pools
+    int y = py + 48;
+    int bw = (pw - 40 - 3 * 10) / 4, bh = 98;
+    for (int k = 0; k < PC_COUNT; k++) {
+        int x = px + 20 + k * (bw + 10);
+        Color cc = catColor(k);
+        cv->fillRect(x, y, bw, bh, rgb(30, 34, 44));
+        cv->fillRect(x, y, 4, bh, cc);
+        cv->text(x + 12, y + 6, PRESSURE_NAMES[k], 15, cc, AL_LEFT, true);
+        cv->text(x + bw - 10, y + 6, std::to_string(me.evoPool[k]) + "  (+" + std::to_string(rate[k]) + ")", 15, C_TEXT, AL_RIGHT, true);
+        int ly = y + 28, n = 0;
+        std::string tip;
+        for (auto& p : pres) {
+            if (p.cat != k) continue;
+            tip += (tip.empty() ? "" : "\n") + std::string("+") + std::to_string(p.value) + " " + p.name + ": " + p.why;
+            if (n < 4) {
+                cv->text(x + 12, ly, "+" + std::to_string(p.value) + " " + p.name, 12, C_DIM);
+                ly += 16;
+            }
+            n++;
         }
-        hot(x, y, cw, ch, nullptr, t.name + ": " + t.flavor);
+        if (!n) cv->text(x + 12, ly, "No pressure of this kind", 12, rgb(200, 120, 100));
+        static const char* HINT[PC_COUNT] = {"Grows with cities, population and culture.", "Grows with territory, harsh lands and hard times.",
+                                             "Grows with war, battles and predators.", "Grows with fallout in your lands."};
+        hot(x, y, bw, bh, nullptr, std::string(PRESSURE_NAMES[k]) + " pressure. " + HINT[k] + (tip.empty() ? "" : "\n" + tip));
     }
-    // pressures
-    y += ch + 24;
-    cv->text(px + 20, y, "Evolutionary pressures: +" + std::to_string(g.evolutionRate(g.player)) + " points per turn", 16, C_TEXT, AL_LEFT, true);
-    y += 28;
-    for (auto& p : g.evolutionPressures(g.player)) {
-        cv->text(px + 30, y, "+" + std::to_string(p.value), 14, rgb(130, 220, 150), AL_LEFT, true);
-        cv->text(px + 70, y, p.name, 14, C_TEXT, AL_LEFT, true);
-        cv->text(px + 260, y, p.why, 13, C_DIM);
-        y += 22;
-        if (y > py + ph - 30) break;
+    // ---- trait card
+    auto card = [&](int t, int x, int cy, int w, int h) {
+        const TraitDef& td = g_traits[t];
+        bool has = g.hasTrait(g.player, t), goal = me.evoGoal == t, can = g.canEvolve(g.player, t);
+        int turns = can ? g.evolveTurns(g.player, t) : -1;
+        Color bg = has ? rgb(34, 78, 50) : goal ? rgb(70, 62, 30) : can ? rgb(36, 46, 60) : rgb(30, 32, 38);
+        if (can && over(x, cy, w, h)) bg = lighten(bg, 0.12f);
+        cv->fillRect(x, cy, w, h, bg);
+        cv->rect(x, cy, w, h, goal ? C_GOLD : has ? rgb(110, 200, 130) : can ? rgb(100, 130, 170) : rgb(60, 64, 74), goal ? 2 : 1);
+        std::string nm = td.name;
+        while (nm.size() > 4 && cv->textWidth(nm, 13, true) > w - (td.capstone ? 56 : 14)) nm = nm.substr(0, nm.size() - 3) + ".";
+        cv->text(x + 7, cy + 5, nm, 13, has ? rgb(200, 250, 210) : can ? C_TEXT : C_DIM, AL_LEFT, true);
+        if (td.capstone) cv->text(x + w - 6, cy + 6, "FINAL", 10, C_GOLD, AL_RIGHT, true);
+        int cx = x + 7;
+        for (int k = 0; k < PC_COUNT; k++) {
+            if (!td.cost[k]) continue;
+            std::string cs = std::string(PRESSURE_ABBR[k]) + " " + std::to_string(td.cost[k]);
+            cv->text(cx, cy + 23, cs, 11, has ? C_DIM : catColor(k), AL_LEFT, true);
+            cx += cv->textWidth(cs, 11, true) + 8;
+        }
+        std::string eff = td.effect;
+        while (eff.size() > 4 && cv->textWidth(eff, 11) > w - 14) eff = eff.substr(0, eff.size() - 4) + "..";
+        cv->text(x + 7, cy + 39, eff, 11, rgb(200, 210, 220));
+        std::string st;
+        Color sc = C_DIM;
+        if (has) { st = "EVOLVED"; sc = rgb(130, 220, 150); }
+        else if (!can) { st = g.traitBlocker(g.player, t); sc = rgb(150, 150, 160); }
+        else if (turns < 0) { st = g.traitBlocker(g.player, t); sc = rgb(240, 140, 110); }
+        else { st = (goal ? "Evolving - " : "") + (turns == 0 ? std::string("ready") : std::to_string(turns) + " turns"); sc = goal ? C_GOLD : C_TEXT; }
+        while (st.size() > 4 && cv->textWidth(st, 11, true) > w - 14) st = st.substr(0, st.size() - 4) + "..";
+        cv->text(x + 7, cy + h - 17, st, 11, sc, AL_LEFT, true);
+        std::string tip = td.name + ": " + td.effect + ".\n" + td.flavor;
+        std::string blk = g.traitBlocker(g.player, t);
+        if (!blk.empty() && !has) tip += "\n" + blk + ".";
+        if (td.capstone) tip += "\nFinal adaptation: a species can only ever have one.";
+        hot(x, cy, w, h, can ? std::function<void()>([this, t] { game->setEvoGoal(game->player, t); }) : std::function<void()>(), tip);
+    };
+    // ---- trunk
+    y += bh + 12;
+    cv->text(px + 20, y, std::string(STRAND_NAMES[ST_TRUNK]) + "  -  required for science", 14, C_GOLD, AL_LEFT, true);
+    y += 20;
+    int tw = (pw - 40 - 5 * 8) / 6, th = 76;
+    for (int i = 0; i < 6; i++) {
+        int x = px + 20 + i * (tw + 8);
+        card(i, x, y, tw, th);
+        if (i < 5) cv->line(x + tw, y + th / 2, x + tw + 8, y + th / 2, rgb(110, 140, 120), 2);
+    }
+    // ---- strands
+    y += th + 16;
+    int sw = (pw - 40 - 3 * 12) / 4, sh = std::min(76, (py + ph - (y + 40) - 2 * 8) / 3);
+    static const int MAIN_CAT[ST_COUNT] = {PC_SOCIAL, PC_ECOLOGY, PC_SOCIAL, PC_CONFLICT, PC_MUTATION};
+    for (int st = ST_TOOL; st < ST_COUNT; st++) {
+        int x = px + 20 + (st - 1) * (sw + 12);
+        bool closed = !g.strandStarted(g.player, st) && g.strandsStarted(g.player) >= MAX_STRANDS;
+        cv->text(x, y, std::string(STRAND_NAMES[st]) + (closed ? " (closed)" : ""), 14, closed ? C_DIM : C_TEXT, AL_LEFT, true);
+        cv->text(x + sw, y + 2, std::string("needs ") + PRESSURE_NAMES[MAIN_CAT[st]], 11, catColor(MAIN_CAT[st]), AL_RIGHT, true);
+        int cy = y + 20, i = 0;
+        for (int t = 0; t < TR_COUNT; t++) {
+            if (g_traits[t].strand != st) continue;
+            card(t, x, cy + i * (sh + 8), sw, sh);
+            if (i < 2) cv->line(x + sw / 2, cy + i * (sh + 8) + sh, x + sw / 2, cy + (i + 1) * (sh + 8), rgb(110, 140, 120), 2);
+            i++;
+        }
     }
     if (const PrimateDef* pd = g.primate(g.player))
-        if (pd->evoPct && y <= py + ph - 30) cv->text(px + 30, y + 4, "+" + std::to_string(pd->evoPct) + "% " + pd->plural + " evolve faster than most primates", 13, C_GOLD);
+        cv->text(px + 20, py + ph - 20, std::string("The ") + pd->plural + " lean towards the " + STRAND_NAMES[pd->evoLean] +
+                 (pd->evoPct ? " and evolve " + std::to_string(pd->evoPct) + "% faster than most primates." : "."), 12, C_DIM);
 }
 
 // ============================================================ menu, help, log
@@ -1105,11 +1186,13 @@ void GameUI::renderHelp() {
         "You lead a band of primates. Survive the Fall, then build a new civilisation from the ashes.\n"
         "WINNING  Rebirth victory: research Rebirth and complete the Rebirth Project. Domination: control every original primate capital. "
         "Cultural: adopt every Tradition. Otherwise the highest score wins when time runs out.\n"
-        "EVOLUTION  Your species starts unable to learn deliberately: it earns no science until it evolves an Enlarged Neocortex. Even then it has no "
-        "language, so only the most basic discoveries - Fire, Foraging, Stone Tools, Cooking, Woodcraft - are possible. Evolutionary pressures (survival, group living, crowding, conflict, predators, harsh climate, the nuclear winter and even "
-        "radiation) earn Evolution points that unlock traits in order: Enlarged Neocortex, Expressive Gestures, Proto-Speech, Speech, Advanced Speech, Abstract Thought "
-        "and beyond. Speech is required for Tribal technologies, Advanced Speech for Ancient ones and Abstract Thought for everything after. "
-        "Science earned while you wait is stored, not lost. Press V to see the Evolution screen.\n"
+        "EVOLUTION  Your species starts unable to learn deliberately: it earns no science until it evolves an Enlarged Neocortex. Four kinds of "
+        "evolutionary pressure fill four pools each turn: Social (cities, population, culture), Ecological (survival, territory, harsh lands, the "
+        "nuclear winter), Conflict (war, battles, predators) and Mutation (fallout). On the Evolution screen (V) you choose which trait to evolve "
+        "towards; it appears once your pools can pay for it. The language trunk (Neocortex, Gestures, Proto-Speech, Speech, Advanced Speech, "
+        "Abstract Thought) is needed for science: Speech for Tribal technologies, Advanced Speech for Ancient ones, Abstract Thought for the rest. "
+        "Four strands - Tool Brain, Social Brain, Predator Brain and the Mutant Line - each need their own kind of pressure, so a peaceful species "
+        "will struggle to become predators. A species may commit to only two strands, and can only ever have one final adaptation.\n"
         "THE RUINS  The Fall leaves ruined cities, towns, bases, labs and power plants. Each holds up to four layers of salvage - Scrap, Books, "
         "Machines and Data - that only become usable once you research Salvaging, Deciphering, Reverse Engineering and Computing. Move a Gatherer "
         "onto a ruin and press Excavate. Orange dots under a ruin are layers you can dig now. Ruins inside your borders also add Production and Science.\n"
