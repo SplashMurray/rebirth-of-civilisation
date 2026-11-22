@@ -40,7 +40,7 @@ void Game::aiResearch(int c) {
     double bestS = 1e18;
     for (size_t t = 0; t < g_techs.size(); t++) {
         if (!canResearch(c, (int)t)) continue;
-        double s = g_techs[t].cost * (0.75 + 0.5 * rng.unit());
+        double s = techCost(t) * (0.75 + 0.5 * rng.unit());
         if (isTierTech((int)t)) s *= 0.6;
         if ((int)t == ID.tCurrency) s *= 0.7;
         if ((int)t == ID.tRebirth) s *= 0.3;
@@ -64,11 +64,11 @@ void Game::aiDiplomacy(int c) {
         int theirPow = militaryPower(o) + 1;
         if (cv.war[o]) {
             int len = turn - cv.warSince[o];
-            if (o != player && len > 12 && (myPow < theirPow || rng.chance(0.08))) proposePeace(c, o);
+            if (o != player && len > dur(12) && (myPow < theirPow || rng.chance(0.08))) proposePeace(c, o);
             continue;
         }
-        if (turn < 25 || wars > 0) continue;
-        if (turn - cv.warSince[o] < 20) continue;  // recent peace
+        if (turn < dur(25) || wars > 0) continue;
+        if (turn - cv.warSince[o] < dur(20)) continue;  // recent peace
         // proximity
         int closest = 99;
         for (auto& a : cities) {
@@ -169,7 +169,7 @@ void Game::aiCity(City& city) {
     else if (threat > 0 && !garrison) { kind = BK_UNIT; id = bestMilitary(false); }
     else if (mil < 1 + myCities) { kind = BK_UNIT; id = bestMilitary(mil % 3 == 2); }
     else if (workers < std::max(1, (myCities + 1) * 2 / 3) && city.pop >= 2) { kind = BK_UNIT; id = uniqueFor(c, ID.uGatherer); }
-    else if (myCities + settlers < targetCities && settlers == 0 && city.pop >= 2 && turn < 260 && canBuild(city, BK_UNIT, ID.uElder)) { kind = BK_UNIT; id = ID.uElder; }
+    else if (myCities + settlers < targetCities && settlers == 0 && city.pop >= 2 && turn < dur(260) && canBuild(city, BK_UNIT, ID.uElder)) { kind = BK_UNIT; id = ID.uElder; }
     else if (atWarAny && mil < myCities * 3 && rng.chance(0.6)) { kind = BK_UNIT; id = bestMilitary(rng.chance(0.35)); }
     if (id < 0) {
         int best = -1;

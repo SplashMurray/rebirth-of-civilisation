@@ -151,6 +151,10 @@ struct TraitDef {
 };
 
 extern const char* ERA_NAMES[];
+extern const char* SPEED_NAMES[3];
+extern const int SPEED_PCT[3];
+extern const int SPEED_TURNS[3];
+extern const int SPEED_COST[3];
 static const int NUM_ERAS = 9;
 
 // ---------------------------------------------------------------- traditions (policies)

@@ -111,12 +111,13 @@ int Game::score(int c) const {
 
 int Game::yearAD(int t) const {
     if (t <= PROLOGUE_TURNS) return 2032 + (t - 1) / 2;
-    int y = 2035;
+    // calendar stretches with game speed so every speed spans the same centuries
+    double y = 2035, s = speedPct / 100.0;
     for (int k = PROLOGUE_TURNS + 2; k <= t; k++) {
-        int prev = k - 1;
-        y += prev < 60 ? 20 : prev < 120 ? 10 : prev < 200 ? 5 : prev < 280 ? 2 : 1;
+        double prev = (k - 1) / s;
+        y += (prev < 60 ? 20 : prev < 120 ? 10 : prev < 200 ? 5 : prev < 280 ? 2 : 1) / s;
     }
-    return y;
+    return (int)y;
 }
 
 std::string Game::dateString(int t) const {
@@ -184,7 +185,7 @@ int Game::nextTowardGoal(int c, int goal) const {
     }
     int best = -1;
     for (size_t t = 0; t < g_techs.size(); t++)
-        if (need[t] && canResearch(c, (int)t) && (best < 0 || g_techs[t].cost < g_techs[best].cost)) best = (int)t;
+        if (need[t] && canResearch(c, (int)t) && (best < 0 || techCost(t) < techCost(best))) best = (int)t;
     return best;
 }
 
@@ -202,7 +203,7 @@ void Game::grantTech(int c, int t, bool announce) {
     cv.techs[t] = 1;
     if (cv.research == t) {
         // completed normally: carry the overflow; granted for free: refund partial progress
-        int leftover = cv.techProgress[t] >= g_techs[t].cost ? cv.techProgress[t] - g_techs[t].cost : cv.techProgress[t];
+        int leftover = cv.techProgress[t] >= techCost(t) ? cv.techProgress[t] - techCost(t) : cv.techProgress[t];
         cv.research = -1;
         cv.scienceBank += leftover;
     }
@@ -256,7 +257,7 @@ void Game::addScience(int c, int amount) {
     }
     int t = cv.research;
     cv.techProgress[t] += amount;
-    if (cv.techProgress[t] >= g_techs[t].cost) {
+    if (cv.techProgress[t] >= techCost(t)) {
         grantTech(c, t);  // leftover goes to bank, next research picked from goal
         if (cv.research >= 0 && cv.scienceBank > 0) {
             int b = cv.scienceBank;
@@ -269,7 +270,7 @@ void Game::addScience(int c, int amount) {
 int Game::researchTurns(int c) const {
     const Civ& cv = civs[c];
     if (cv.research < 0) return 0;
-    int left = g_techs[cv.research].cost - cv.techProgress[cv.research];
+    int left = techCost(cv.research) - cv.techProgress[cv.research];
     int s = std::max(1, cv.sciencePerTurn);
     return std::max(1, (left + s - 1) / s);
 }
@@ -297,8 +298,8 @@ std::vector<Pressure> Game::evolutionPressures(int c) const {
         }
     if (land / 12) out.push_back({"Wide ranging", std::min(5, land / 12), PC_ECOLOGY, "Mastering a large territory (+1 per 12 land tiles, up to +5)."});
     if (harsh / 4) out.push_back({"Harsh climate", std::min(3, harsh / 4), PC_ECOLOGY, "Cold, drought and mountains in your lands (+1 per 4 harsh tiles, up to +3)."});
-    if (warHappened && turn <= PROLOGUE_TURNS + 30)
-        out.push_back({"Nuclear winter", 3, PC_ECOLOGY, "The dark, cold years after the Fall cull the weak (lasts 30 turns)."});
+    if (warHappened && turn <= PROLOGUE_TURNS + dur(30))
+        out.push_back({"Nuclear winter", 3, PC_ECOLOGY, "The dark, cold years after the Fall cull the weak (lasts " + std::to_string(dur(30)) + " turns)."});
     // conflict
     bool war = false;
     for (int o = FIRST_PRIMATE_CIV; o < (int)civs.size(); o++) if (cv.war[o] && civs[o].alive) war = true;
@@ -317,8 +318,8 @@ std::vector<Pressure> Game::evolutionPressures(int c) const {
     for (auto& t : tiles) if (t.owner == c && t.fallout) fall++;
     for (auto& u : units) if (u.alive && u.owner == c && at(u.x, u.y).fallout) fall += 2;
     if (fall) out.push_back({"Radiation", std::min(4, (fall + 1) / 2), PC_MUTATION, "Fallout in your lands and on your units drives mutation (up to +4)."});
-    if (warHappened && turn <= PROLOGUE_TURNS + 40)
-        out.push_back({"Background radiation", 1, PC_MUTATION, "The whole planet is still mildly radioactive (lasts 40 turns)."});
+    if (warHappened && turn <= PROLOGUE_TURNS + dur(40))
+        out.push_back({"Background radiation", 1, PC_MUTATION, "The whole planet is still mildly radioactive (lasts " + std::to_string(dur(40)) + " turns)."});
     return out;
 }
 
@@ -366,7 +367,7 @@ bool Game::canEvolve(int c, int t) const {
 }
 
 bool Game::affordable(int c, int t) const {
-    for (int k = 0; k < PC_COUNT; k++) if (civs[c].evoPool[k] < g_traits[t].cost[k]) return false;
+    for (int k = 0; k < PC_COUNT; k++) if (civs[c].evoPool[k] < traitCost(t, k)) return false;
     return true;
 }
 
@@ -375,7 +376,7 @@ int Game::evolveTurns(int c, int t) const {
     if (r.empty() || turn == 1) r = evolutionRates(c);
     int turns = 0;
     for (int k = 0; k < PC_COUNT; k++) {
-        int need = g_traits[t].cost[k] - civs[c].evoPool[k];
+        int need = traitCost(t, k) - civs[c].evoPool[k];
         if (need <= 0) continue;
         if (r[k] <= 0) return -1;
         turns = std::max(turns, (need + r[k] - 1) / r[k]);
@@ -392,7 +393,7 @@ std::string Game::traitBlocker(int c, int t) const {
     if (evolveTurns(c, t) < 0) {
         std::vector<int> r = evolutionRates(c);
         for (int k = 0; k < PC_COUNT; k++)
-            if (g_traits[t].cost[k] > civs[c].evoPool[k] && r[k] <= 0)
+            if (traitCost(t, k) > civs[c].evoPool[k] && r[k] <= 0)
                 return std::string("Your people face no ") + PRESSURE_NAMES[k] + " pressure";
     }
     return "";
@@ -412,7 +413,7 @@ void Game::setEvoGoal(int c, int t) {
 void Game::gainTrait(int c, int t) {
     Civ& cv = civs[c];
     const TraitDef& tr = g_traits[t];
-    for (int k = 0; k < PC_COUNT; k++) cv.evoPool[k] -= tr.cost[k];
+    for (int k = 0; k < PC_COUNT; k++) cv.evoPool[k] -= traitCost(t, k);
     cv.traits[t] = 1;
     refreshTraitFx(c);
     if (cv.evoGoal == t) cv.evoGoal = -1;
@@ -440,9 +441,9 @@ int Game::bestFitStrand(int c) const {
         int cap = -1;
         for (size_t t = 0; t < g_traits.size(); t++) if (g_traits[t].strand == st && g_traits[t].capstone) cap = (int)t;
         int k = MAIN[st];
-        int rate = r[k] - (k == PC_MUTATION && warHappened && turn <= PROLOGUE_TURNS + 40 ? 1 : 0);  // ignore fading background radiation
+        int rate = r[k] - (k == PC_MUTATION && warHappened && turn <= PROLOGUE_TURNS + dur(40) ? 1 : 0);  // ignore fading background radiation
         if (rate <= 0 || cap < 0) continue;
-        double turns = (double)std::max(0, g_traits[cap].cost[k] - civs[c].evoPool[k]) / rate;
+        double turns = (double)std::max(0, traitCost(cap, k) - civs[c].evoPool[k]) / rate;
         if (turns < bt) { bt = turns; best = st; }
     }
     return best;
@@ -464,7 +465,7 @@ int Game::aiChooseTrait(int c) {
         if (tr.strand != ST_TRUNK && !strandStarted(c, tr.strand)) {
             // commit deliberately: first the species' natural leaning, later whatever its pressures support best
             bool ok = pd && tr.strand == pd->evoLean;
-            if (!ok && turn >= 30) {
+            if (!ok && turn >= dur(30)) {
                 bool leanStalled = true;  // the natural leaning lacks the pressure it needs?
                 if (pd && strandStarted(c, pd->evoLean)) leanStalled = false;
                 if (pd && leanStalled)
@@ -502,7 +503,7 @@ void Game::processEvolution(int c) {
 // ============================================================ traditions
 int Game::policyCost(int c) const {
     int n = civs[c].policiesAdopted;
-    return 40 + 50 * n + 10 * n * n;
+    return sc(40 + 50 * n + 10 * n * n);
 }
 bool Game::canAdopt(int c, int p) const {
     return !civs[c].policies[p] && hasTech(c, g_policies[p].techId) && civs[c].culture >= policyCost(c);
@@ -572,7 +573,7 @@ const City* Game::cityAt(int x, int y) const {
 }
 
 int Game::growthThreshold(int pop) const {
-    return 12 + 6 * (pop - 1) + (int)std::pow((double)(pop - 1), 1.5);
+    return sc(12 + 6 * (pop - 1) + (int)std::pow((double)(pop - 1), 1.5));
 }
 
 int Game::ruinTilesInTerritory(const City& city) const {
@@ -811,9 +812,9 @@ int Game::buildCost(int c, int kind, int id) const {
             if (c >= FIRST_PRIMATE_CIV) pct -= civs[c].fx.milCost;
         }
         if (d.cls == UnitClass::Settler) pct -= policyPct(c, PolicyEffect::SettlerCost);
-        return std::max(5, applyPct(d.cost, pct));
+        return std::max(5, sc(applyPct(d.cost, pct)));
     }
-    if (kind == BK_BUILDING) return g_buildings[id].cost;
+    if (kind == BK_BUILDING) return sc(g_buildings[id].cost);
     return 0;
 }
 
@@ -1328,7 +1329,7 @@ void Game::excavateReward(int c, int x, int y, int tier) {
     std::string site = t.site >= 0 ? sites[t.site].name : g_ruins[t.ruin].ruinName;
     if (t.site >= 0 && t.ruin == RUIN_CITY) site = "the ruins of " + site;
     else site = "a " + g_ruins[t.ruin].ruinName;
-    int curCost = cv.research >= 0 ? g_techs[cv.research].cost : 60 + 40 * era(c);
+    int curCost = cv.research >= 0 ? techCost(cv.research) : 60 + 40 * era(c);
     std::string body;
     switch (tier) {
         case 0: {
@@ -1355,7 +1356,7 @@ void Game::excavateReward(int c, int x, int y, int tier) {
                 int tech = cv.research;
                 if (tech < 0) {
                     for (size_t k = 0; k < g_techs.size(); k++)
-                        if (canResearch(c, (int)k) && (tech < 0 || g_techs[k].cost < g_techs[tech].cost)) tech = (int)k;
+                        if (canResearch(c, (int)k) && (tech < 0 || techCost(k) < techCost(tech))) tech = (int)k;
                 }
                 if (tech >= 0) {
                     grantTech(c, tech, true);
@@ -1383,7 +1384,7 @@ void Game::excavateReward(int c, int x, int y, int tier) {
                 int tech = cv.research;
                 if (tech < 0)
                     for (size_t k = 0; k < g_techs.size(); k++)
-                        if (canResearch(c, (int)k) && (tech < 0 || g_techs[k].cost < g_techs[tech].cost)) tech = (int)k;
+                        if (canResearch(c, (int)k) && (tech < 0 || techCost(k) < techCost(tech))) tech = (int)k;
                 if (tech >= 0) {
                     grantTech(c, tech, true);
                     body += "\n\nFree technology: " + g_techs[tech].name;

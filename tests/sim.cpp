@@ -42,6 +42,7 @@ static void invariants(Game& g) {
 int main(int argc, char** argv) {
     int games = argc > 1 ? std::atoi(argv[1]) : 3;
     int size = argc > 2 ? std::atoi(argv[2]) : 1;
+    int speed = argc > 3 ? std::atoi(argv[3]) : 1;
     std::setvbuf(stdout, nullptr, _IONBF, 0);  // keep output if anything crashes
     initData();
     for (int gi = 0; gi < games; gi++) {
@@ -52,9 +53,10 @@ int main(int argc, char** argv) {
         s.mapSize = size;
         s.primate = gi % (int)g_primates.size();
         s.allAI = true;
+        s.speed = speed;
         g.newGame(s);
         int firstCity = -1, currencyTurn = -1, deciphTurn = -1;
-        while (!g.gameOver && g.turn <= MAX_TURNS + 1) {
+        while (!g.gameOver && g.turn <= g.maxTurns + 1) {
             g.endTurn();
             invariants(g);
             if (firstCity < 0 && g.numCities(g.player) > 0) firstCity = g.turn;

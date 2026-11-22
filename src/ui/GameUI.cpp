@@ -225,7 +225,7 @@ void GameUI::renderSetup() {
     cv->text(W / 2, 24, "Choose Your Primate", 34, C_TEXT, AL_CENTER, true);
     cv->text(W / 2, 66, "Each primate has its own strengths. Humans are not playable - they will not survive 2034.", 15, C_DIM, AL_CENTER);
     int cols = 4, gap = 14;
-    int cw = std::min(330, (W - 80 - gap * (cols - 1)) / cols), ch = 236;
+    int cw = std::min(330, (W - 80 - gap * (cols - 1)) / cols), ch = std::min(236, (H - 100 - 176) / 2);
     int gx = (W - (cw * cols + gap * (cols - 1))) / 2, gy = 100;
     for (int i = 0; i < (int)g_primates.size(); i++) {
         const PrimateDef& p = g_primates[i];
@@ -254,15 +254,23 @@ void GameUI::renderSetup() {
     for (int i = 0; i < 3; i++)
         button(gx + 110 + i * 200, oy + 44, 190, 34, diffs[i], true, [this, i] { setupDiff = i; }, "",
                setupDiff == i ? rgb(110, 90, 40) : C_PANEL2, 14);
+    cv->text(gx, oy + 96, "Game speed:", 16, C_TEXT, AL_LEFT, true);
+    static const char* SPEED_TIPS[3] = {"Quick: 330 turns. Everything costs less; a shorter game.",
+                                        "Standard: 500 turns, like Civilization VI's standard speed.",
+                                        "Epic: 750 turns. Everything costs more; a long, slow game."};
+    for (int i = 0; i < 3; i++)
+        button(gx + 110 + i * 200, oy + 88, 190, 34, std::string(SPEED_NAMES[i]) + " (" + std::to_string(SPEED_TURNS[i]) + " turns)", true,
+               [this, i] { setupSpeed = i; }, SPEED_TIPS[i], setupSpeed == i ? rgb(110, 90, 40) : C_PANEL2, 14);
     button(W - 260 - gx + 20, oy + 4, 220, 70, "Begin", true, [this] {
         GameSettings s;
         s.primate = setupPrimate;
         s.mapSize = setupSize;
         s.difficulty = setupDiff;
+        s.speed = setupSpeed;
         s.seed = (uint64_t)std::time(nullptr) ^ ((uint64_t)animMs << 20);
         startGame(s);
     }, "", rgb(60, 110, 60), 24);
-    button(20, H - 50, 120, 36, "Back", true, [this] { screen = SCR_TITLE; });
+    button(20, 20, 110, 34, "< Back", true, [this] { screen = SCR_TITLE; }, "Return to the title screen (Esc)");
 }
 
 void GameUI::startGame(const GameSettings& s) {
@@ -338,7 +346,8 @@ void GameUI::renderTopBar() {
     }
     int dw = cv->textWidth(date, 14, true);
     cv->text(bx - 12, 10, date, 14, g.warHappened ? C_TEXT : rgb(255, 150, 120), AL_RIGHT, true);
-    hot(bx - 12 - dw, 0, dw, TOP, nullptr, g.dateString(g.turn));
+    hot(bx - 12 - dw, 0, dw, TOP, nullptr, g.dateString(g.turn) + ". " + SPEED_NAMES[g.settings.speed] + " speed: the game ends at turn " +
+        std::to_string(g.maxTurns) + " if nobody has won before then.");
     int limit = bx - 12 - dw - 14;
     // left side, skipping whatever no longer fits
     int x = 10, y = 10;
@@ -409,7 +418,7 @@ void GameUI::renderTopBar() {
             rs = "Awaiting " + g_traits[need].name + " (" + std::to_string(me.scienceBank) + " science stored)";
         }
     }
-    double frac = me.research >= 0 ? (double)me.techProgress[me.research] / g_techs[me.research].cost : 0;
+    double frac = me.research >= 0 ? (double)me.techProgress[me.research] / g.techCost(me.research) : 0;
     int rw = std::min(300, limit - x);
     if (rw >= 130) {
         int rx = std::clamp((W - rw) / 2, x, limit - rw);
@@ -926,8 +935,8 @@ void GameUI::renderTech() {
         else if (traitLocked) info = "Needs " + g_traits[td.trait].name + " (evolution)";
         else {
             int sp = std::max(1, me.sciencePerTurn);
-            int left = td.cost - me.techProgress[t];
-            info = std::to_string(td.cost) + " science  (" + std::to_string((left + sp - 1) / sp) + " turns)";
+            int left = g.techCost(t) - me.techProgress[t];
+            info = std::to_string(g.techCost(t)) + " science  (" + std::to_string((left + sp - 1) / sp) + " turns)";
         }
         cv->text(bx + 8, by + 24, info, 11, !known && traitLocked ? rgb(240, 140, 110) : C_DIM);
         std::string un;
@@ -939,7 +948,7 @@ void GameUI::renderTech() {
         for (auto& rs2 : g_resources) if (rs2.revealTechId == t && !rs2.name.empty()) un += (un.empty() ? "" : ", ") + std::string("Reveals ") + rs2.name;
         while (un.size() > 4 && cv->textWidth(un, 11) > boxW - 16) un = un.substr(0, un.size() - 4) + "..";
         cv->text(bx + 8, by + 40, un, 11, rgb(190, 200, 150));
-        if (cur) bar(bx + 1, by + boxH - 4, boxW - 2, 3, (double)me.techProgress[t] / td.cost, C_SCI);
+        if (cur) bar(bx + 1, by + boxH - 4, boxW - 2, 3, (double)me.techProgress[t] / g.techCost(t), C_SCI);
         std::string tip = td.name + " - " + td.flavor;
         if (!known && !avail) tip += " (Click to set as a research goal.)";
         hot(bx, by, boxW, boxH, known ? std::function<void()>() : std::function<void()>([this, t] { game->setGoal(game->player, t); }), tip);
@@ -1105,7 +1114,7 @@ void GameUI::renderEvolution() {
         int cx = x + 7;
         for (int k = 0; k < PC_COUNT; k++) {
             if (!td.cost[k]) continue;
-            std::string cs = std::string(PRESSURE_ABBR[k]) + " " + std::to_string(td.cost[k]);
+            std::string cs = std::string(PRESSURE_ABBR[k]) + " " + std::to_string(g.traitCost(t, k));
             cv->text(cx, cy + 23, cs, 11, has ? C_DIM : catColor(k), AL_LEFT, true);
             cx += cv->textWidth(cs, 11, true) + 8;
         }
@@ -1603,7 +1612,7 @@ void GameUI::key(int k, bool shift, bool ctrl) {
         if (k == KEY_RIGHT) setupPrimate = (setupPrimate + 1) % (int)g_primates.size();
         if (k == KEY_ENTER) {
             GameSettings s;
-            s.primate = setupPrimate; s.mapSize = setupSize; s.difficulty = setupDiff;
+            s.primate = setupPrimate; s.mapSize = setupSize; s.difficulty = setupDiff; s.speed = setupSpeed;
             s.seed = (uint64_t)std::time(nullptr);
             startGame(s);
         }

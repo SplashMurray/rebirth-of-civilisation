@@ -50,7 +50,7 @@ private:
     Canvas* cv = nullptr;
 
     // ---- setup choices
-    int setupPrimate = 0, setupSize = 1, setupDiff = 1;
+    int setupPrimate = 0, setupSize = 1, setupDiff = 1, setupSpeed = 1;
 
     // ---- map camera
     double camX = 0, camY = 0;

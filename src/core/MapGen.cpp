@@ -263,6 +263,10 @@ void revealAround(Game& g, int c, int x, int y, int r);
 void Game::newGame(const GameSettings& s) {
     initData();
     settings = s;
+    settings.speed = std::clamp(s.speed, 0, 2);
+    speedPct = SPEED_PCT[settings.speed];
+    costPct = SPEED_COST[settings.speed];
+    maxTurns = SPEED_TURNS[settings.speed];
     rng.seed(s.seed * 2654435761ull + 12345);
     static const int SW[] = {44, 56, 70}, SH[] = {28, 36, 44}, NCIV[] = {4, 6, 8};
     W = SW[s.mapSize];

@@ -61,8 +61,8 @@ bool Game::proposePeace(int from, int to) {
     if (!civs[from].war[to]) return false;
     int len = turn - civs[to].warSince[from];
     int pf = militaryPower(from) + 5, pt = militaryPower(to) + 5;
-    bool accept = len >= 8 && pt < pf * 1.5 && rng.chance(0.75);
-    if (civs[to].primate >= 0 && g_primates[civs[to].primate].aggression <= 2 && len >= 4) accept = true;
+    bool accept = len >= dur(8) && pt < pf * 1.5 && rng.chance(0.75);
+    if (civs[to].primate >= 0 && g_primates[civs[to].primate].aggression <= 2 && len >= dur(4)) accept = true;
     if (accept) makePeace(from, to);
     return accept;
 }
@@ -226,7 +226,7 @@ void Game::processCity(City& city) {
                         if (bd.special == BSpecial::FreeTech) {
                             int best = -1;
                             for (size_t k = 0; k < g_techs.size(); k++)
-                                if (canResearch(c, (int)k) && (best < 0 || g_techs[k].cost > g_techs[best].cost)) best = (int)k;
+                                if (canResearch(c, (int)k) && (best < 0 || techCost(k) > techCost(best))) best = (int)k;
                             if (best >= 0) grantTech(c, best);
                         }
                         if (bd.special == BSpecial::Victory && !gameOver) {
@@ -260,7 +260,7 @@ void Game::processCity(City& city) {
     int bp = policyPct(c, PolicyEffect::Borders);
     if (const PrimateDef* pd = primate(c)) bp += pd->borderPct;
     city.borderCulture += applyPct(bc, bp);
-    int need2 = 10 + 6 * city.claims + city.claims * city.claims / 2;
+    int need2 = sc(10 + 6 * city.claims + city.claims * city.claims / 2);
     if (city.borderCulture >= need2) {
         int bestI = -1, bestS = -1;
         for (auto& p : ring(city.x, city.y, 3)) {
@@ -433,7 +433,7 @@ void Game::triggerNuclearWar() {
 
 void Game::decayFallout() {
     for (auto& t : tiles)
-        if (t.fallout > 0 && rng.range(16) == 0) t.fallout--;
+        if (t.fallout > 0 && rng.range(dur(16)) == 0) t.fallout--;
 }
 
 // ------------------------------------------------------------ ferals
@@ -441,7 +441,7 @@ void Game::feralTurn() {
     if (!warHappened) return;
     int count = 0;
     for (auto& u : units) if (u.alive && u.owner == CIV_FERAL) count++;
-    int cap = std::min(24, (int)(civs.size() - FIRST_PRIMATE_CIV) * 2 + turn / 40);
+    int cap = std::min(24, (int)(civs.size() - FIRST_PRIMATE_CIV) * 2 + turn * 100 / speedPct / 40);
     if (turn % 3 == 0 && count < cap) {
         for (int tries = 0; tries < 40; tries++) {
             int x, y;
@@ -462,7 +462,7 @@ void Game::feralTurn() {
             bool nearCity = false;
             for (auto& ci : cities) if (ci.alive && dist(ci.x, ci.y, x, y) < 5) nearCity = true;
             if (nearCity) continue;
-            int type = unitIndex(turn < 90 ? "Feral Dogs" : turn < 190 ? "Mutant Hounds" : "Rogue Machines");
+            int type = unitIndex(turn < dur(90) ? "Feral Dogs" : turn < dur(190) ? "Mutant Hounds" : "Rogue Machines");
             spawnUnit(CIV_FERAL, type, x, y);
             break;
         }
@@ -549,7 +549,7 @@ void Game::checkVictory() {
             return;
         }
     // time
-    if (turn >= MAX_TURNS) {
+    if (turn >= maxTurns) {
         int best = -1;
         for (int c = FIRST_PRIMATE_CIV; c < (int)civs.size(); c++)
             if (civs[c].alive && (best < 0 || score(c) > score(best))) best = c;

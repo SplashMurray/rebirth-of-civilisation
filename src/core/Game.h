@@ -9,7 +9,6 @@ static const int CIV_HUMANS = 0;   // humanity: alive until the Fall, never play
 static const int CIV_FERAL = 1;    // feral packs and rogue machines (barbarians)
 static const int FIRST_PRIMATE_CIV = 2;
 static const int PROLOGUE_TURNS = 6;  // the war happens at the end of turn 6 (2034)
-static const int MAX_TURNS = 340;
 static const int MAX_STRANDS = 2;      // evolutionary strands a species may commit to
 
 struct Tile {
@@ -127,6 +126,7 @@ struct GameSettings {
     int difficulty = 1;  // 0 easy, 1 normal, 2 hard
     uint64_t seed = 1;
     bool allAI = false;  // simulation / test mode
+    int speed = 1;       // 0 quick, 1 standard, 2 epic
 };
 
 struct CombatResult {
@@ -173,6 +173,14 @@ public:
     bool hasResource(int c, int r) const;   // Scrap Metal also counts as Iron
     bool hasNeeds(int c, const std::vector<int>& needs) const;
     bool unitBelongsTo(int c, int u) const;
+    // game speed: everything that costs points or lasts a number of turns is scaled by speedPct
+    int speedPct = 150;   // length of time: durations, calendar, fallout decay
+    int costPct = 180;    // cost of everything: science, production, growth, culture, evolution
+    int maxTurns = 500;
+    int sc(int v) const { return (int)((long long)v * costPct / 100); }
+    int dur(int turns) const { return turns * speedPct / 100; }
+    int techCost(int t) const { return sc(g_techs[t].cost); }
+    int traitCost(int t, int k) const { return sc(g_traits[t].cost[k]); }
     int statWars = 0, statCaptures = 0, statRazes = 0;  // diagnostics only (not saved)
 
     // ---- setup (MapGen.cpp)

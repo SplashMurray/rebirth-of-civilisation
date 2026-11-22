@@ -35,6 +35,7 @@ int main(int argc, char** argv) {
     ui.screen = GameUI::SCR_SETUP;
     ui.mouseMove(700, 300);
     shot(ui, "02_setup");
+    shot(ui, "02b_setup_small", 1280, 720);
     GameSettings s;
     s.primate = 0;
     s.seed = 42;

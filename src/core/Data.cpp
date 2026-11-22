@@ -21,6 +21,11 @@ DataIds ID;
 const char* PRESSURE_NAMES[PC_COUNT] = {"Social", "Ecological", "Conflict", "Mutation"};
 const char* PRESSURE_ABBR[PC_COUNT] = {"Soc", "Eco", "Con", "Mut"};
 const char* STRAND_NAMES[ST_COUNT] = {"Brain and Language", "Tool Brain", "Social Brain", "Predator Brain", "Mutant Line"};
+const char* SPEED_NAMES[3] = {"Quick", "Standard", "Epic"};
+const int SPEED_PCT[3] = {100, 150, 225};
+const int SPEED_TURNS[3] = {330, 500, 750};
+// costs rise faster than the turn count: on longer games empires grow to full size relatively earlier
+const int SPEED_COST[3] = {100, 180, 265};
 const char* ERA_NAMES[] = {"Awakening", "Tribal", "Ancient", "Classical", "Kingdoms",
                            "Reclamation", "Industrial", "Modern", "Rebirth"};
 const char* RUIN_TIER_TECH[RUIN_TIERS] = {"Salvaging", "Deciphering", "Reverse Engineering", "Computing"};

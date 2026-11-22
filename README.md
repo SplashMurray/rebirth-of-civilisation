@@ -87,7 +87,16 @@
   * **Rebirth (science):** research *Rebirth* and complete the *Rebirth Project*.
   * **Domination:** control every original primate capital.
   * **Cultural:** adopt all 16 Traditions.
-  * **Score:** have the highest score when time runs out (turn 340).
+  * **Score:** have the highest score when time runs out (turn 500 at Standard speed).
+* **Three game speeds**, chosen at setup as in *Civilization VI*:
+
+  | Speed | Turn limit | Pace |
+  |---|---|---|
+  | Quick | 330 | Everything costs less; AI games are usually decided around turns 200–220 |
+  | **Standard** (default) | 500 | Like Civ VI Standard; AI games are usually decided around turns 300–390 |
+  | Epic | 750 | Everything costs much more; AI games run around 500–560 turns |
+
+  Speed scales the cost of science, production, growth, culture and evolution, along with timed effects (nuclear winter, fallout decay, feral escalation). The calendar stretches so every speed spans the same centuries after the Fall.
 * Save and load, autosave, an event log, tooltips everywhere, a minimap, and three difficulty levels.
 
 ## The primates
