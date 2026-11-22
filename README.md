@@ -76,6 +76,18 @@
   | Fruit, Fish, Game, Stone | always visible | Bonus food and production |
 
   Every start position is guaranteed Copper, Tin, Horses, Iron and Coal within a few tiles, though you still have to claim them.
+* **Disasters that drive evolution.** About once every 20–25 turns (at Standard speed) a disaster strikes each species. Which one depends on where it lives, and each adds evolutionary pressure: a burst of points now plus lingering pressure for a few turns.
+
+  | Disaster | Likelier when you have | Damage | Pressure |
+  |---|---|---|---|
+  | Wildfire | Forest and jungle | Burns a patch of woodland and lumber camps, hurts units | Ecological |
+  | Drought | Plains and desert | −33% Food in nearby cities for several turns | Ecological, Social |
+  | Flood | Coastal cities | −1 population, halves food stores, washes away improvements | Ecological, Social |
+  | Epidemic | Large, crowded cities | Kills population and spreads to neighbouring cities | Mutation, Social |
+  | Earthquake | Hills and mountains | Damages city defences, may destroy a building | Ecological, Social |
+  | Harsh Winter | Tundra and snow, or the nuclear winter | Halves food stores, frostbite for troops in the open | Ecological |
+  | Reactor Leak | Ruined power plants near your cities | Fresh fallout around the ruin | Mutation |
+  | Predator Migration | After the Fall | Several feral packs arrive near a city | Conflict |
 * **Fallout** damages units and poisons tiles. It fades over time, and Gatherers can clean it up once you research Radiology.
 * **Cities** grow, work tiles, expand their borders with culture, build 25 buildings and 6 world wonders, and bombard nearby enemies.
 * **28 unit types:** Warbands and Stone Throwers early on, then Salvaged Rifles, Rebuilt Tanks and Exo-Primates. Ranged and siege units, embarkation across water, fortification, terrain defence bonuses and city capture all work as you would expect from the genre.
@@ -92,8 +104,8 @@
 
   | Speed | Turn limit | Pace |
   |---|---|---|
-  | Quick | 330 | Everything costs less; AI games are usually decided around turns 200–220 |
-  | **Standard** (default) | 500 | Like Civ VI Standard; AI games are usually decided around turns 300–390 |
+  | Quick | 330 | Everything costs less; AI games are usually decided around turns 190–220 |
+  | **Standard** (default) | 500 | Like Civ VI Standard; AI games are usually decided around turns 300–380 |
   | Epic | 750 | Everything costs much more; AI games run around 500–560 turns |
 
   Speed scales the cost of science, production, growth, culture and evolution, along with timed effects (nuclear winter, fallout decay, feral escalation). The calendar stretches so every speed spans the same centuries after the Fall.
@@ -136,8 +148,9 @@
 |---|---|
 | ![Evolution tree](docs/screenshots/11b_evolution_mid.png) | ![Early tech tree](docs/screenshots/04c_tech_start.png) |
 | ![Start](docs/screenshots/04_start_map.png) | ![The Fall](docs/screenshots/07_fall_popup.png) |
+| ![A drought](docs/screenshots/11c_disaster.png) | ![Late game](docs/screenshots/16_lategame.png) |
 | ![Excavating ruins](docs/screenshots/09_unit_panel.png) | ![Tech tree](docs/screenshots/10_tech_tree.png) |
-| ![City screen](docs/screenshots/13_city_midgame.png) | ![Late game](docs/screenshots/16_lategame.png) |
+| ![City screen](docs/screenshots/13_city_midgame.png) | ![Choosing a primate](docs/screenshots/02_setup.png) |
 
 ## Building from source
 

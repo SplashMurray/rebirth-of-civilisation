@@ -5,7 +5,7 @@
 #include <sstream>
 
 namespace {
-const int SAVE_VERSION = 6;
+const int SAVE_VERSION = 7;
 
 struct Archive {
     bool writing;
@@ -55,6 +55,7 @@ struct Archive {
         }
     }
     void io(Color& c) { io(c.r); io(c.g); io(c.b); }
+    void io(TempPressure& t) { io(t.name); io(t.cat); io(t.value); io(t.turns); }
     template <class T> void io(std::vector<T>& v) {
         long long n = (long long)v.size();
         num(n);
@@ -124,6 +125,7 @@ void ioGame(Archive& a, Game& g) {
         a.io(c.explored); a.io(c.visible); a.io(c.war); a.io(c.met); a.io(c.warSince);
         a.io(c.capital); a.io(c.ruinsExcavated); a.io(c.nameIdx); a.io(c.yieldBonusPct);
         a.io(c.traits); a.io(c.evoGoal); a.io(c.evoPool); a.io(c.evoRate); a.io(c.battles);
+        a.io(c.tempPressures); a.io(c.lastDisaster);
     }
     long long nu = (long long)g.units.size();
     a.num(nu);
@@ -140,7 +142,7 @@ void ioGame(Archive& a, Game& g) {
         a.io(c.id); a.io(c.name); a.io(c.owner); a.io(c.origOwner); a.io(c.capital); a.io(c.origCapital);
         a.io(c.x); a.io(c.y); a.io(c.pop); a.io(c.food); a.io(c.prod); a.io(c.buildKind); a.io(c.buildId);
         a.io(c.has); a.io(c.borderCulture); a.io(c.claims); a.io(c.hp); a.io(c.alive); a.io(c.founded);
-        ioYields(a, c.yields); a.io(c.foodSurplus); a.io(c.worked);
+        ioYields(a, c.yields); a.io(c.foodSurplus); a.io(c.worked); a.io(c.droughtTurns);
     }
     long long nl = (long long)g.log.size();
     a.num(nl);

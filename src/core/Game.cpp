@@ -318,6 +318,8 @@ std::vector<Pressure> Game::evolutionPressures(int c) const {
     for (auto& t : tiles) if (t.owner == c && t.fallout) fall++;
     for (auto& u : units) if (u.alive && u.owner == c && at(u.x, u.y).fallout) fall += 2;
     if (fall) out.push_back({"Radiation", std::min(4, (fall + 1) / 2), PC_MUTATION, "Fallout in your lands and on your units drives mutation (up to +4)."});
+    for (auto& tp : cv.tempPressures)
+        out.push_back({tp.name + " (" + std::to_string(tp.turns) + ")", tp.value, tp.cat, "Lingering pressure from a disaster (" + std::to_string(tp.turns) + " more turns)."});
     if (warHappened && turn <= PROLOGUE_TURNS + dur(40))
         out.push_back({"Background radiation", 1, PC_MUTATION, "The whole planet is still mildly radioactive (lasts " + std::to_string(dur(40)) + " turns)."});
     return out;
@@ -492,6 +494,9 @@ void Game::processEvolution(int c) {
     cv.evoRate = evolutionRates(c);
     for (int k = 0; k < PC_COUNT; k++) cv.evoPool[k] += cv.evoRate[k];
     cv.battles = 0;
+    for (auto& tp : cv.tempPressures) tp.turns--;
+    cv.tempPressures.erase(std::remove_if(cv.tempPressures.begin(), cv.tempPressures.end(), [](const TempPressure& t) { return t.turns <= 0; }),
+                           cv.tempPressures.end());
     for (int guard = 0; guard < 4; guard++) {
         if (!cv.player && (cv.evoGoal < 0 || !canEvolve(c, cv.evoGoal))) cv.evoGoal = aiChooseTrait(c);
         if (cv.evoGoal >= 0 && !canEvolve(c, cv.evoGoal)) cv.evoGoal = -1;
@@ -650,6 +655,7 @@ void Game::computeCity(City& city) {
     pct.cult += policyPct(c, PolicyEffect::Culture);
     pct.gold += policyPct(c, PolicyEffect::Gold);
     if (ownsWonderSpecial(c, BSpecial::GrowthBonus)) pct.food += 10;
+    if (city.droughtTurns > 0) pct.food -= 33;
     int hb = civs[c].yieldBonusPct;
     pct.food += hb / 2; pct.prod += hb; pct.sci += hb;
     total.food = applyPct(total.food, pct.food);

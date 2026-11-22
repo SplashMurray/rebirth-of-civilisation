@@ -73,6 +73,15 @@ struct City {
     Yields yields;
     int foodSurplus = 0;
     std::vector<int> worked;
+    int droughtTurns = 0;   // drought: -33% food while > 0
+};
+
+// evolutionary pressure that lingers for a few turns after a disaster
+struct TempPressure {
+    std::string name;
+    int cat = 0;
+    int value = 0;
+    int turns = 0;
 };
 
 struct Civ {
@@ -105,6 +114,8 @@ struct Civ {
     std::vector<int> evoPool, evoRate;      // per pressure category
     int battles = 0;                        // fights this turn (conflict pressure)
     TraitFx fx;                             // summed trait effects (derived, not saved)
+    std::vector<TempPressure> tempPressures;  // lingering pressure from disasters
+    int lastDisaster = -100;
 };
 
 struct Notification {
@@ -113,7 +124,7 @@ struct Notification {
     int x = -1, y = -1;
 };
 
-enum PopupKind { POP_INFO, POP_NUKE, POP_INTRO, POP_TECH, POP_RUIN, POP_WAR, POP_VICTORY, POP_DEFEAT, POP_WONDER, POP_EVOLUTION };
+enum PopupKind { POP_INFO, POP_NUKE, POP_INTRO, POP_TECH, POP_RUIN, POP_WAR, POP_VICTORY, POP_DEFEAT, POP_WONDER, POP_EVOLUTION, POP_DISASTER };
 struct Popup {
     int kind = POP_INFO;
     std::string title, body;
@@ -326,6 +337,12 @@ public:
     void makePeace(int a, int b);
     bool proposePeace(int from, int to);   // returns accepted
     void meet(int a, int b);
+
+    // ---- disasters (Disasters.cpp)
+    void disasterTurn(int c);
+    bool triggerDisaster(int c, int type);   // returns true if it happened
+    int statDisasters = 0;
+    int statDisasterKind[8] = {};
 
     // ---- ferals
     void feralTurn();

@@ -20,6 +20,7 @@ add_library(rebirth_game STATIC
   src/core/MapGen.cpp
   src/core/Turn.cpp
   src/core/AI.cpp
+  src/core/Disasters.cpp
   src/core/Save.cpp
   src/ui/GameUI.cpp
   src/ui/UIMap.cpp

@@ -80,6 +80,11 @@ int main(int argc, char** argv) {
     shot(ui, "10_tech_tree");
     ui.overlay = GameUI::OV_POLICY;
     shot(ui, "11_traditions");
+    ui.overlay = GameUI::OV_NONE;
+    for (int d = 1; d < 8; d++) if (g.triggerDisaster(g.player, d)) break;  // a drought, if possible
+    if (!g.popups.empty() && g.popups.front().x >= 0) ui.centerOn(g.popups.front().x, g.popups.front().y);
+    shot(ui, "11c_disaster");
+    g.popups.clear();
     ui.overlay = GameUI::OV_EVO;
     shot(ui, "11b_evolution_mid");
     ui.overlay = GameUI::OV_DIPLO;

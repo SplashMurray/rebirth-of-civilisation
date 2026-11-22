@@ -151,6 +151,7 @@ void Game::processCiv(int c) {
     cv.culture += cult;
     cv.cultureTotal += cult;
     cv.gold += cv.goldPerTurn;
+    disasterTurn(c);
     processEvolution(c);
     processUnitsEndOfTurn(c);
     for (auto& ci : cities)
@@ -160,6 +161,7 @@ void Game::processCiv(int c) {
 void Game::processCity(City& city) {
     int c = city.owner;
     computeCity(city);
+    if (city.droughtTurns > 0) city.droughtTurns--;
     // growth
     city.food += city.foodSurplus;
     int need = growthThreshold(city.pop);

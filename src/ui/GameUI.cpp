@@ -759,6 +759,10 @@ void GameUI::renderCity() {
              (tg > 0 ? " - grows in " + std::to_string(tg) + " turns" : c.foodSurplus < 0 ? " - STARVING" : " - stagnant"), 13, C_FOOD);
     bar(px + 16, y + 18, pw - 32, 6, (double)c.food / need, C_FOOD);
     y += 32;
+    if (c.droughtTurns > 0) {
+        cv->text(px + 16, y - 4, "DROUGHT: -33% Food for " + std::to_string(c.droughtTurns) + " more turns", 13, rgb(240, 160, 80), AL_LEFT, true);
+        y += 16;
+    }
     // current production
     cv->fillRect(px + 10, y, pw - 20, 64, rgb(32, 38, 50));
     if (c.buildKind != BK_NONE) {
@@ -1202,6 +1206,9 @@ void GameUI::renderHelp() {
         "Abstract Thought) is needed for science: Speech for Tribal technologies, Advanced Speech for Ancient ones, Abstract Thought for the rest. "
         "Four strands - Tool Brain, Social Brain, Predator Brain and the Mutant Line - each need their own kind of pressure, so a peaceful species "
         "will struggle to become predators. A species may commit to only two strands, and can only ever have one final adaptation.\n"
+        "DISASTERS  Wildfires, droughts, floods, epidemics, earthquakes, harsh winters, reactor leaks and predator migrations strike at random - "
+        "but which ones depends on where you live: forests burn, coasts flood, crowded cities catch disease, ruined reactors leak. Each one hurts, "
+        "and each one adds evolutionary pressure - a burst of points plus lingering pressure for a few turns.\n"
         "THE RUINS  The Fall leaves ruined cities, towns, bases, labs and power plants. Each holds up to four layers of salvage - Scrap, Books, "
         "Machines and Data - that only become usable once you research Salvaging, Deciphering, Reverse Engineering and Computing. Move a Gatherer "
         "onto a ruin and press Excavate. Orange dots under a ruin are layers you can dig now. Ruins inside your borders also add Production and Science.\n"
@@ -1260,12 +1267,12 @@ void GameUI::renderPopup() {
     int pw = big ? std::min(760, W - 40) : std::min(560, W - 40);
     int textW = pw - 40 - (p.kind == POP_NUKE ? 170 : 0);
     auto lines = wrap(p.body, textW, 15);
-    int ph = 110 + (int)lines.size() * 21;
+    int ph = 132 + (int)lines.size() * 21;
     if (p.kind == POP_VICTORY || p.kind == POP_DEFEAT) ph += 30 + (int)(g.civs.size() - FIRST_PRIMATE_CIV) * 20;
     if (p.kind == POP_NUKE) ph = std::max(ph, 330);
     int px = (W - pw) / 2, py = std::max(TOP + 10, (H - ph) / 2);
     Color head = p.kind == POP_NUKE ? rgb(150, 50, 30) : p.kind == POP_WAR ? rgb(140, 40, 40) : p.kind == POP_VICTORY ? rgb(150, 120, 40) :
-                 p.kind == POP_DEFEAT ? rgb(80, 40, 40) : p.kind == POP_RUIN ? rgb(130, 84, 40) : p.kind == POP_TECH ? rgb(40, 80, 130) : p.kind == POP_EVOLUTION ? rgb(40, 110, 70) : rgb(56, 70, 92);
+                 p.kind == POP_DEFEAT ? rgb(80, 40, 40) : p.kind == POP_RUIN ? rgb(130, 84, 40) : p.kind == POP_TECH ? rgb(40, 80, 130) : p.kind == POP_EVOLUTION ? rgb(40, 110, 70) : p.kind == POP_DISASTER ? rgb(150, 70, 20) : rgb(56, 70, 92);
     cv->fillRect(px - 2, py - 2, pw + 4, ph + 4, rgb(0, 0, 0));
     cv->fillRect(px, py, pw, ph, rgb(26, 30, 38));
     cv->fillRect(px, py, pw, 46, head);
