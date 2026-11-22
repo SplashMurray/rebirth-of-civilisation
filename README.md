@@ -29,7 +29,7 @@
 * **Hex map**, randomly generated, with grassland, plains, desert, tundra, snow, coast and ocean, plus forest, jungle, hills, mountains and resources. Small, Standard and Large sizes (4, 6 or 8 primate civilisations).
 * **Eight playable primates**, each with its own bonuses, a unique unit and a preferred starting terrain (see below).
 * **Turn-based economy** with Food, Production, Science and Culture. **Gold is not available at the start.** Your people only learn the value of money when they research **Currency**; from then on cities earn Gold, which buys units and buildings.
-* **45 technologies across 9 eras** (Awakening, Tribal, Ancient, Classical, Kingdoms, Reclamation, Industrial, Modern, Rebirth), shown as a scrollable tech tree. You can click any technology to set it as a research goal.
+* **46 technologies across 9 eras** (Awakening, Tribal, Ancient, Classical, Kingdoms, Reclamation, Industrial, Modern, Rebirth), shown as a scrollable tech tree. You can click any technology to set it as a research goal.
 * **Human ruins as a source of technology.** Every ruin holds up to four layers of salvage that unlock as you advance:
 
   | Layer | Unlocked by | Reward |
@@ -40,9 +40,25 @@
   | Data Archives | Computing | A free technology plus Science |
 
   Ruins inside your borders also yield Production and Science, and the *Archive of Humanity* and *Salvage Yard* buildings boost them further.
+* **Resources revealed by technology.** Deposits only appear on the map once you understand them. Strategic resources inside your borders unlock units and buildings, and the right improvement boosts their yields:
+
+  | Resource | Revealed by | Used for / improvement |
+  |---|---|---|
+  | Copper | Digging | With Tin: **Bronze Phalanx** (Bronze Working). Mine |
+  | Tin | Bronze Working | With Copper: Bronze Phalanx. Mine |
+  | Horses | Animal Taming | Beast Riders, Baboon Raiders, Armoured Riders. Pasture |
+  | Iron | Smelting | Iron Blades, Armoured Riders, Bombards. Mine. Salvaged **Scrap Metal** from ruins counts as Iron |
+  | Coal | Steam Power | Factory, Power Station. Mine |
+  | Oil | Combustion | Rebuilt Tanks. Mine |
+  | Uranium | Radiology | Exo-Primates. Mine |
+  | Gold Ore | Currency | +3 Gold. Mine |
+  | Wheat, Rice, Maize | always visible | Crops: a **Farm** on them gives +2 Food |
+  | Fruit, Fish, Game, Stone | always visible | Bonus food and production |
+
+  Every start position is guaranteed Copper, Tin, Horses, Iron and Coal within a few tiles, though you still have to claim them.
 * **Fallout** damages units and poisons tiles. It fades over time, and Gatherers can clean it up once you research Radiology.
 * **Cities** grow, work tiles, expand their borders with culture, build 25 buildings and 6 world wonders, and bombard nearby enemies.
-* **27 unit types:** Warbands and Stone Throwers early on, then Salvaged Rifles, Rebuilt Tanks and Exo-Primates. Ranged and siege units, embarkation across water, fortification, terrain defence bonuses and city capture all work as you would expect from the genre.
+* **28 unit types:** Warbands and Stone Throwers early on, then Salvaged Rifles, Rebuilt Tanks and Exo-Primates. Ranged and siege units, embarkation across water, fortification, terrain defence bonuses and city capture all work as you would expect from the genre.
 * **Traditions:** 16 culture-bought policies, similar to *Civilization V*'s social policies.
 * **Feral packs:** feral dogs, then mutant hounds, then rogue human war machines roam the wastelands. They take the place of barbarians.
 * **Diplomacy:** AI rivals declare war based on their personality and relative strength. You can declare war or sue for peace.

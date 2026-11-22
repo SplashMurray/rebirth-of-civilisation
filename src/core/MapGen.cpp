@@ -76,24 +76,57 @@ void Game::generateMap() {
                 if (!g_terrain[at(nb[k].x, nb[k].y).terrain].water) { at(x, y).terrain = T_COAST; break; }
         }
     // resources
+    struct Odds { uint8_t r; int pct10; };  // chance in tenths of a percent
+    auto roll = [&](Tile& t, std::initializer_list<Odds> table) {
+        int v = rng.range(1000), acc = 0;
+        for (auto& o : table) {
+            acc += o.pct10;
+            if (v < acc) { t.res = o.r; return; }
+        }
+    };
     for (int y = 0; y < H; y++)
         for (int x = 0; x < W; x++) {
             Tile& t = at(x, y);
-            if (t.mountain) continue;
-            int r = rng.range(100);
-            if (t.terrain == T_COAST) { if (r < 9) t.res = R_FISH; continue; }
-            if (t.terrain == T_OCEAN) continue;
-            if (t.hills) { if (r < 7) t.res = R_STONE; else if (r < 13) t.res = R_IRON; continue; }
-            if (t.veg == V_JUNGLE) { if (r < 12) t.res = R_FRUIT; continue; }
-            if (t.veg == V_FOREST) { if (r < 10) t.res = R_GAME; continue; }
+            if (t.mountain || t.terrain == T_OCEAN) continue;
+            double lat = std::abs(y - (H - 1) / 2.0) / ((H - 1) / 2.0);
+            if (t.terrain == T_COAST) { roll(t, {{R_FISH, 90}}); continue; }
+            if (t.hills) {
+                roll(t, {{R_STONE, 45}, {R_IRON, 50}, {R_COPPER, 55}, {R_TIN, 40}, {R_COAL, 45}, {R_GOLD, 20}, {R_URANIUM, 15}});
+                continue;
+            }
+            if (t.veg == V_JUNGLE) { roll(t, {{R_FRUIT, 110}, {R_RICE, 15}}); continue; }
+            if (t.veg == V_FOREST) { roll(t, {{R_GAME, 95}, {R_COAL, 20}}); continue; }
             switch (t.terrain) {
-                case T_GRASS: if (r < 5) t.res = R_FRUIT; else if (r < 9) t.res = R_HORSES; break;
-                case T_PLAINS: if (r < 7) t.res = R_HORSES; else if (r < 10) t.res = R_STONE; break;
-                case T_DESERT: if (r < 8) t.res = R_OIL; break;
-                case T_TUNDRA: if (r < 8) t.res = R_GAME; else if (r < 13) t.res = R_OIL; break;
+                case T_GRASS:
+                    if (lat < 0.45) roll(t, {{R_RICE, 50}, {R_FRUIT, 30}, {R_MAIZE, 30}, {R_HORSES, 25}, {R_COPPER, 10}});
+                    else roll(t, {{R_WHEAT, 50}, {R_MAIZE, 25}, {R_HORSES, 35}, {R_FRUIT, 15}, {R_COPPER, 10}});
+                    break;
+                case T_PLAINS:
+                    roll(t, {{R_WHEAT, 65}, {R_MAIZE, 30}, {R_HORSES, 60}, {R_STONE, 20}, {R_COPPER, 20}, {R_TIN, 10}});
+                    break;
+                case T_DESERT: roll(t, {{R_OIL, 70}, {R_GOLD, 20}, {R_URANIUM, 20}, {R_COPPER, 15}}); break;
+                case T_TUNDRA: roll(t, {{R_GAME, 70}, {R_OIL, 40}, {R_TIN, 25}, {R_URANIUM, 20}, {R_COAL, 20}}); break;
                 default: break;
             }
         }
+}
+
+// Make sure every start can reach the key strategic resources, so nobody is locked out of bronze or iron.
+static void ensureNear(Game& g, Pt s, int res, int maxD) {
+    for (auto& p : g.ring(s.x, s.y, maxD))
+        if (g.at(p.x, p.y).res == res) return;
+    std::vector<Pt> spots;
+    for (auto& p : g.ring(s.x, s.y, maxD)) {
+        int d = g.dist(s.x, s.y, p.x, p.y);
+        const Tile& t = g.at(p.x, p.y);
+        if (d < 2 || g.isWater(p.x, p.y) || t.mountain || t.res != R_NONE || t.site >= 0 || t.owner >= 0) continue;
+        spots.push_back(p);
+    }
+    if (spots.empty()) return;
+    Pt p = spots[g.rng.range((int)spots.size())];
+    Tile& t = g.at(p.x, p.y);
+    t.res = (uint8_t)res;
+    if (res == R_HORSES && t.veg != V_NONE) t.veg = V_NONE;
 }
 
 void Game::placeHumanity() {
@@ -281,6 +314,16 @@ void Game::newGame(const GameSettings& s) {
     player = FIRST_PRIMATE_CIV;
     placeHumanity();
     std::vector<Pt> starts = chooseStarts(nPrim);
+    for (Pt st : starts) {
+        ensureNear(*this, st, R_COPPER, 5);
+        ensureNear(*this, st, R_TIN, 6);
+        ensureNear(*this, st, R_HORSES, 6);
+        ensureNear(*this, st, R_IRON, 7);
+        ensureNear(*this, st, R_COAL, 8);
+        if (rng.chance(0.5)) ensureNear(*this, st, R_WHEAT, 4);
+        else ensureNear(*this, st, R_RICE, 4);
+    }
+    markResourcesDirty();
     for (int i = 0; i < nPrim; i++) {
         int c = FIRST_PRIMATE_CIV + i;
         Pt p = starts[i];

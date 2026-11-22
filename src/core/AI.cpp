@@ -283,7 +283,11 @@ void Game::aiUnit(Unit& uref) {
         }
         if (canDecon(U()) && at(U().x, U().y).owner == c) { startDecon(U()); return; }
         auto pickImp = [&](const std::vector<int>& opts) {
-            for (int want : {IMP_MINE, IMP_FARM, IMP_LUMBER, IMP_TRADEPOST})
+            const Tile& here = at(U().x, U().y);
+            int r = resourceVisible(c, U().x, U().y) ? (int)here.res : (int)R_NONE;
+            int pref = r == R_HORSES ? IMP_PASTURE : isCrop(r) ? IMP_FARM : isMineral(r) ? IMP_MINE : -1;
+            for (int o : opts) if (o == pref) return o;
+            for (int want : {IMP_MINE, IMP_FARM, IMP_LUMBER, IMP_PASTURE, IMP_TRADEPOST})
                 for (int o : opts) if (o == want) return o;
             return opts.empty() ? -1 : opts[0];
         };
@@ -296,7 +300,10 @@ void Game::aiUnit(Unit& uref) {
         bestD = 99; tx = -1;
         for (auto& ci : cities) {
             if (!ci.alive || ci.owner != c) continue;
-            for (int wi : ci.worked) {
+            std::vector<int> cand = ci.worked;
+            for (auto& p : ring(ci.x, ci.y, 3))  // unimproved resources in territory are worth it too
+                if (at(p.x, p.y).city == ci.id && resourceVisible(c, p.x, p.y)) cand.push_back(idx(p.x, p.y));
+            for (int wi : cand) {
                 int x = wi % W, y = wi / W;
                 const Tile& t = at(x, y);
                 if (t.imp != IMP_NONE) continue;

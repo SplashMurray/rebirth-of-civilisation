@@ -14,16 +14,24 @@ struct TerrainDef {
     bool water;
 };
 
-enum Resource : uint8_t { R_NONE, R_FRUIT, R_FISH, R_GAME, R_STONE, R_IRON, R_HORSES, R_OIL, R_SCRAP, R_COUNT };
+enum Resource : uint8_t {
+    R_NONE, R_FRUIT, R_FISH, R_GAME, R_STONE, R_IRON, R_HORSES, R_OIL, R_SCRAP,
+    R_COPPER, R_TIN, R_COAL, R_URANIUM, R_GOLD, R_WHEAT, R_RICE, R_MAIZE, R_COUNT
+};
+enum ResourceKind { RK_BONUS = 0, RK_STRATEGIC = 1, RK_LUXURY = 2, RK_CROP = 3 };
 struct ResourceDef {
     std::string name, abbr;
     int food, prod, gold;
     std::string revealTech;
     Color color;
+    int kind;           // ResourceKind
+    std::string hint;   // which improvement to build on it
     int revealTechId = -1;
 };
+bool isCrop(int r);
+bool isMineral(int r);
 
-enum Improvement : uint8_t { IMP_NONE, IMP_FARM, IMP_MINE, IMP_LUMBER, IMP_TRADEPOST, IMP_COUNT };
+enum Improvement : uint8_t { IMP_NONE, IMP_FARM, IMP_MINE, IMP_LUMBER, IMP_TRADEPOST, IMP_PASTURE, IMP_COUNT };
 struct ImprovementDef {
     std::string name;
     int food, prod, gold;
@@ -59,6 +67,7 @@ struct UnitDef {
     std::string desc;
     int techId = -1;
     int replacesId = -1;
+    std::vector<int> needs;  // strategic resources required to train it
     bool civilian() const { return cls == UnitClass::Settler || cls == UnitClass::Worker; }
     bool military() const { return !civilian(); }
     bool ranged() const { return rstr > 0; }
@@ -78,6 +87,7 @@ struct BuildingDef {
     BSpecial special;
     std::string desc;
     int techId = -1;
+    std::vector<int> needs;  // strategic resources required to build it
 };
 
 // ---------------------------------------------------------------- techs
@@ -144,6 +154,8 @@ int techIndex(const std::string& name);
 int unitIndex(const std::string& name);
 int buildingIndex(const std::string& name);
 int policyIndex(const std::string& name);
+int resourceIndex(const std::string& name);
+std::string needsText(const std::vector<int>& needs);
 
 // commonly referenced ids (filled by initData)
 struct DataIds {

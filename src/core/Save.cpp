@@ -5,7 +5,7 @@
 #include <sstream>
 
 namespace {
-const int SAVE_VERSION = 1;
+const int SAVE_VERSION = 2;
 
 struct Archive {
     bool writing;
@@ -177,6 +177,7 @@ bool Game::load(const std::string& path) {
     ioGame(a, tmp);
     if (!a.ok || tmp.W <= 0 || (int)tmp.tiles.size() != tmp.W * tmp.H) return false;
     *this = tmp;
+    resDirty = true;
     popups.clear();
     nukeAnimPending = false;
     for (auto& c : cities) if (c.alive) computeCity(c);

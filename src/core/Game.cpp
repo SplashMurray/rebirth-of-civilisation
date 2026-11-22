@@ -126,6 +126,32 @@ std::string Game::dateString(int t) const {
     return "Year " + std::to_string(y - 2034) + " AF (" + std::to_string(y) + " AD)";
 }
 
+// ============================================================ strategic resources
+int Game::resourceCount(int c, int r) const {
+    if (c < 0 || c >= (int)civs.size()) return 0;
+    if (resDirty || resCache.size() != civs.size()) {
+        resCache.assign(civs.size(), std::vector<int>(R_COUNT, 0));
+        for (int y = 0; y < H; y++)
+            for (int x = 0; x < W; x++) {
+                const Tile& t = at(x, y);
+                if (t.owner < 0 || t.res == R_NONE || t.owner >= (int)civs.size()) continue;
+                if (resourceVisible(t.owner, x, y)) resCache[t.owner][t.res]++;
+            }
+        resDirty = false;
+    }
+    return resCache[c][r];
+}
+
+bool Game::hasResource(int c, int r) const {
+    if (resourceCount(c, r) > 0) return true;
+    return r == R_IRON && resourceCount(c, R_SCRAP) > 0;
+}
+
+bool Game::hasNeeds(int c, const std::vector<int>& needs) const {
+    for (int r : needs) if (!hasResource(c, r)) return false;
+    return true;
+}
+
 // ============================================================ research
 bool Game::canResearch(int c, int t) const {
     if (t < 0 || civs[c].techs[t]) return false;
@@ -180,6 +206,7 @@ void Game::grantTech(int c, int t, bool announce) {
         cv.scienceBank += leftover;
     }
     if (cv.goal == t) cv.goal = -1;
+    markResourcesDirty();
     if (announce && c == player) {
         std::string unlocks;
         for (auto& u : g_units)
@@ -200,6 +227,11 @@ void Game::grantTech(int c, int t, bool announce) {
             if (g_ruinTierTech[k] == t)
                 extra = std::string("\n\nThe wreckage of humanity holds new secrets: Gatherers can now excavate ") +
                         RUIN_TIER_NAME[k] + " from human ruins.";
+        for (auto& r : g_resources)
+            if (r.revealTechId == t && !r.name.empty())
+                extra += "\n\nYour people can now recognise deposits of " + r.name + (r.kind == RK_STRATEGIC ? " (strategic resource)" : "") + ".";
+        if (g_techs[t].name == "Bronze Working")
+            extra += "\n\nWith both Copper and Tin inside your borders you can train the Bronze Phalanx.";
         std::string body = g_techs[t].flavor;
         if (!unlocks.empty()) body += "\n\nUnlocks: " + unlocks;
         body += extra;
@@ -286,6 +318,7 @@ Yields Game::tileYields(int c, int x, int y) const {
         const ImprovementDef& im = g_improvements[t.imp];
         y0.food += im.food; y0.prod += im.prod; y0.gold += im.gold;
         if (c >= 0 && t.imp == IMP_FARM && hasTech(c, ID.tChemistry)) y0.food++;
+        if (t.imp == IMP_FARM && isCrop(t.res)) y0.food++;  // farmed wheat, rice and maize
         if (c >= 0 && t.imp == IMP_MINE && hasTech(c, ID.tIndustrial)) y0.prod++;
     }
     if (t.ruin != RUIN_NONE && warHappened && c >= 0) {
@@ -422,6 +455,7 @@ void Game::claimTile(City& city, int x, int y) {
     Tile& t = at(x, y);
     t.owner = (int8_t)city.owner;
     t.city = (int16_t)city.id;
+    markResourcesDirty();
 }
 
 int Game::foundCity(int c, int x, int y) {
@@ -465,12 +499,13 @@ int Game::uniqueFor(int c, int base) const {
     return base;
 }
 
-static bool unitBelongs(const Game& g, int c, int u) {
+bool Game::unitBelongsTo(int c, int u) const {
     const UnitDef& d = g_units[u];
     if (d.primate == -2) return false;
-    if (d.primate >= 0) return d.primate == g.civs[c].primate;
-    return g.uniqueFor(c, u) == u;
+    if (d.primate >= 0) return d.primate == civs[c].primate;
+    return uniqueFor(c, u) == u;
 }
+static bool unitBelongs(const Game& g, int c, int u) { return g.unitBelongsTo(c, u); }
 
 bool Game::unitObsolete(int c, int u) const {
     const UnitDef& d = g_units[u];
@@ -478,7 +513,7 @@ bool Game::unitObsolete(int c, int u) const {
     for (size_t v = 0; v < g_units.size(); v++) {
         const UnitDef& o = g_units[v];
         if ((int)v == u || o.cls != d.cls) continue;
-        if (!unitBelongs(*this, c, (int)v) || !hasTech(c, o.techId)) continue;
+        if (!unitBelongs(*this, c, (int)v) || !hasTech(c, o.techId) || !hasNeeds(c, o.needs)) continue;
         if (std::max(o.str, o.rstr) > std::max(d.str, d.rstr) && o.cost > d.cost) return true;
     }
     return false;
@@ -488,7 +523,7 @@ std::vector<int> Game::availableUnits(int c) const {
     std::vector<int> out;
     for (size_t u = 0; u < g_units.size(); u++) {
         if (!unitBelongs(*this, c, (int)u)) continue;
-        if (!hasTech(c, g_units[u].techId)) continue;
+        if (!hasTech(c, g_units[u].techId) || !hasNeeds(c, g_units[u].needs)) continue;
         if (unitObsolete(c, (int)u)) continue;
         out.push_back((int)u);
     }
@@ -507,6 +542,7 @@ bool Game::canBuild(const City& city, int kind, int id) const {
     if (kind == BK_UNIT) {
         if (id < 0 || id >= (int)g_units.size()) return false;
         if (!unitBelongs(*this, c, id) || !hasTech(c, g_units[id].techId)) return false;
+        if (!hasNeeds(c, g_units[id].needs)) return false;
         if (g_units[id].cls == UnitClass::Settler && city.pop < 2) return false;
         return true;
     }
@@ -516,6 +552,7 @@ bool Game::canBuild(const City& city, int kind, int id) const {
         if (b.special == BSpecial::Palace || city.has[id]) return false;
         if (!hasTech(c, b.techId)) return false;
         if (b.wonder && wonderCity[id] >= 0) return false;
+        if (!hasNeeds(c, b.needs)) return false;
         return true;
     }
     return false;
@@ -575,6 +612,7 @@ int Game::turnsToGrow(const City& city) const {
 
 void Game::captureCity(City& city, int newOwner) {
     int old = city.owner;
+    markResourcesDirty();
     // units of the old owner in the city are lost
     for (auto& u : units)
         if (u.alive && u.x == city.x && u.y == city.y && u.owner != newOwner) killUnit(u);
@@ -962,11 +1000,14 @@ std::vector<int> Game::buildOptions(const Unit& u) const {
     for (int im = 1; im < IMP_COUNT; im++) {
         if (t.imp == im || !hasTech(u.owner, g_improvements[im].techId)) continue;
         bool ok = false;
+        bool vis = resourceVisible(u.owner, u.x, u.y);
+        int r = vis ? (int)t.res : (int)R_NONE;
         switch (im) {
-            case IMP_FARM: ok = t.veg == V_NONE && t.terrain != T_SNOW && t.res != R_STONE && t.res != R_IRON && t.res != R_OIL; break;
-            case IMP_MINE: ok = t.hills || t.res == R_STONE || t.res == R_IRON || t.res == R_OIL || t.res == R_SCRAP; break;
-            case IMP_LUMBER: ok = t.veg == V_FOREST; break;
-            case IMP_TRADEPOST: ok = t.veg != V_FOREST && !t.hills; break;
+            case IMP_FARM: ok = t.veg == V_NONE && t.terrain != T_SNOW && !isMineral(r) && r != R_HORSES; break;
+            case IMP_MINE: ok = t.hills || isMineral(r); break;
+            case IMP_LUMBER: ok = t.veg == V_FOREST && !isMineral(r); break;
+            case IMP_TRADEPOST: ok = t.veg != V_FOREST && !t.hills && !isMineral(r) && !isCrop(r) && r != R_HORSES; break;
+            case IMP_PASTURE: ok = r == R_HORSES; break;
         }
         if (ok) out.push_back(im);
     }

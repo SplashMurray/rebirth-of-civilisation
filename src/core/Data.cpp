@@ -41,6 +41,19 @@ int buildingIndex(const std::string& n) {
     for (size_t i = 0; i < g_buildings.size(); i++) if (g_buildings[i].name == n) return (int)i;
     return -1;
 }
+int resourceIndex(const std::string& n) {
+    for (size_t i = 0; i < g_resources.size(); i++) if (g_resources[i].name == n) return (int)i;
+    return -1;
+}
+bool isCrop(int r) { return r > 0 && r < (int)g_resources.size() && g_resources[r].kind == RK_CROP; }
+bool isMineral(int r) {
+    return r == R_STONE || r == R_IRON || r == R_OIL || r == R_SCRAP || r == R_COPPER || r == R_TIN || r == R_COAL || r == R_URANIUM || r == R_GOLD;
+}
+std::string needsText(const std::vector<int>& needs) {
+    std::string s;
+    for (size_t i = 0; i < needs.size(); i++) s += (i ? (i + 1 == needs.size() ? " and " : ", ") : "") + g_resources[needs[i]].name;
+    return s;
+}
 int policyIndex(const std::string& n) {
     for (size_t i = 0; i < g_policies.size(); i++) if (g_policies[i].name == n) return (int)i;
     return -1;
@@ -67,16 +80,25 @@ void initData() {
         {"Snow", 0, 0, 0, rgb(232, 238, 244), false},
     };
 
+    // name, abbr, food, prod, gold, reveal tech, colour, kind, hint
     g_resources = {
-        {"", "", 0, 0, 0, "", rgb(0, 0, 0)},
-        {"Wild Fruit", "Fr", 1, 0, 1, "", rgb(240, 200, 40)},
-        {"Fish", "Fi", 2, 0, 1, "", rgb(150, 210, 240)},
-        {"Game", "Gm", 1, 1, 0, "", rgb(160, 100, 60)},
-        {"Stone", "St", 0, 1, 0, "", rgb(170, 170, 170)},
-        {"Iron", "Fe", 0, 2, 0, "Smelting", rgb(120, 130, 150)},
-        {"Wild Horses", "Ho", 1, 1, 0, "Animal Taming", rgb(200, 150, 100)},
-        {"Oil", "Oi", 0, 3, 1, "Combustion", rgb(30, 30, 30)},
-        {"Scrap Metal", "Sm", 0, 1, 1, "Salvaging", rgb(190, 120, 70)},
+        {"", "", 0, 0, 0, "", rgb(0, 0, 0), RK_BONUS, ""},
+        {"Wild Fruit", "Fr", 1, 0, 1, "", rgb(240, 200, 40), RK_BONUS, ""},
+        {"Fish", "Fi", 2, 0, 1, "", rgb(150, 210, 240), RK_BONUS, ""},
+        {"Game", "Gm", 1, 1, 0, "", rgb(160, 100, 60), RK_BONUS, ""},
+        {"Stone", "St", 0, 1, 0, "", rgb(170, 170, 170), RK_BONUS, "Mine: +2 Production"},
+        {"Iron", "Fe", 0, 2, 0, "Smelting", rgb(120, 130, 150), RK_STRATEGIC, "Mine: +2 Production"},
+        {"Horses", "Ho", 1, 1, 0, "Animal Taming", rgb(200, 150, 100), RK_STRATEGIC, "Pasture: +1 Food, +1 Production"},
+        {"Oil", "Oi", 0, 3, 1, "Combustion", rgb(30, 30, 30), RK_STRATEGIC, "Mine: +2 Production"},
+        {"Scrap Metal", "Sm", 0, 1, 1, "Salvaging", rgb(190, 120, 70), RK_STRATEGIC, "Mine: +2 Production. Counts as Iron."},
+        {"Copper", "Cu", 0, 1, 1, "Digging", rgb(204, 112, 60), RK_STRATEGIC, "Mine: +2 Production"},
+        {"Tin", "Sn", 0, 1, 0, "Bronze Working", rgb(176, 186, 196), RK_STRATEGIC, "Mine: +2 Production"},
+        {"Coal", "Co", 0, 2, 0, "Steam Power", rgb(54, 50, 50), RK_STRATEGIC, "Mine: +2 Production"},
+        {"Uranium", "U", 0, 1, 1, "Radiology", rgb(120, 230, 80), RK_STRATEGIC, "Mine: +2 Production"},
+        {"Gold Ore", "Au", 0, 0, 3, "Currency", rgb(250, 214, 60), RK_LUXURY, "Mine: +2 Production"},
+        {"Wheat", "Wh", 1, 0, 0, "", rgb(232, 206, 120), RK_CROP, "Farm: +2 Food"},
+        {"Rice", "Ri", 1, 0, 0, "", rgb(236, 240, 220), RK_CROP, "Farm: +2 Food"},
+        {"Maize", "Mz", 1, 0, 0, "", rgb(248, 190, 40), RK_CROP, "Farm: +2 Food"},
     };
 
     g_improvements = {
@@ -85,6 +107,7 @@ void initData() {
         {"Mine", 0, 2, 0, "Digging", 5},
         {"Lumber Camp", 0, 1, 0, "Woodcraft", 5},
         {"Trading Post", 0, 0, 2, "Currency", 5},
+        {"Pasture", 1, 1, 0, "Animal Taming", 4},
     };
 
     g_ruins = {
@@ -117,8 +140,9 @@ void initData() {
         {"Archery", 3, {"Spearcraft"}, "Strike from afar."},
         {"Animal Taming", 3, {"Cultivation", "Spearcraft"}, "Feral horses and great dogs learn to carry riders."},
         {"Masonry", 3, {"Digging"}, "Stacked stone outlasts any nest."},
+        {"Bronze Working", 3, {"Digging"}, "Copper and tin, melted together, make something harder than either."},
         {"Writing", 4, {"Symbols"}, "Knowledge outlives the one who knew it."},
-        {"Smelting", 4, {"Salvaging"}, "Melted scrap pours into new shapes."},
+        {"Smelting", 4, {"Salvaging", "Bronze Working"}, "Melted scrap pours into new shapes."},
         {"Bartering", 4, {"Cultivation", "Symbols"}, "Two bananas for a sharp stone."},
         {"Currency", 5, {"Bartering", "Writing"}, "Bottle caps from the old world become money. Unlocks Gold income."},
         {"Mathematics", 5, {"Writing", "Masonry"}, "Counting beyond fingers and toes."},
@@ -224,6 +248,7 @@ void initData() {
         {"Stone Thrower", "ST", 35, 5, 7, 2, 2, "Tool Use", UC::Ranged, "", -1, "Ranged attack at 2 tiles."},
         {"Spear Troop", "Sp", 50, 12, 0, 0, 2, "Spearcraft", UC::Melee, "", -1, "Disciplined spear-wielders."},
         {"Hunting Party", "HP", 50, 15, 0, 0, 3, "Spearcraft", UC::Melee, "Spear Troop", 0, "Chimpanzee Spear Troop. Stronger and faster."},
+        {"Bronze Phalanx", "BP", 60, 15, 0, 0, 2, "Bronze Working", UC::Melee, "", -1, "A shield wall of bronze-armed troops."},
         {"Bow Troop", "Bw", 50, 7, 10, 2, 2, "Archery", UC::Ranged, "", -1, "Archers."},
         {"Peacekeepers", "PK", 50, 11, 12, 2, 2, "Archery", UC::Ranged, "Bow Troop", 1, "Bonobo Bow Troop. Tougher in defence."},
         {"Beast Riders", "BR", 70, 14, 0, 0, 4, "Animal Taming", UC::Mounted, "", -1, "Fast mounted raiders."},
@@ -286,6 +311,19 @@ void initData() {
         {"Rebirth Project", 4000, "Rebirth", Y(0, 0, 0, 0, 0), Y(0, 0, 0, 0, 0), 0, 0, true, BSpecial::Victory, "Rebuild civilisation. Completing it wins the game."},
     };
     for (auto& b : g_buildings) b.techId = needTech(b.tech);
+    // strategic resource requirements (unique units inherit those of the unit they replace)
+    auto needU = [](const char* u, std::vector<int> r) { g_units[unitIndex(u)].needs = r; };
+    auto needB = [](const char* b, std::vector<int> r) { g_buildings[buildingIndex(b)].needs = r; };
+    needU("Bronze Phalanx", {R_COPPER, R_TIN});
+    needU("Beast Riders", {R_HORSES});
+    needU("Iron Blades", {R_IRON});
+    needU("Armoured Riders", {R_HORSES, R_IRON});
+    needU("Bombard", {R_IRON});
+    needU("Rebuilt Tanks", {R_OIL});
+    needU("Exo-Primates", {R_URANIUM});
+    for (auto& u : g_units) if (u.replacesId >= 0 && u.needs.empty()) u.needs = g_units[u.replacesId].needs;
+    needB("Factory", {R_COAL});
+    needB("Power Station", {R_COAL});
     // global production pacing
     for (auto& u : g_units) if (u.cls != UC::Recon && u.cls != UC::Worker) u.cost = u.cost * 3 / 2;
     for (auto& b : g_buildings) if (b.special != BSpecial::Victory) b.cost = b.cost * 3 / 2;

@@ -337,6 +337,19 @@ void GameUI::renderTopBar() {
     for (size_t p = 0; p < g_policies.size(); p++) if (g.canAdopt(g.player, (int)p)) can = true;
     item("Culture " + std::to_string(me.culture) + "/" + std::to_string(pc) + " (+" + std::to_string(me.culturePerTurn) + ")", C_CULT,
          "Culture accumulates towards your next Tradition. Adopting every Tradition wins a Cultural victory.", [this] { overlay = OV_POLICY; });
+    {
+        std::string abbr, tip;
+        for (int r = 1; r < R_COUNT; r++) {
+            if (g_resources[r].kind != RK_STRATEGIC || !g.hasTech(g.player, g_resources[r].revealTechId)) continue;
+            int n = g.resourceCount(g.player, r);
+            if (n > 0) abbr += (abbr.empty() ? "" : " ") + g_resources[r].abbr;
+            tip += (tip.empty() ? "" : ", ") + g_resources[r].name + " " + std::to_string(n);
+        }
+        if (!tip.empty())
+            item(abbr.empty() ? "No resources" : abbr, rgb(230, 170, 120),
+                 "Strategic resources inside your borders: " + tip +
+                 ". Some units and buildings need them (Bronze Phalanx: Copper and Tin; riders: Horses; Iron Blades: Iron or Scrap Metal; Factory: Coal; tanks: Oil).");
+    }
     if (can) item("TRADITION READY", rgb(255, 160, 255), "Choose a new Tradition", [this] { overlay = OV_POLICY; });
     // right side: buttons and date
     int bx = W - 8;
@@ -430,6 +443,11 @@ void GameUI::renderTileInfo() {
     if (t.imp) terr += ", " + g_improvements[t.imp].name;
     lines.push_back({terr, C_TEXT});
     if (!t.mountain) lines.push_back({yieldsStr(g.tileYields(g.player, hoverX, hoverY)), C_DIM});
+    if (g.resourceVisible(g.player, hoverX, hoverY)) {
+        const ResourceDef& rd = g_resources[t.res];
+        static const char* KIND[] = {"Bonus resource", "Strategic resource", "Luxury resource", "Crop"};
+        lines.push_back({std::string(KIND[rd.kind]) + ": " + rd.name + (rd.hint.empty() ? "" : ". " + rd.hint), rgb(230, 190, 120)});
+    }
     if (t.owner >= 0) {
         std::string o = g.civs[t.owner].name;
         if (t.city >= 0) o = g.cities[t.city].name + " (" + o + ")";
@@ -717,7 +735,19 @@ void GameUI::renderCity() {
         std::string tip = d.name + ": " + d.desc;
         if (d.military()) tip += " Strength " + std::to_string(d.str) + (d.ranged() ? ", ranged " + std::to_string(d.rstr) : "") + ", moves " + std::to_string(d.moves) + ".";
         if (d.primate >= 0) tip += " (Unique unit)";
+        if (!d.needs.empty()) tip += " Uses " + needsText(d.needs) + ".";
         rows.push_back({BK_UNIT, u, d.name, "", tip});
+    }
+    for (size_t u = 0; u < g_units.size(); u++) {  // known but missing strategic resources
+        const UnitDef& d = g_units[u];
+        if (!g.unitBelongsTo(g.player, (int)u) || !g.hasTech(g.player, d.techId) || g.hasNeeds(g.player, d.needs)) continue;
+        rows.push_back({BK_UNIT, (int)u, d.name, "", d.name + ": " + d.desc + " Strength " + std::to_string(d.str) + ". Requires " + needsText(d.needs) +
+                       " inside your borders."});
+    }
+    for (size_t b = 0; b < g_buildings.size(); b++) {
+        const BuildingDef& bd = g_buildings[b];
+        if (bd.needs.empty() || c.has[b] || !g.hasTech(g.player, bd.techId) || g.hasNeeds(g.player, bd.needs)) continue;
+        rows.push_back({BK_BUILDING, (int)b, bd.name, "", bd.name + ": requires " + needsText(bd.needs) + " inside your borders."});
     }
     for (int b : g.availableBuildings(c)) {
         const BuildingDef& bd = g_buildings[b];
@@ -729,6 +759,7 @@ void GameUI::renderCity() {
         add(bd.pct.cult, "Culture", true); add(bd.pct.gold, "Gold", true);
         if (bd.defense) eff += (eff.empty() ? "" : ", ") + std::string("+") + std::to_string(bd.defense) + " Defence";
         if (!bd.desc.empty()) eff += (eff.empty() ? "" : ". ") + bd.desc;
+        if (!bd.needs.empty()) eff += ". Uses " + needsText(bd.needs);
         rows.push_back({BK_BUILDING, b, bd.name + (bd.wonder ? " (Wonder)" : ""), "", bd.name + ": " + eff});
     }
     int listTop = y, listH = ph - (y - py) - 110;
@@ -755,13 +786,15 @@ void GameUI::renderCity() {
         int cost = g.buildCost(c.owner, r.kind, r.id);
         int turns = std::max(1, (cost - c.prod + std::max(1, c.yields.prod) - 1) / std::max(1, c.yields.prod));
         cv->text(px + 22, ry + 7, r.name, 13, ok ? C_TEXT : C_DIM, AL_LEFT, true);
+        bool needLocked = (r.kind == BK_UNIT ? !g.hasNeeds(g.player, g_units[r.id].needs) : !g.hasNeeds(g.player, g_buildings[r.id].needs));
+        if (needLocked) cv->text(px + 30 + cv->textWidth(r.name, 13, true), ry + 8, "needs " + needsText(r.kind == BK_UNIT ? g_units[r.id].needs : g_buildings[r.id].needs), 11, rgb(220, 130, 100));
         cv->text(pw - 20, ry + 7, std::to_string(cost) + "  (" + std::to_string(turns) + "t)", 13, C_DIM, AL_RIGHT);
         if (ry >= listTop && ry + rh <= listTop + listH + 2) {
             int kind = r.kind, id = r.id;
             hot(px + 10, ry, pw - 20, rh - 2, ok ? std::function<void()>([this, kind, id] {
                 City& cc = game->cities[selCity];
                 game->setProduction(cc, kind, id);
-            }) : std::function<void()>(), r.tip + (ok ? "" : " (city must be size 2)"));
+            }) : std::function<void()>(), r.tip + (ok || r.tip.find("Requires") != std::string::npos || r.tip.find("requires") != std::string::npos ? "" : " (city must be size 2)"));
         }
     }
     cv->unclip();
@@ -855,6 +888,7 @@ void GameUI::renderTech() {
                 un += (un.empty() ? "" : ", ") + u.name;
         for (auto& b : g_buildings) if (b.techId == t) un += (un.empty() ? "" : ", ") + b.name;
         for (auto& im : g_improvements) if (im.techId == t && !im.name.empty()) un += (un.empty() ? "" : ", ") + im.name;
+        for (auto& rs2 : g_resources) if (rs2.revealTechId == t && !rs2.name.empty()) un += (un.empty() ? "" : ", ") + std::string("Reveals ") + rs2.name;
         while (un.size() > 4 && cv->textWidth(un, 11) > boxW - 16) un = un.substr(0, un.size() - 4) + "..";
         cv->text(bx + 8, by + 40, un, 11, rgb(190, 200, 150));
         if (cur) bar(bx + 1, by + boxH - 4, boxW - 2, 3, (double)me.techProgress[t] / td.cost, C_SCI);
@@ -985,6 +1019,10 @@ void GameUI::renderHelp() {
         "Machines and Data - that only become usable once you research Salvaging, Deciphering, Reverse Engineering and Computing. Move a Gatherer "
         "onto a ruin and press Excavate. Orange dots under a ruin are layers you can dig now. Ruins inside your borders also add Production and Science.\n"
         "FALLOUT  Radioactive tiles (yellow symbols) damage units and produce nothing. Fallout fades with time; Radiology lets Gatherers clean it.\n"
+        "RESOURCES  Technologies reveal resources on the map: Copper (Digging), Tin (Bronze Working), Horses (Animal Taming), Iron (Smelting), "
+        "Coal (Steam Power), Oil (Combustion), Uranium (Radiology) and Gold Ore (Currency). Strategic resources inside your borders unlock units and "
+        "buildings - Copper plus Tin for the Bronze Phalanx, Horses for riders, Iron (or salvaged Scrap Metal) for Iron Blades, Coal for Factories, "
+        "Oil for tanks. Wheat, Rice and Maize are crops: build a Farm on them for extra food. Build Pastures on Horses and Mines on minerals.\n"
         "GOLD  Your people only learn the value of money with the Currency technology. From then on cities earn Gold, used to buy items.\n"
         "CITIES  Found settlements with an Elder Troop. Click a city to choose what it builds. Cities grow with surplus food and claim land with culture.\n"
         "COMBAT  Move a military unit onto an enemy to attack. Ranged units attack from a distance. Hills, forest, jungle and fortifying help defence. "

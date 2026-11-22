@@ -369,6 +369,7 @@ void Game::humanNews() {
 
 void Game::triggerNuclearWar() {
     warHappened = true;
+    markResourcesDirty();
     civs[CIV_HUMANS].alive = false;
     for (auto& t : tiles) if (t.owner == CIV_HUMANS) t.owner = -1;
     int killed = 0;

@@ -151,6 +151,14 @@ public:
     std::vector<Notification> log;
     std::vector<Popup> popups;
     bool nukeAnimPending = false;
+    // strategic resources owned by each civ (cached; rebuilt when territory or techs change)
+    mutable std::vector<std::vector<int>> resCache;
+    mutable bool resDirty = true;
+    void markResourcesDirty() { resDirty = true; }
+    int resourceCount(int c, int r) const;
+    bool hasResource(int c, int r) const;   // Scrap Metal also counts as Iron
+    bool hasNeeds(int c, const std::vector<int>& needs) const;
+    bool unitBelongsTo(int c, int u) const;
     int statWars = 0, statCaptures = 0, statRazes = 0;  // diagnostics only (not saved)
 
     // ---- setup (MapGen.cpp)
