@@ -14,6 +14,7 @@ std::vector<BuildingDef> g_buildings;
 std::vector<TechDef> g_techs;
 std::vector<PolicyDef> g_policies;
 std::vector<PrimateDef> g_primates;
+std::vector<TraitDef> g_traits;
 std::vector<std::string> g_humanCityNames;
 DataIds ID;
 
@@ -126,16 +127,17 @@ void initData() {
 
     // ------------------------------------------------------------ technologies
     g_techs = {
-        {"Foraging", 0, {}, "Knowing which fruit is ripe, and where to find it."},
-        {"Tool Use", 0, {}, "A stick to fish for termites. A stone to crack a nut."},
-        {"Vocal Language", 0, {}, "Calls become words. Words become stories."},
-        {"Fire", 1, {"Tool Use"}, "Taken from the burning cities, kept alive in the dark."},
-        {"Woodcraft", 1, {"Tool Use"}, "Branches shaped with purpose."},
-        {"Cultivation", 1, {"Foraging"}, "Seeds dropped by the troop become gardens."},
-        {"Digging", 2, {"Tool Use", "Fire"}, "Beneath the soil lie stone, metal and secrets."},
-        {"Symbols", 2, {"Vocal Language", "Fire"}, "Marks on bark that mean something."},
+        {"Fire", 0, {}, "A lightning-struck tree, a flame carefully carried home and kept alive through the night."},
+        {"Foraging", 0, {}, "Knowing which fruit is ripe, which roots are safe, and where to find them."},
+        {"Stone Tools", 0, {}, "A stick to fish for termites. A sharp stone to crack a nut or cut a vine."},
+        {"Cooking", 1, {"Fire", "Foraging"}, "Food held over the fire is easier to eat and feeds a bigger brain."},
+        {"Woodcraft", 1, {"Stone Tools"}, "Branches shaped with purpose."},
+        {"Storytelling", 2, {"Cooking"}, "Around the fire, the elders speak of what came before."},
+        {"Cultivation", 2, {"Foraging"}, "Seeds dropped by the troop become gardens."},
+        {"Digging", 2, {"Stone Tools", "Fire"}, "Beneath the soil lie stone, metal and secrets."},
         {"Spearcraft", 2, {"Fire", "Woodcraft"}, "Fire-hardened points."},
         {"Rafts", 2, {"Woodcraft"}, "Lashed logs carry the troop across the shallows."},
+        {"Symbols", 3, {"Storytelling"}, "Marks on bark that mean something."},
         {"Salvaging", 3, {"Digging"}, "The dead cities are full of strange, useful scrap."},
         {"Archery", 3, {"Spearcraft"}, "Strike from afar."},
         {"Animal Taming", 3, {"Cultivation", "Spearcraft"}, "Feral horses and great dogs learn to carry riders."},
@@ -181,6 +183,8 @@ void initData() {
             t.era = ERA_BY_COL[t.col];
             t.cost = COST_BY_COL[t.col];
             t.row = rowCount[t.col]++;
+            // evolution gates: no real science without language
+            t.trait = t.era == 0 ? -1 : t.era == 1 ? TR_SPEECH : t.era == 2 ? TR_ADV_SPEECH : TR_ABSTRACT;
         }
         for (auto& t : g_techs)
             for (auto& p : t.prereqNames) t.prereqs.push_back(needTech(p));
@@ -235,6 +239,24 @@ void initData() {
          {"Jigokudani", "Shiga", "Yakushima", "Koshima", "Arashiyama", "Shimokita", "Kinkazan", "Takasakiyama", "Hakusan", "Nikko", "Kamikochi", "Shodoshima"}},
     };
 
+    // ------------------------------------------------------------ evolution
+    g_traits = {
+        {"Expressive Gestures", 20, "+1 Culture in every city",
+         "Pointing, beckoning, a raised hand for silence. The troop begins to share what it means."},
+        {"Proto-Speech", 40, "+10% Science",
+         "Calls grow more varied: a cry for snake, another for eagle, another for food. Each sound means one thing."},
+        {"Speech", 75, "Unlocks Tribal-era technologies. +1 Science in every city",
+         "The throat and the brain have changed. Sounds combine into words, and words name everything. Ideas can now be taught."},
+        {"Advanced Speech", 140, "Unlocks Ancient-era technologies. +15% Culture",
+         "Grammar, tense and question. The troop can speak of yesterday and tomorrow, of what is and what might be."},
+        {"Abstract Thought", 230, "Unlocks Classical-era technologies and beyond. +15% Science",
+         "Numbers without objects, rules without examples. Minds that can reason about the reasoning of others."},
+        {"Extended Childhood", 400, "+10% Food",
+         "Young ones stay with their mothers for years, learning everything the troop knows."},
+        {"Collective Learning", 620, "+10% Science",
+         "Knowledge now grows faster than any single mind. Each generation begins where the last left off."},
+    };
+
     // ------------------------------------------------------------ units
     // name, abbr, cost, str, rstr, range, moves, tech, class, replaces, primate, desc
     g_units = {
@@ -245,7 +267,7 @@ void initData() {
         {"Song Scout", "SS", 22, 7, 0, 0, 4, "", UC::Recon, "Scout", 6, "Gibbon Scout. Faster and tougher."},
         {"Warband", "Wb", 30, 8, 0, 0, 2, "", UC::Melee, "", -1, "Basic melee troop."},
         {"Silverback Guard", "SG", 30, 12, 0, 0, 2, "", UC::Melee, "Warband", 3, "Gorilla Warband. Much stronger."},
-        {"Stone Thrower", "ST", 35, 5, 7, 2, 2, "Tool Use", UC::Ranged, "", -1, "Ranged attack at 2 tiles."},
+        {"Stone Thrower", "ST", 35, 5, 7, 2, 2, "Stone Tools", UC::Ranged, "", -1, "Ranged attack at 2 tiles."},
         {"Spear Troop", "Sp", 50, 12, 0, 0, 2, "Spearcraft", UC::Melee, "", -1, "Disciplined spear-wielders."},
         {"Hunting Party", "HP", 50, 15, 0, 0, 3, "Spearcraft", UC::Melee, "Spear Troop", 0, "Chimpanzee Spear Troop. Stronger and faster."},
         {"Bronze Phalanx", "BP", 60, 15, 0, 0, 2, "Bronze Working", UC::Melee, "", -1, "A shield wall of bronze-armed troops."},
@@ -279,8 +301,8 @@ void initData() {
     g_buildings = {
         {"Nest Hall", 0, "", Y(0, 2, 3, 2, 3), Y(0, 0, 0, 0, 0), 3, 25, false, BSpecial::Palace, "Seat of the troop. Free in the capital."},
         {"Food Cache", 40, "Foraging", Y(2, 0, 0, 0, 0), Y(0, 0, 0, 0, 0), 0, 0, false, BSpecial::None, ""},
-        {"Totem", 30, "Vocal Language", Y(0, 0, 0, 2, 0), Y(0, 0, 0, 0, 0), 0, 0, false, BSpecial::None, ""},
-        {"Elder Circle", 45, "Fire", Y(0, 0, 2, 0, 0), Y(0, 0, 0, 0, 0), 0, 0, false, BSpecial::None, ""},
+        {"Totem", 30, "Storytelling", Y(0, 0, 0, 2, 0), Y(0, 0, 0, 0, 0), 0, 0, false, BSpecial::None, ""},
+        {"Elder Circle", 45, "Cooking", Y(0, 0, 2, 0, 0), Y(0, 0, 0, 0, 0), 0, 0, false, BSpecial::None, ""},
         {"Tool Shed", 55, "Woodcraft", Y(0, 2, 0, 0, 0), Y(0, 0, 0, 0, 0), 0, 0, false, BSpecial::None, ""},
         {"Palisade", 50, "Digging", Y(0, 0, 0, 0, 0), Y(0, 0, 0, 0, 0), 4, 50, false, BSpecial::None, ""},
         {"Shrine", 60, "Symbols", Y(0, 0, 0, 3, 0), Y(0, 0, 0, 0, 0), 0, 0, false, BSpecial::None, ""},
@@ -349,6 +371,10 @@ void initData() {
     };
     for (auto& p : g_policies) p.techId = needTech(p.tech);
 
+    // evolutionary aptitude: social and vocal species evolve language faster
+    static const int EVO[] = {10, 20, 10, 0, 0, 10, 25, 0};
+    for (size_t i = 0; i < g_primates.size() && i < 8; i++) g_primates[i].evoPct = EVO[i];
+    ID.tCooking = techIndex("Cooking");
     ID.uElder = unitIndex("Elder Troop");
     ID.uGatherer = unitIndex("Gatherer");
     ID.uTinkerer = unitIndex("Tinkerer");

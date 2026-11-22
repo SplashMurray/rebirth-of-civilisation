@@ -100,6 +100,16 @@ struct TechDef {
     int era = 0;
     int row = 0;
     std::vector<int> prereqs;
+    int trait = -1;   // evolutionary trait required before this can be researched
+};
+
+// ---------------------------------------------------------------- evolution
+enum TraitId { TR_GESTURES, TR_PROTO_SPEECH, TR_SPEECH, TR_ADV_SPEECH, TR_ABSTRACT, TR_CHILDHOOD, TR_COLLECTIVE, TR_COUNT };
+struct TraitDef {
+    std::string name;
+    int cost;
+    std::string effect;
+    std::string flavor;
 };
 extern const char* ERA_NAMES[];
 static const int NUM_ERAS = 9;
@@ -135,6 +145,7 @@ struct PrimateDef {
     int aggression;          // 0..10 for AI
     int startBias;           // 0 jungle,1 forest,2 plains,3 coast,4 tundra,5 hills
     std::vector<std::string> cityNames;
+    int evoPct = 0;          // evolution speed bonus
 };
 
 // ---------------------------------------------------------------- tables
@@ -147,6 +158,7 @@ extern std::vector<BuildingDef> g_buildings;
 extern std::vector<TechDef> g_techs;
 extern std::vector<PolicyDef> g_policies;
 extern std::vector<PrimateDef> g_primates;
+extern std::vector<TraitDef> g_traits;
 extern std::vector<std::string> g_humanCityNames;
 
 void initData();
@@ -162,6 +174,7 @@ struct DataIds {
     int uElder, uGatherer, uScout, uWarband, uTinkerer;
     int bPalace, bRebirth;
     int tCurrency, tRafts, tNavigation, tRadiology, tSalvaging, tDeciphering, tReverse, tComputing, tRebirth;
+    int tCooking;
     int tCultivation, tDigging, tWoodcraft, tIndustrial, tChemistry;
 };
 extern DataIds ID;

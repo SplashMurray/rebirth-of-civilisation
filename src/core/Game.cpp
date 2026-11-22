@@ -105,7 +105,7 @@ int Game::score(int c) const {
     for (auto t : cv.techs) if (t) s += 5;
     for (size_t b = 0; b < g_buildings.size(); b++)
         if (g_buildings[b].wonder && wonderCity[b] >= 0 && cities[wonderCity[b]].owner == c) s += 25;
-    s += cv.policiesAdopted * 8 + cv.ruinsExcavated * 5;
+    s += cv.policiesAdopted * 8 + cv.ruinsExcavated * 5 + cv.evoStage * 5;
     return s;
 }
 
@@ -155,6 +155,7 @@ bool Game::hasNeeds(int c, const std::vector<int>& needs) const {
 // ============================================================ research
 bool Game::canResearch(int c, int t) const {
     if (t < 0 || civs[c].techs[t]) return false;
+    if (g_techs[t].trait >= 0 && !hasTrait(c, g_techs[t].trait)) return false;
     for (int p : g_techs[t].prereqs) if (!civs[c].techs[p]) return false;
     return true;
 }
@@ -272,6 +273,73 @@ int Game::researchTurns(int c) const {
     return std::max(1, (left + s - 1) / s);
 }
 
+// ============================================================ evolution
+std::vector<Pressure> Game::evolutionPressures(int c) const {
+    std::vector<Pressure> out;
+    const Civ& cv = civs[c];
+    out.push_back({"Survival", 2, "Every generation, the cleverest survive."});
+    int nc = 0, pop = 0;
+    for (auto& ci : cities) if (ci.alive && ci.owner == c) { nc++; pop += ci.pop; }
+    if (nc) out.push_back({"Group living", nc, "Living in larger, settled groups rewards communication (+1 per city)."});
+    if (pop / 4) out.push_back({"Crowding", pop / 4, "Dense populations compete for status and mates (+1 per 4 population)."});
+    if (warHappened && turn <= PROLOGUE_TURNS + 30)
+        out.push_back({"Nuclear winter", 3, "The dark, cold years after the Fall cull the weak (lasts 30 turns)."});
+    int fall = 0;
+    for (auto& t : tiles) if (t.owner == c && t.fallout) fall++;
+    for (auto& u : units) if (u.alive && u.owner == c && at(u.x, u.y).fallout) fall += 2;
+    if (fall) out.push_back({"Radiation mutations", std::min(3, (fall + 1) / 2), "Fallout in your lands drives mutation (up to +3)."});
+    bool war = false;
+    for (int o = FIRST_PRIMATE_CIV; o < (int)civs.size(); o++) if (cv.war[o] && civs[o].alive) war = true;
+    if (war) out.push_back({"Conflict", 2, "War with rival primates demands cunning and coordination."});
+    bool beasts = false;
+    for (auto& u : units) {
+        if (!u.alive || u.owner != CIV_FERAL) continue;
+        for (auto& ci : cities) if (ci.alive && ci.owner == c && dist(ci.x, ci.y, u.x, u.y) <= 4) beasts = true;
+    }
+    if (beasts) out.push_back({"Predators", 1, "Feral packs prowling near your settlements."});
+    if (cv.capital >= 0 && cities[cv.capital].alive) {
+        int harsh = 0;
+        const City& cap = cities[cv.capital];
+        for (auto& p : ring(cap.x, cap.y, 2)) {
+            int tr = at(p.x, p.y).terrain;
+            if (tr == T_TUNDRA || tr == T_SNOW || tr == T_DESERT) harsh++;
+        }
+        if (harsh >= 5) out.push_back({"Harsh climate", 1, "Surviving cold or drought around your capital requires planning."});
+    }
+    int stories = std::min(5, cv.culturePerTurn / 4);
+    if (stories) out.push_back({"Shared stories", stories, "Culture rewards those who can speak and remember (+1 per 4 Culture per turn, up to +5)."});
+    return out;
+}
+
+int Game::evolutionRate(int c) const {
+    int sum = 0;
+    for (auto& p : evolutionPressures(c)) sum += p.value;
+    if (const PrimateDef* pd = primate(c)) sum = applyPct(sum, pd->evoPct);
+    return sum;
+}
+
+void Game::processEvolution(int c) {
+    Civ& cv = civs[c];
+    cv.evoPerTurn = evolutionRate(c);
+    if (cv.evoStage >= (int)g_traits.size()) return;
+    cv.evolution += cv.evoPerTurn;
+    while (cv.evoStage < (int)g_traits.size() && cv.evolution >= g_traits[cv.evoStage].cost) {
+        cv.evolution -= g_traits[cv.evoStage].cost;
+        const TraitDef& tr = g_traits[cv.evoStage];
+        cv.evoStage++;
+        notify(c, "Evolution: your people have developed " + tr.name + ".");
+        popup(c, POP_EVOLUTION, "Evolution: " + tr.name, tr.flavor + "\n\n" + tr.effect + ".");
+        for (int o = FIRST_PRIMATE_CIV; o < (int)civs.size(); o++)
+            if (o != c && civs[o].alive && civs[o].met[c] && cv.evoStage == TR_SPEECH + 1)
+                notify(o, "The " + cv.name + " have learned to speak.");
+    }
+    if (cv.evoStage >= (int)g_traits.size()) cv.evolution = 0;
+    if (cv.research < 0 && cv.goal >= 0) {
+        int n = nextTowardGoal(c, cv.goal);
+        if (n >= 0) setResearch(c, n);
+    }
+}
+
 // ============================================================ traditions
 int Game::policyCost(int c) const {
     int n = civs[c].policiesAdopted;
@@ -362,6 +430,7 @@ void Game::computeCity(City& city) {
     // centre tile
     Yields cy = tileYields(c, city.x, city.y);
     cy.food = std::max(cy.food, 2) + 1;
+    if (hasTech(c, ID.tCooking)) cy.food += 1;
     cy.prod = std::max(cy.prod, 1) + 1;
     if (hasGold(c)) cy.gold += 1;
     total += cy;
@@ -400,6 +469,16 @@ void Game::computeCity(City& city) {
         }
     }
     total.sci += policyPct(c, PolicyEffect::FlatSci);
+    // evolutionary traits
+    if (c >= FIRST_PRIMATE_CIV) {
+        if (hasTrait(c, TR_GESTURES)) total.cult += 1;
+        if (hasTrait(c, TR_PROTO_SPEECH)) pct.sci += 10;
+        if (hasTrait(c, TR_SPEECH)) total.sci += 1;
+        if (hasTrait(c, TR_ADV_SPEECH)) pct.cult += 15;
+        if (hasTrait(c, TR_ABSTRACT)) pct.sci += 15;
+        if (hasTrait(c, TR_CHILDHOOD)) pct.food += 10;
+        if (hasTrait(c, TR_COLLECTIVE)) pct.sci += 10;
+    }
     total.cult += policyPct(c, PolicyEffect::FlatCult);
     if (pd) {
         pct.food += pd->foodPct; pct.prod += pd->prodPct; pct.sci += pd->sciPct;
@@ -479,6 +558,9 @@ int Game::foundCity(int c, int x, int y) {
         cv.capital = city.id;
     }
     cities.push_back(city);
+#ifdef REBIRTH_STRESS_REALLOC
+    cities.shrink_to_fit();
+#endif
     City& ref = cities.back();
     for (auto& p : ring(x, y, 1)) {
         Tile& t = at(p.x, p.y);
@@ -664,6 +746,9 @@ int Game::spawnUnit(int c, int type, int x, int y) {
     u.owner = c;
     u.x = x; u.y = y;
     units.push_back(u);
+#ifdef REBIRTH_STRESS_REALLOC
+    units.shrink_to_fit();
+#endif
     Unit& r = units.back();
     r.moves = maxMoves(r);
     return r.id;

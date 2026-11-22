@@ -5,7 +5,7 @@
 #include <sstream>
 
 namespace {
-const int SAVE_VERSION = 2;
+const int SAVE_VERSION = 3;
 
 struct Archive {
     bool writing;
@@ -122,6 +122,7 @@ void ioGame(Archive& a, Game& g) {
         a.io(c.policies); a.io(c.policiesAdopted);
         a.io(c.explored); a.io(c.visible); a.io(c.war); a.io(c.met); a.io(c.warSince);
         a.io(c.capital); a.io(c.ruinsExcavated); a.io(c.nameIdx); a.io(c.yieldBonusPct);
+        a.io(c.evolution); a.io(c.evoStage); a.io(c.evoPerTurn);
     }
     long long nu = (long long)g.units.size();
     a.num(nu);

@@ -44,6 +44,11 @@ int main(int argc, char** argv) {
     ui.render(warm);
     ui.mouseMove(800, 470);
     shot(ui, "04_start_map");
+    ui.overlay = GameUI::OV_EVO;
+    shot(ui, "04b_evolution_start");
+    ui.overlay = GameUI::OV_TECH;
+    shot(ui, "04c_tech_start");
+    ui.overlay = GameUI::OV_NONE;
     // found the capital and look at the city screen
     ui.key('B', false, false);
     shot(ui, "05_city_screen");
@@ -73,6 +78,8 @@ int main(int argc, char** argv) {
     shot(ui, "10_tech_tree");
     ui.overlay = GameUI::OV_POLICY;
     shot(ui, "11_traditions");
+    ui.overlay = GameUI::OV_EVO;
+    shot(ui, "11b_evolution_mid");
     ui.overlay = GameUI::OV_DIPLO;
     shot(ui, "12_diplomacy");
     ui.overlay = GameUI::OV_NONE;

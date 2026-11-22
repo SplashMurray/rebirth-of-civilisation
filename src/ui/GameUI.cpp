@@ -239,7 +239,7 @@ void GameUI::renderSetup() {
         cv->text(x + 58, y + 20, p.name, 19, C_TEXT, AL_LEFT, true);
         cv->text(x + 58, y + 44, p.leader, 13, C_DIM);
         cv->text(x + 12, y + 70, p.ability, 15, C_GOLD, AL_LEFT, true);
-        int ty = textBlock(x + 12, y + 92, cw - 24, p.abilityDesc, 13, C_TEXT, 3);
+        int ty = textBlock(x + 12, y + 92, cw - 24, p.abilityDesc + (p.evoPct ? " Evolves +" + std::to_string(p.evoPct) + "% faster." : ""), 13, C_TEXT, 3);
         textBlock(x + 12, ty + 6, cw - 24, p.flavor, 12, C_DIM, 2);
         hot(x, y, cw, ch, [this, i] { setupPrimate = i; });
     }
@@ -304,6 +304,7 @@ void GameUI::renderGame() {
         case OV_MENU: renderMenu(); break;
         case OV_HELP: renderHelp(); break;
         case OV_LOG: renderLog(); break;
+        case OV_EVO: renderEvolution(); break;
         default: break;
     }
     renderTopBar();
@@ -313,30 +314,63 @@ void GameUI::renderGame() {
 void GameUI::renderTopBar() {
     Game& g = *game;
     const Civ& me = g.civs[g.player];
+    bool compact = W < 1500;
     cv->fillRect(0, 0, W, TOP, rgb(20, 24, 31));
     cv->line(0, TOP - 1, W, TOP - 1, rgb(110, 96, 60), 2);
     hot(0, 0, W, TOP, nullptr);
+    // right side first: buttons and date
+    int bx = W - 8;
+    auto rb = [&](const std::string& l, std::function<void()> fn, const std::string& tip) {
+        int w = cv->textWidth(l, 13, true) + (compact ? 12 : 18);
+        bx -= w + 4;
+        button(bx, 6, w, TOP - 12, l, true, fn, tip, C_PANEL2, 13);
+    };
+    rb("Menu", [this] { overlay = overlay == OV_MENU ? OV_NONE : OV_MENU; }, "Save, load, help (Esc)");
+    rb("Log", [this] { overlay = overlay == OV_LOG ? OV_NONE : OV_LOG; logScroll = 0; }, "Event log (L)");
+    rb(compact ? "Evo" : "Evolution", [this] { overlay = overlay == OV_EVO ? OV_NONE : OV_EVO; }, "Evolutionary traits and pressures (V)");
+    rb(compact ? "Diplo" : "Diplomacy", [this] { overlay = overlay == OV_DIPLO ? OV_NONE : OV_DIPLO; }, "Other civilisations (D)");
+    rb(compact ? "Trad" : "Traditions", [this] { overlay = overlay == OV_POLICY ? OV_NONE : OV_POLICY; }, "Adopt traditions with culture (P)");
+    rb("Tech", [this] { overlay = overlay == OV_TECH ? OV_NONE : OV_TECH; }, "Technology tree (T)");
+    std::string date = "Turn " + std::to_string(g.turn) + "  |  " + g.dateString(g.turn);
+    if (compact) {
+        date = "T" + std::to_string(g.turn) + " | ";
+        date += g.turn <= PROLOGUE_TURNS ? g.dateString(g.turn) : std::to_string(g.yearAD(g.turn) - 2034) + " AF";
+    }
+    int dw = cv->textWidth(date, 14, true);
+    cv->text(bx - 12, 10, date, 14, g.warHappened ? C_TEXT : rgb(255, 150, 120), AL_RIGHT, true);
+    hot(bx - 12 - dw, 0, dw, TOP, nullptr, g.dateString(g.turn));
+    int limit = bx - 12 - dw - 14;
+    // left side, skipping whatever no longer fits
     int x = 10, y = 10;
     auto item = [&](const std::string& s, Color c, const std::string& tip, std::function<void()> fn = nullptr) {
         int w = cv->textWidth(s, 14, true);
+        if (x + w > limit) return;
         cv->text(x, y, s, 14, c, AL_LEFT, true);
         hot(x - 4, 0, w + 8, TOP, fn, tip);
-        x += w + 22;
+        x += w + (compact ? 14 : 22);
     };
     cv->fillCircle(x + 8, TOP / 2, 9, me.color);
     cv->circle(x + 8, TOP / 2, 9, rgb(0, 0, 0), 1);
     x += 26;
-    item("Science +" + std::to_string(me.sciencePerTurn), C_SCI, "Science per turn. Science is used to research new technologies.",
+    item((compact ? "Sci +" : "Science +") + std::to_string(me.sciencePerTurn), C_SCI, "Science per turn. Science is used to research new technologies.",
          [this] { overlay = OV_TECH; });
+    if (me.evoStage < (int)g_traits.size())
+        item((compact ? "Evo " : "Evolution ") + std::to_string(me.evolution) + "/" + std::to_string(g_traits[me.evoStage].cost) + " (+" +
+                 std::to_string(g.evolutionRate(g.player)) + ")",
+             rgb(130, 220, 150), "Next evolutionary trait: " + g_traits[me.evoStage].name + " - " + g_traits[me.evoStage].effect + ".\n" + pressureTip(g.player),
+             [this] { overlay = OV_EVO; });
+    else
+        item(compact ? "Evolved" : "Fully evolved", rgb(130, 220, 150), "Your species has gained every evolutionary trait.", [this] { overlay = OV_EVO; });
     if (g.hasGold(g.player))
         item("Gold " + std::to_string(me.gold) + " (" + fmtPct(me.goldPerTurn) + ")", C_GOLD, "Gold in the treasury (per turn). Spend it to buy units and buildings in your cities.");
     else
-        item("Gold: unknown", rgb(130, 120, 90), "Your people do not yet understand money. Research Currency to unlock Gold income.");
+        item(compact ? "Gold ?" : "Gold: unknown", rgb(130, 120, 90), "Your people do not yet understand money. Research Currency to unlock Gold income.");
     int pc = g.policyCost(g.player);
     bool can = false;
     for (size_t p = 0; p < g_policies.size(); p++) if (g.canAdopt(g.player, (int)p)) can = true;
-    item("Culture " + std::to_string(me.culture) + "/" + std::to_string(pc) + " (+" + std::to_string(me.culturePerTurn) + ")", C_CULT,
+    item((compact ? "Cult " : "Culture ") + std::to_string(me.culture) + "/" + std::to_string(pc) + " (+" + std::to_string(me.culturePerTurn) + ")", C_CULT,
          "Culture accumulates towards your next Tradition. Adopting every Tradition wins a Cultural victory.", [this] { overlay = OV_POLICY; });
+    if (can) item(compact ? "TRADITION!" : "TRADITION READY", rgb(255, 160, 255), "Choose a new Tradition", [this] { overlay = OV_POLICY; });
     {
         std::string abbr, tip;
         for (int r = 1; r < R_COUNT; r++) {
@@ -350,36 +384,23 @@ void GameUI::renderTopBar() {
                  "Strategic resources inside your borders: " + tip +
                  ". Some units and buildings need them (Bronze Phalanx: Copper and Tin; riders: Horses; Iron Blades: Iron or Scrap Metal; Factory: Coal; tanks: Oil).");
     }
-    if (can) item("TRADITION READY", rgb(255, 160, 255), "Choose a new Tradition", [this] { overlay = OV_POLICY; });
-    // right side: buttons and date
-    int bx = W - 8;
-    auto rb = [&](const std::string& l, std::function<void()> fn, const std::string& tip) {
-        int w = cv->textWidth(l, 13, true) + 18;
-        bx -= w + 4;
-        button(bx, 6, w, TOP - 12, l, true, fn, tip, C_PANEL2, 13);
-    };
-    rb("Menu", [this] { overlay = overlay == OV_MENU ? OV_NONE : OV_MENU; }, "Save, load, help (Esc)");
-    rb("Log", [this] { overlay = overlay == OV_LOG ? OV_NONE : OV_LOG; logScroll = 0; }, "Event log (L)");
-    rb("Diplomacy", [this] { overlay = overlay == OV_DIPLO ? OV_NONE : OV_DIPLO; }, "Other civilisations (D)");
-    rb("Traditions", [this] { overlay = overlay == OV_POLICY ? OV_NONE : OV_POLICY; }, "Adopt traditions with culture (P)");
-    rb("Tech", [this] { overlay = overlay == OV_TECH ? OV_NONE : OV_TECH; }, "Technology tree (T)");
-    std::string date = "Turn " + std::to_string(g.turn) + "  |  " + g.dateString(g.turn);
-    int dw = cv->textWidth(date, 14, true);
-    cv->text(bx - 14, 10, date, 14, g.warHappened ? C_TEXT : rgb(255, 150, 120), AL_RIGHT, true);
     // research, in whatever space is left
-    int dateX = bx - 14 - dw;
     std::string rs = me.research >= 0 ? g_techs[me.research].name + " (" + std::to_string(g.researchTurns(g.player)) + ")" : "Choose research";
+    if (me.research < 0) {
+        bool any = false;
+        for (size_t t = 0; t < g_techs.size(); t++) if (g.canResearch(g.player, (int)t)) any = true;
+        if (!any && me.evoStage < (int)g_traits.size()) rs = "Awaiting " + g_traits[me.evoStage].name + " (" + std::to_string(me.scienceBank) + " science stored)";
+    }
     double frac = me.research >= 0 ? (double)me.techProgress[me.research] / g_techs[me.research].cost : 0;
-    int rw = std::min(280, dateX - 24 - x);
-    int rx = std::max(x, (W - rw) / 2);
-    if (rx + rw > dateX - 16) rx = dateX - 16 - rw;
-    if (rw >= 150) {
+    int rw = std::min(300, limit - x);
+    if (rw >= 130) {
+        int rx = std::clamp((W - rw) / 2, x, limit - rw);
         cv->fillRect(rx, 6, rw, TOP - 12, rgb(30, 40, 56));
         bar(rx, TOP - 10, rw, 4, frac, C_SCI);
         std::string shown = rs;
         while (shown.size() > 4 && cv->textWidth(shown, 14, true) > rw - 10) shown = shown.substr(0, shown.size() - 4) + "..";
         cv->text(rx + rw / 2, 9, shown, 14, me.research >= 0 ? C_TEXT : rgb(255, 200, 120), AL_CENTER, true);
-        hot(rx, 6, rw, TOP - 12, [this] { overlay = OV_TECH; }, "Current research. Click to open the technology tree.");
+        hot(rx, 6, rw, TOP - 12, [this] { overlay = OV_TECH; }, rs + ". Click to open the technology tree.");
     }
 }
 
@@ -828,7 +849,10 @@ void GameUI::renderTech() {
     for (int e = 0; e < NUM_ERAS; e++) {
         int x0 = ox + eraStart[e] * colW - 8, x1 = ox + eraStart[e + 1] * colW - 14;
         cv->fillRect(x0, top + 8, x1 - x0, 28, e % 2 ? rgb(34, 40, 54) : rgb(40, 34, 50));
-        cv->text((x0 + x1) / 2, top + 14, std::string(ERA_NAMES[e]) + " Era", 14, C_GOLD, AL_CENTER, true);
+        std::string hdr = std::string(ERA_NAMES[e]) + " Era";
+        int need = e == 0 ? -1 : e == 1 ? TR_SPEECH : e == 2 ? TR_ADV_SPEECH : TR_ABSTRACT;
+        if (need >= 0 && e <= 3) hdr += g.hasTrait(g.player, need) ? "" : "  -  requires " + g_traits[need].name;
+        cv->text((x0 + x1) / 2, top + 14, hdr, 14, need >= 0 && !g.hasTrait(g.player, need) ? rgb(240, 140, 110) : C_GOLD, AL_CENTER, true);
     }
     auto boxPos = [&](int t, int& bx, int& by) { bx = ox + g_techs[t].col * colW; by = oy + g_techs[t].row * rowH; };
     // goal path
@@ -875,13 +899,15 @@ void GameUI::renderTech() {
         if (tier) cv->text(bx + boxW - 8, by + 5, "RUINS", 10, rgb(255, 170, 80), AL_RIGHT, true);
         if (t == ID.tCurrency) cv->text(bx + boxW - 8, by + 5, "GOLD", 10, C_GOLD, AL_RIGHT, true);
         std::string info;
+        bool traitLocked = td.trait >= 0 && !g.hasTrait(g.player, td.trait);
         if (known) info = "Researched";
+        else if (traitLocked) info = "Needs " + g_traits[td.trait].name + " (evolution)";
         else {
             int sp = std::max(1, me.sciencePerTurn);
             int left = td.cost - me.techProgress[t];
             info = std::to_string(td.cost) + " science  (" + std::to_string((left + sp - 1) / sp) + " turns)";
         }
-        cv->text(bx + 8, by + 24, info, 11, C_DIM);
+        cv->text(bx + 8, by + 24, info, 11, !known && traitLocked ? rgb(240, 140, 110) : C_DIM);
         std::string un;
         for (auto& u : g_units)
             if (u.techId == t && u.primate != -2 && (u.primate == -1 ? g.uniqueFor(g.player, unitIndex(u.name)) == unitIndex(u.name) : u.primate == me.primate))
@@ -987,6 +1013,63 @@ void GameUI::renderDiplomacy() {
     }
 }
 
+// ============================================================ evolution
+std::string GameUI::pressureTip(int c) {
+    std::string s = "Evolutionary pressures this turn:";
+    for (auto& p : game->evolutionPressures(c)) s += "\n  +" + std::to_string(p.value) + " " + p.name;
+    if (const PrimateDef* pd = game->primate(c))
+        if (pd->evoPct) s += "\n  +" + std::to_string(pd->evoPct) + "% " + pd->plural + " aptitude";
+    return s;
+}
+
+void GameUI::renderEvolution() {
+    Game& g = *game;
+    const Civ& me = g.civs[g.player];
+    int pw = std::min(1040, W - 40), ph = std::min(640, H - TOP - 30);
+    int px = (W - pw) / 2, py = TOP + 14;
+    panel(px, py, pw, ph);
+    cv->text(px + 20, py + 14, "Evolution", 26, rgb(130, 220, 150), AL_LEFT, true);
+    button(px + pw - 40, py + 12, 28, 28, "X", true, [this] { overlay = OV_NONE; });
+    textBlock(px + 20, py + 50, pw - 40,
+              "Your species is still evolving. Pressures on survival reshape brain, throat and society, earning Evolution points. "
+              "Without Speech there can be no teaching, and without Advanced Speech no real science.", 13, C_DIM, 3);
+    // trait chain
+    int n = (int)g_traits.size();
+    int gap = 8, cw = (pw - 40 - gap * (n - 1)) / n, ch = 200;
+    int y = py + 100;
+    for (int i = 0; i < n; i++) {
+        const TraitDef& t = g_traits[i];
+        int x = px + 20 + i * (cw + gap);
+        bool has = i < me.evoStage, cur = i == me.evoStage;
+        Color bg = has ? rgb(36, 80, 52) : cur ? rgb(44, 60, 52) : rgb(32, 34, 42);
+        cv->fillRect(x, y, cw, ch, bg);
+        cv->rect(x, y, cw, ch, has ? rgb(110, 200, 130) : cur ? rgb(200, 240, 200) : rgb(70, 74, 86), cur ? 2 : 1);
+        if (i + 1 < n) cv->line(x + cw, y + ch / 2, x + cw + gap, y + ch / 2, rgb(110, 140, 120), 2);
+        int ty = textBlock(x + 8, y + 8, cw - 16, t.name, 14, has ? rgb(200, 250, 210) : C_TEXT, 2, true);
+        cv->text(x + 8, ty + 2, has ? "Gained" : std::to_string(t.cost) + " points", 11, has ? rgb(130, 220, 150) : C_DIM);
+        textBlock(x + 8, ty + 22, cw - 16, t.effect, 12, i == TR_SPEECH || i == TR_ADV_SPEECH || i == TR_ABSTRACT ? C_GOLD : rgb(210, 220, 230), 2);
+        if (cur) {
+            bar(x + 8, y + ch - 20, cw - 16, 8, (double)me.evolution / t.cost, rgb(110, 210, 130));
+            int left = t.cost - me.evolution, rate = std::max(1, g.evolutionRate(g.player));
+            cv->text(x + 8, y + ch - 38, std::to_string(me.evolution) + "/" + std::to_string(t.cost) + " - " + std::to_string((left + rate - 1) / rate) + " turns", 11, C_TEXT);
+        }
+        hot(x, y, cw, ch, nullptr, t.name + ": " + t.flavor);
+    }
+    // pressures
+    y += ch + 24;
+    cv->text(px + 20, y, "Evolutionary pressures: +" + std::to_string(g.evolutionRate(g.player)) + " points per turn", 16, C_TEXT, AL_LEFT, true);
+    y += 28;
+    for (auto& p : g.evolutionPressures(g.player)) {
+        cv->text(px + 30, y, "+" + std::to_string(p.value), 14, rgb(130, 220, 150), AL_LEFT, true);
+        cv->text(px + 70, y, p.name, 14, C_TEXT, AL_LEFT, true);
+        cv->text(px + 260, y, p.why, 13, C_DIM);
+        y += 22;
+        if (y > py + ph - 30) break;
+    }
+    if (const PrimateDef* pd = g.primate(g.player))
+        if (pd->evoPct && y <= py + ph - 30) cv->text(px + 30, y + 4, "+" + std::to_string(pd->evoPct) + "% " + pd->plural + " evolve faster than most primates", 13, C_GOLD);
+}
+
 // ============================================================ menu, help, log
 void GameUI::renderMenu() {
     int pw = 320, ph = 360, px = (W - pw) / 2, py = (H - ph) / 2;
@@ -1015,6 +1098,11 @@ void GameUI::renderHelp() {
         "You lead a band of primates. Survive the Fall, then build a new civilisation from the ashes.\n"
         "WINNING  Rebirth victory: research Rebirth and complete the Rebirth Project. Domination: control every original primate capital. "
         "Cultural: adopt every Tradition. Otherwise the highest score wins when time runs out.\n"
+        "EVOLUTION  Your species starts without language, so only the most basic discoveries - Fire, Foraging, Stone Tools, Cooking, Woodcraft - "
+        "are possible. Evolutionary pressures (survival, group living, crowding, conflict, predators, harsh climate, the nuclear winter and even "
+        "radiation) earn Evolution points that unlock traits in order: Expressive Gestures, Proto-Speech, Speech, Advanced Speech, Abstract Thought "
+        "and beyond. Speech is required for Tribal technologies, Advanced Speech for Ancient ones and Abstract Thought for everything after. "
+        "Science earned while you wait is stored, not lost. Press V to see the Evolution screen.\n"
         "THE RUINS  The Fall leaves ruined cities, towns, bases, labs and power plants. Each holds up to four layers of salvage - Scrap, Books, "
         "Machines and Data - that only become usable once you research Salvaging, Deciphering, Reverse Engineering and Computing. Move a Gatherer "
         "onto a ruin and press Excavate. Orange dots under a ruin are layers you can dig now. Ruins inside your borders also add Production and Science.\n"
@@ -1029,7 +1117,7 @@ void GameUI::renderHelp() {
         "Capture cities by reducing their HP to zero with a melee unit. Beware the feral packs that roam the wastelands.\n"
         "CONTROLS  Left-click: select.  Right-click: move / attack.  Drag or arrow keys: scroll.  Wheel or +/-: zoom.  Enter: end turn.  "
         "Space: skip unit.  Tab: next unit.  B: found city.  F: fortify.  S: sleep.  E: excavate.  X: decontaminate.  M: move mode.  C: centre on unit.  "
-        "T: technologies.  P: traditions.  D: diplomacy.  L: log.  Ctrl+S / Ctrl+L: save / load.  Esc: menu / close.";
+        "T: technologies.  V: evolution.  P: traditions.  D: diplomacy.  L: log.  Ctrl+S / Ctrl+L: save / load.  Esc: menu / close.";
     textBlock(px + 20, py + 56, pw - 40, text, 14, C_TEXT, 5);
 }
 
@@ -1078,7 +1166,7 @@ void GameUI::renderPopup() {
     if (p.kind == POP_NUKE) ph = std::max(ph, 330);
     int px = (W - pw) / 2, py = std::max(TOP + 10, (H - ph) / 2);
     Color head = p.kind == POP_NUKE ? rgb(150, 50, 30) : p.kind == POP_WAR ? rgb(140, 40, 40) : p.kind == POP_VICTORY ? rgb(150, 120, 40) :
-                 p.kind == POP_DEFEAT ? rgb(80, 40, 40) : p.kind == POP_RUIN ? rgb(130, 84, 40) : p.kind == POP_TECH ? rgb(40, 80, 130) : rgb(56, 70, 92);
+                 p.kind == POP_DEFEAT ? rgb(80, 40, 40) : p.kind == POP_RUIN ? rgb(130, 84, 40) : p.kind == POP_TECH ? rgb(40, 80, 130) : p.kind == POP_EVOLUTION ? rgb(40, 110, 70) : rgb(56, 70, 92);
     cv->fillRect(px - 2, py - 2, pw + 4, ph + 4, rgb(0, 0, 0));
     cv->fillRect(px, py, pw, ph, rgb(26, 30, 38));
     cv->fillRect(px, py, pw, 46, head);
@@ -1467,9 +1555,10 @@ void GameUI::key(int k, bool shift, bool ctrl) {
         case KEY_ENTER: endTurnNow(); return;
         default: break;
     }
-    if (overlay == OV_CITY && (k == 'T' || k == 'P' || k == 'D' || k == 'L')) overlay = OV_NONE;
+    if (overlay == OV_CITY && (k == 'T' || k == 'P' || k == 'D' || k == 'L' || k == 'V')) overlay = OV_NONE;
     if (overlay != OV_NONE && overlay != OV_CITY) {
-        if ((k == 'T' && overlay == OV_TECH) || (k == 'P' && overlay == OV_POLICY) || (k == 'D' && overlay == OV_DIPLO) || (k == 'L' && overlay == OV_LOG))
+        if ((k == 'T' && overlay == OV_TECH) || (k == 'P' && overlay == OV_POLICY) || (k == 'D' && overlay == OV_DIPLO) || (k == 'L' && overlay == OV_LOG) ||
+            (k == 'V' && overlay == OV_EVO))
             overlay = OV_NONE;
         return;
     }
@@ -1478,6 +1567,7 @@ void GameUI::key(int k, bool shift, bool ctrl) {
         case 'P': overlay = OV_POLICY; return;
         case 'D': overlay = OV_DIPLO; return;
         case 'L': overlay = OV_LOG; logScroll = 0; return;
+        case 'V': overlay = OV_EVO; return;
         case KEY_TAB: { int n = nextUnitNeedingOrders(selUnit); if (n >= 0) selectUnit(n, true); return; }
         case 'C': if (sel()) centerOn(sel()->x, sel()->y); return;
         case 'M': if (sel()) moveMode = !moveMode; return;

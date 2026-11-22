@@ -20,7 +20,7 @@
 |---|---|
 | **The last days (Jan 2032 – Aug 2034)** | Six turns of the prologue. Human cities still glow on the horizon and their radios grow more frightening each turn. Use the time to explore and found your first settlement, but keep your troop away from the human cities. |
 | **The Fall (August 2034)** | A global nuclear war wipes out humanity completely. Every human city, town, military base, laboratory and power plant becomes a ruin surrounded by radioactive fallout. Units caught in the blasts die. |
-| **The rebirth (Year 1 AF onward)** | Years are counted *After the Fall*. The primates develop from tool use and fire to writing, currency, industry, computing and finally the **Rebirth Project**. |
+| **The rebirth (Year 1 AF onward)** | Years are counted *After the Fall*. Pressured by a changing world, the primates evolve speech, then advance from fire and stone tools to writing, currency, industry, computing and finally the **Rebirth Project**. |
 
 ![The Fall](docs/screenshots/06_nuke_anim.png)
 
@@ -28,8 +28,21 @@
 
 * **Hex map**, randomly generated, with grassland, plains, desert, tundra, snow, coast and ocean, plus forest, jungle, hills, mountains and resources. Small, Standard and Large sizes (4, 6 or 8 primate civilisations).
 * **Eight playable primates**, each with its own bonuses, a unique unit and a preferred starting terrain (see below).
+* **Evolution: from grunts to grammar.** At the start your species cannot speak, so only the most basic discoveries are possible: **Fire, Foraging and Stone Tools**, then Cooking and Woodcraft. *Evolutionary pressures* earn Evolution points, and the points unlock traits in order:
+
+  | Trait | Effect |
+  |---|---|
+  | Expressive Gestures | +1 Culture per city |
+  | Proto-Speech | +10% Science |
+  | **Speech** | **Required for every Tribal-era technology**; +1 Science per city |
+  | **Advanced Speech** | **Required for every Ancient-era technology**; +15% Culture |
+  | Abstract Thought | Required for Classical-era technologies and beyond; +15% Science |
+  | Extended Childhood | +10% Food |
+  | Collective Learning | +10% Science |
+
+  The pressures are survival, group living (cities), crowding (population), conflict with rivals, predators near your settlements, a harsh climate, shared stories (culture), the **nuclear winter** after the Fall and **radiation-driven mutation** from fallout in your lands. Gibbons, Bonobos and other social or vocal species evolve faster. Science earned while you wait for a trait is stored, not lost. Press `V` to open the Evolution screen.
 * **Turn-based economy** with Food, Production, Science and Culture. **Gold is not available at the start.** Your people only learn the value of money when they research **Currency**; from then on cities earn Gold, which buys units and buildings.
-* **46 technologies across 9 eras** (Awakening, Tribal, Ancient, Classical, Kingdoms, Reclamation, Industrial, Modern, Rebirth), shown as a scrollable tech tree. You can click any technology to set it as a research goal.
+* **47 technologies across 9 eras** (Awakening, Tribal, Ancient, Classical, Kingdoms, Reclamation, Industrial, Modern, Rebirth), shown as a scrollable tech tree. You can click any technology to set it as a research goal.
 * **Human ruins as a source of technology.** Every ruin holds up to four layers of salvage that unlock as you advance:
 
   | Layer | Unlocked by | Reward |
@@ -96,7 +109,7 @@
 | `Enter` | End the turn |
 | `Space` / `Tab` | Skip the unit / go to the next unit |
 | `B` `F` `S` `E` `X` `M` | Found city / fortify / sleep / excavate ruins / decontaminate / move mode |
-| `T` `P` `D` `L` | Technology tree / traditions / diplomacy / event log |
+| `T` `V` `P` `D` `L` | Technology tree / evolution / traditions / diplomacy / event log |
 | `Ctrl+S` / `Ctrl+L` | Save / load |
 | `F1` | How to play |
 | `Esc` | Menu / close the current window |
@@ -105,6 +118,7 @@
 
 | | |
 |---|---|
+| ![Evolution](docs/screenshots/04b_evolution_start.png) | ![Early tech tree](docs/screenshots/04c_tech_start.png) |
 | ![Start](docs/screenshots/04_start_map.png) | ![The Fall](docs/screenshots/07_fall_popup.png) |
 | ![Excavating ruins](docs/screenshots/09_unit_panel.png) | ![Tech tree](docs/screenshots/10_tech_tree.png) |
 | ![City screen](docs/screenshots/13_city_midgame.png) | ![Late game](docs/screenshots/16_lategame.png) |

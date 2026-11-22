@@ -151,6 +151,7 @@ void Game::processCiv(int c) {
     cv.culture += cult;
     cv.cultureTotal += cult;
     cv.gold += cv.goldPerTurn;
+    processEvolution(c);
     processUnitsEndOfTurn(c);
     for (auto& ci : cities)
         if (ci.alive && ci.owner == c) cityBombard(ci);

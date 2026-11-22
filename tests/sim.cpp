@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <chrono>
+#include <filesystem>
 
 static int fails = 0;
 #define CHECK(cond, ...) do { if (!(cond)) { fails++; std::printf("CHECK FAILED %s:%d: ", __FILE__, __LINE__); std::printf(__VA_ARGS__); std::printf("\n"); } } while (0)
@@ -41,6 +42,7 @@ static void invariants(Game& g) {
 int main(int argc, char** argv) {
     int games = argc > 1 ? std::atoi(argv[1]) : 3;
     int size = argc > 2 ? std::atoi(argv[2]) : 1;
+    std::setvbuf(stdout, nullptr, _IONBF, 0);  // keep output if anything crashes
     initData();
     for (int gi = 0; gi < games; gi++) {
         auto t0 = std::chrono::steady_clock::now();
@@ -74,12 +76,18 @@ int main(int argc, char** argv) {
                 std::printf(" | ferals %d\n", ferals);
             }
             if (g.turn == 120 && gi == 0) {
-                CHECK(g.save("/tmp/roc_test.sav"), "save failed");
+                std::string path = (std::filesystem::temp_directory_path() / "roc_sim_test.roc").string();
+                CHECK(g.save(path), "save failed: %s", path.c_str());
                 Game h;
-                CHECK(h.load("/tmp/roc_test.sav"), "load failed");
-                CHECK(h.turn == g.turn && h.units.size() == g.units.size() && h.cities.size() == g.cities.size(), "roundtrip mismatch");
-                CHECK(h.civs[3].techs == g.civs[3].techs && h.tiles.size() == g.tiles.size(), "roundtrip mismatch 2");
-                CHECK(h.rng.s == g.rng.s, "rng mismatch");
+                bool loaded = h.load(path);
+                CHECK(loaded, "load failed: %s", path.c_str());
+                if (loaded) {
+                    CHECK(h.turn == g.turn && h.units.size() == g.units.size() && h.cities.size() == g.cities.size(), "roundtrip mismatch");
+                    CHECK(h.civs.size() == g.civs.size() && h.civs[3].techs == g.civs[3].techs && h.tiles.size() == g.tiles.size(), "roundtrip mismatch 2");
+                    CHECK(h.rng.s == g.rng.s, "rng mismatch");
+                    CHECK(h.civs[3].evoStage == g.civs[3].evoStage, "evolution not saved");
+                }
+                std::fflush(stdout);
             }
         }
         double secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();

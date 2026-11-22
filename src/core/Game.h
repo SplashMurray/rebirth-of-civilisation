@@ -99,6 +99,9 @@ struct Civ {
     int ruinsExcavated = 0;
     int nameIdx = 0;
     int yieldBonusPct = 0;  // difficulty handicap for AI
+    int evolution = 0;      // points towards the next evolutionary trait
+    int evoStage = 0;       // number of traits gained
+    int evoPerTurn = 0;
 };
 
 struct Notification {
@@ -107,7 +110,7 @@ struct Notification {
     int x = -1, y = -1;
 };
 
-enum PopupKind { POP_INFO, POP_NUKE, POP_INTRO, POP_TECH, POP_RUIN, POP_WAR, POP_VICTORY, POP_DEFEAT, POP_WONDER };
+enum PopupKind { POP_INFO, POP_NUKE, POP_INTRO, POP_TECH, POP_RUIN, POP_WAR, POP_VICTORY, POP_DEFEAT, POP_WONDER, POP_EVOLUTION };
 struct Popup {
     int kind = POP_INFO;
     std::string title, body;
@@ -129,6 +132,12 @@ struct CombatResult {
 };
 
 struct Pt { int x, y; };
+
+struct Pressure {
+    std::string name;
+    int value;
+    std::string why;
+};
 
 class Game {
 public:
@@ -204,6 +213,12 @@ public:
     void grantTech(int c, int t, bool announce = true);
     void addScience(int c, int amount);
     int researchTurns(int c) const;
+
+    // ---- evolution
+    bool hasTrait(int c, int t) const { return civs[c].evoStage > t; }
+    std::vector<Pressure> evolutionPressures(int c) const;
+    int evolutionRate(int c) const;
+    void processEvolution(int c);
 
     // ---- traditions
     int policyCost(int c) const;
