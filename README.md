@@ -150,7 +150,7 @@ ctest --test-dir build            # plays complete AI-vs-AI games and checks gam
 ./build/rebirth_screens out/      # renders every screen to SVG (convert to PNG with rsvg-convert)
 ```
 
-GitHub Actions builds the Windows `.exe` and runs the tests on every push. Pushing a tag such as `v0.1.0` publishes a release with the zipped game.
+GitHub Actions builds the Windows `.exe` and runs the tests on every push. Each push to `main` publishes (or refreshes) the release for the version in `CMakeLists.txt`; bump that version to start a new release.
 
 ## Project layout
 
