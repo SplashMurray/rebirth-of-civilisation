@@ -1,0 +1,29 @@
+// Rebirth of Civilisation - Windows resources
+#include <winver.h>
+1 ICON "rebirth.ico"
+
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION 0,1,0,0
+PRODUCTVERSION 0,1,0,0
+FILEOS VOS_NT_WINDOWS32
+FILETYPE VFT_APP
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "080904b0"
+    BEGIN
+      VALUE "CompanyName", "Rebirth of Civilisation contributors"
+      VALUE "FileDescription", "Rebirth of Civilisation"
+      VALUE "FileVersion", "0.1.0"
+      VALUE "InternalName", "RebirthOfCivilisation"
+      VALUE "LegalCopyright", "MIT License"
+      VALUE "OriginalFilename", "RebirthOfCivilisation.exe"
+      VALUE "ProductName", "Rebirth of Civilisation"
+      VALUE "ProductVersion", "0.1.0"
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x809, 1200
+  END
+END
