@@ -109,22 +109,57 @@ int Game::score(int c) const {
     return s;
 }
 
-int Game::yearAD(int t) const {
-    if (t <= PROLOGUE_TURNS) return 2032 + (t - 1) / 2;
-    // calendar stretches with game speed so every speed spans the same centuries
-    double y = 2035, s = speedPct / 100.0;
-    for (int k = PROLOGUE_TURNS + 2; k <= t; k++) {
-        double prev = (k - 1) / s;
-        y += (prev < 60 ? 20 : prev < 120 ? 10 : prev < 200 ? 5 : prev < 280 ? 2 : 1) / s;
+// The calendar follows the progress of the most advanced species, not the turn number:
+// while brains and language are still evolving each turn spans thousands of years; once
+// science takes over, turns shrink era by era as in Civilization (about 40 years down to 1).
+int Game::yearsPerTurn() const {
+    int trunk = -1, topEra = 0;
+    for (int c = FIRST_PRIMATE_CIV; c < (int)civs.size(); c++) {
+        if (!civs[c].alive) continue;
+        for (int t = TR_NEOCORTEX; t <= TR_ABSTRACT; t++) if (hasTrait(c, t)) trunk = std::max(trunk, t);
+        topEra = std::max(topEra, era(c));
     }
-    return (int)y;
+    int y;
+    if (trunk < TR_ADV_SPEECH) {
+        static const int EVO_YEARS[] = {20000, 10000, 6000, 3000, 1000};  // none, Neocortex, Gestures, Proto-Speech, Speech
+        y = EVO_YEARS[trunk + 1];
+    } else {
+        static const int ERA_YEARS[NUM_ERAS] = {50, 50, 40, 25, 20, 10, 5, 2, 1};
+        y = ERA_YEARS[std::clamp(topEra, 0, NUM_ERAS - 1)];
+    }
+    // the same span of history at every speed: phases last more turns on slower speeds, so each turn covers fewer years
+    return std::max(1, (int)((long long)y * 170 / costPct));
+}
+
+std::string Game::calendarPhase() const {
+    int y = yearsPerTurn();
+    if (!warHappened) return "The last days of humanity";
+    bool science = false;
+    for (int c = FIRST_PRIMATE_CIV; c < (int)civs.size(); c++) if (civs[c].alive && hasTrait(c, TR_ADV_SPEECH)) science = true;
+    return std::string(science ? "Age of science" : "Age of evolution") + ": " + std::to_string(y) + (y == 1 ? " year" : " years") + " per turn";
+}
+
+static std::string withCommas(long long v) {
+    std::string s = std::to_string(v), out;
+    int n = 0;
+    for (int i = (int)s.size() - 1; i >= 0; i--) {
+        out.insert(out.begin(), s[i]);
+        if (++n % 3 == 0 && i > 0 && s[i - 1] != '-') out.insert(out.begin(), ',');
+    }
+    return out;
 }
 
 std::string Game::dateString(int t) const {
     static const char* pro[] = {"January 2032", "July 2032", "January 2033", "July 2033", "January 2034", "August 2034"};
     if (t <= PROLOGUE_TURNS) return pro[std::max(0, t - 1)];
-    int y = yearAD(t);
-    return "Year " + std::to_string(y - 2034) + " AF (" + std::to_string(y) + " AD)";
+    std::string s = "Year " + withCommas(std::max(1LL, yearAF)) + " AF";
+    if (yearAF < 10000) s += " (" + std::to_string(2034 + yearAF) + " AD)";
+    return s;
+}
+
+std::string Game::shortDate() const {
+    if (turn <= PROLOGUE_TURNS) return dateString(turn);
+    return withCommas(std::max(1LL, yearAF)) + " AF";
 }
 
 // ============================================================ strategic resources

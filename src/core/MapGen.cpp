@@ -273,6 +273,7 @@ void Game::newGame(const GameSettings& s) {
     H = SH[s.mapSize];
     int nPrim = NCIV[s.mapSize];
     turn = 1;
+    yearAF = 0;
     warHappened = false;
     gameOver = false;
     winner = -1;

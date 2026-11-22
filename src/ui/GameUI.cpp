@@ -342,11 +342,12 @@ void GameUI::renderTopBar() {
     std::string date = "Turn " + std::to_string(g.turn) + "  |  " + g.dateString(g.turn);
     if (compact) {
         date = "T" + std::to_string(g.turn) + " | ";
-        date += g.turn <= PROLOGUE_TURNS ? g.dateString(g.turn) : std::to_string(g.yearAD(g.turn) - 2034) + " AF";
+        date += g.shortDate();
     }
     int dw = cv->textWidth(date, 14, true);
     cv->text(bx - 12, 10, date, 14, g.warHappened ? C_TEXT : rgb(255, 150, 120), AL_RIGHT, true);
-    hot(bx - 12 - dw, 0, dw, TOP, nullptr, g.dateString(g.turn) + ". " + SPEED_NAMES[g.settings.speed] + " speed: the game ends at turn " +
+    hot(bx - 12 - dw, 0, dw, TOP, nullptr, g.dateString(g.turn) + ". " + g.calendarPhase() +
+        ". Time passes quickly while species are still evolving, then more slowly as science advances.\n" + SPEED_NAMES[g.settings.speed] + " speed: the game ends at turn " +
         std::to_string(g.maxTurns) + " if nobody has won before then.");
     int limit = bx - 12 - dw - 14;
     // left side, skipping whatever no longer fits
@@ -1209,6 +1210,8 @@ void GameUI::renderHelp() {
         "DISASTERS  Wildfires, droughts, floods, epidemics, earthquakes, harsh winters, reactor leaks and predator migrations strike at random - "
         "but which ones depends on where you live: forests burn, coasts flood, crowded cities catch disease, ruined reactors leak. Each one hurts, "
         "and each one adds evolutionary pressure - a burst of points plus lingering pressure for a few turns.\n"
+        "TIME  The calendar follows progress: while species are still evolving each turn spans thousands of years; once the leading species "
+        "masters Advanced Speech, turns shrink era by era from about 50 years to 1. Hover over the date to see the current pace.\n"
         "THE RUINS  The Fall leaves ruined cities, towns, bases, labs and power plants. Each holds up to four layers of salvage - Scrap, Books, "
         "Machines and Data - that only become usable once you research Salvaging, Deciphering, Reverse Engineering and Computing. Move a Gatherer "
         "onto a ruin and press Excavate. Orange dots under a ruin are layers you can dig now. Ruins inside your borders also add Production and Science.\n"

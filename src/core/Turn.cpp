@@ -123,6 +123,8 @@ void Game::endTurn() {
 
     checkElimination();
     checkVictory();
+    if (turn == PROLOGUE_TURNS) yearAF = 1;
+    else if (turn > PROLOGUE_TURNS) yearAF += yearsPerTurn();
     turn++;
     for (int c = FIRST_PRIMATE_CIV - 1; c < (int)civs.size(); c++)
         if (civs[c].alive) beginTurn(c);

@@ -100,6 +100,17 @@
   * **Domination:** control every original primate capital.
   * **Cultural:** adopt all 16 Traditions.
   * **Score:** have the highest score when time runs out (turn 500 at Standard speed).
+* **A calendar that follows progress.** Years are counted *After the Fall* (AF), and how many pass each turn depends on how far the most advanced species has come:
+
+  | Phase | Years per turn (Standard speed) |
+  |---|---|
+  | Before the Enlarged Neocortex | 20,000 |
+  | Neocortex / Gestures / Proto-Speech | 10,000 / 6,000 / 3,000 |
+  | Speech | 1,000 |
+  | Science (from Advanced Speech): Awakening and Tribal / Ancient / Classical / Kingdoms | 50 / 40 / 25 / 20 |
+  | Reclamation / Industrial / Modern / Rebirth | 10 / 5 / 2 / 1 |
+
+  Evolution therefore unfolds over a hundred thousand years or so, while recorded history takes a few thousand, slowing to a year per turn at the end as in *Civilization*. Other speeds scale the years per turn so a game spans similar history.
 * **Three game speeds**, chosen at setup as in *Civilization VI*:
 
   | Speed | Turn limit | Pace |
@@ -108,7 +119,7 @@
   | **Standard** (default) | 500 | Like Civ VI Standard; AI games are usually decided around turns 300–380 |
   | Epic | 750 | Everything costs much more; AI games run around 500–560 turns |
 
-  Speed scales the cost of science, production, growth, culture and evolution, along with timed effects (nuclear winter, fallout decay, feral escalation). The calendar stretches so every speed spans the same centuries after the Fall.
+  Speed scales the cost of science, production, growth, culture and evolution, along with timed effects (nuclear winter, fallout decay, feral escalation).
 * Save and load, autosave, an event log, tooltips everywhere, a minimap, and three difficulty levels.
 
 ## The primates

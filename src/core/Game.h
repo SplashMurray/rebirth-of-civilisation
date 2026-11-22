@@ -226,8 +226,11 @@ public:
     int score(int c) const;
     int numCities(int c) const;
     int militaryPower(int c) const;
-    std::string dateString(int t) const;
-    int yearAD(int t) const;
+    std::string dateString(int t) const;     // full date for the current turn (t only matters in the prologue)
+    std::string shortDate() const;           // compact form for narrow windows
+    long long yearAF = 0;                    // years since the Fall (advances by yearsPerTurn)
+    int yearsPerTurn() const;                // depends on how far the most advanced species has come
+    std::string calendarPhase() const;
 
     // ---- techs (Game.cpp)
     bool canResearch(int c, int t) const;
