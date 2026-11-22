@@ -39,7 +39,7 @@ if(WIN32)
     src/platform/win32/main_win32.cpp
     res/rebirth.rc
   )
-  target_link_libraries(RebirthOfCivilisation PRIVATE rebirth_game gdi32 user32)
+  target_link_libraries(RebirthOfCivilisation PRIVATE rebirth_game gdiplus gdi32 user32 ole32)
   target_compile_definitions(RebirthOfCivilisation PRIVATE _WIN32_WINNT=0x0601 WINVER=0x0601)
   if(MSVC)
     target_compile_options(RebirthOfCivilisation PRIVATE /W3 /utf-8 /permissive-)

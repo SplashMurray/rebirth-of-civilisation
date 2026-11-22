@@ -51,6 +51,22 @@ public:
         if (clipped) o << "</g>\n";
         clipped = false;
     }
+    void fillRectA(int x, int y, int w, int h, Color c, int a) override {
+        if (w <= 0 || h <= 0) return;
+        o << "<rect x='" << x << "' y='" << y << "' width='" << w << "' height='" << h << "' fill='" << col(c) << "' fill-opacity='" << a / 255.0 << "'/>\n";
+    }
+    void fillPolyA(const int* xy, int n, Color c, int a) override {
+        o << "<polygon points='";
+        for (int i = 0; i < n; i++) o << xy[i * 2] << "," << xy[i * 2 + 1] << " ";
+        o << "' fill='" << col(c) << "' fill-opacity='" << a / 255.0 << "'/>\n";
+    }
+    void fillCircleA(int cx, int cy, int r, Color c, int a) override {
+        o << "<circle cx='" << cx << "' cy='" << cy << "' r='" << r << "' fill='" << col(c) << "' fill-opacity='" << a / 255.0 << "'/>\n";
+    }
+    void lineA(int x1, int y1, int x2, int y2, Color c, int t, int a) override {
+        o << "<line x1='" << x1 << "' y1='" << y1 << "' x2='" << x2 << "' y2='" << y2 << "' stroke='" << col(c) << "' stroke-width='" << t
+          << "' stroke-opacity='" << a / 255.0 << "' stroke-linecap='round'/>\n";
+    }
     bool save(const std::string& path) {
         unclip();
         std::ofstream f(path);

@@ -26,6 +26,7 @@
 
 ## Features
 
+* **Anti-aliased graphics** (GDI+): shaded and textured hex terrain, sandy coastlines, waves, lit mountains, forests and jungles, settlements that grow from huts to towers, translucent fog of war, glowing borders and Civ-style unit flags with an icon for every unit type. The terrain is cached so the map stays smooth.
 * **Hex map**, randomly generated, with grassland, plains, desert, tundra, snow, coast and ocean, plus forest, jungle, hills, mountains and resources. Small, Standard and Large sizes (4, 6 or 8 primate civilisations).
 * **Eight playable primates**, each with its own bonuses, a unique unit and a preferred starting terrain (see below).
 * **Evolution: a branching tree driven by real pressures.** At the start your species cannot learn deliberately and **earns no science at all** until it evolves an **Enlarged Neocortex**. Four kinds of *evolutionary pressure* fill four separate pools every turn:
@@ -205,7 +206,7 @@ src/core/        Rules engine - no platform code
 src/ui/          User interface, drawn through the small Canvas interface
   GameUI.cpp       screens, panels, popups, input
   UIMap.cpp        hex map rendering
-src/platform/win32/main_win32.cpp   Windows window, input and GDI renderer
+src/platform/win32/main_win32.cpp   Windows window, input and GDI+ renderer
 tests/           AI simulation tests, screenshot renderer, random-input stress test
 res/             Icon and Windows resources
 ```

@@ -24,6 +24,16 @@ public:
     virtual int textWidth(const std::string& s, int size, bool bold = false) = 0;
     virtual void clip(int x, int y, int w, int h) = 0;
     virtual void unclip() = 0;
+    // translucent drawing (alpha 0..255). Backends without alpha fall back to opaque drawing.
+    virtual void fillRectA(int x, int y, int w, int h, Color c, int alpha) { (void)alpha; fillRect(x, y, w, h, c); }
+    virtual void fillPolyA(const int* xy, int n, Color c, int alpha) { (void)alpha; fillPoly(xy, n, c); }
+    virtual void fillCircleA(int cx, int cy, int r, Color c, int alpha) { (void)alpha; fillCircle(cx, cy, r, c); }
+    virtual void lineA(int x1, int y1, int x2, int y2, Color c, int thick, int alpha) { (void)alpha; line(x1, y1, x2, y2, c, thick); }
+    // Optional cached layers. layerBegin returns true if an identical layer (same key and size) was cached
+    // and has just been drawn - the caller then skips drawing it. Otherwise drawing is redirected into the
+    // layer until layerEnd, which then composites it. Backends without caching just draw normally.
+    virtual bool layerBegin(int id, uint64_t key) { (void)id; (void)key; return false; }
+    virtual void layerEnd(int id) { (void)id; }
 };
 
 // Platform-independent key codes (letters and digits use their ASCII upper-case value)

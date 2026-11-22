@@ -35,6 +35,7 @@ public:
     int hoverX = -1, hoverY = -1;  // hovered tile
     int mouseX = 0, mouseY = 0;
     int nukeT = -1;                // nuclear war animation timer (ms), -1 = off
+    void renderUnitGallery(Canvas& c);  // test helper: every unit flag at large size
 
 private:
     // ---- hotspots registered while rendering
@@ -110,6 +111,7 @@ private:
     void drawCityOnMap(const City& c, int sx, int sy);
     void drawCityBanner(const City& c, int sx, int sy);
     void drawUnitToken(const Unit& u, int sx, int sy, int r);
+    void drawUnitIcon(int type, int cx, int cy, int s, Color ic, Color accent);
     void drawPathPreview();
     void tileCenter(int tx, int ty, int& sx, int& sy) const;
     bool pickTile(int sx, int sy, int& tx, int& ty) const;
