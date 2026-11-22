@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SignPath artifact configuration for Rebirth of Civilisation.
+     Paste this into the project's artifact configuration in SignPath.
+     The GitHub workflow uploads the executable with actions/upload-artifact, which wraps it in a zip,
+     and passes the version from CMakeLists.txt as the "version" parameter.
+     product-name and product-version restrict signing to files carrying this project's metadata. -->
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <parameters>
+    <parameter name="version" required="true" />
+  </parameters>
+  <zip-file>
+    <pe-file path="RebirthOfCivilisation.exe" product-name="Rebirth of Civilisation" product-version="${version}">
+      <authenticode-sign />
+    </pe-file>
+  </zip-file>
+</artifact-configuration>

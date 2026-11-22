@@ -6,16 +6,29 @@ on:
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
+    inputs:
+      release:
+        description: "Build, sign (once SignPath is set up) and publish a release"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
   windows:
     name: Windows (.exe)
-    runs-on: windows-latest
+    runs-on: windows-latest   # GitHub-hosted runner, as SignPath requires for open-source signing
     steps:
       - uses: actions/checkout@v4
+
+      - name: Read version
+        id: ver
+        shell: pwsh
+        run: |
+          $m = Select-String -Path CMakeLists.txt -Pattern 'project\(RebirthOfCivilisation VERSION ([0-9.]+)'
+          "version=$($m.Matches[0].Groups[1].Value)" >> $env:GITHUB_OUTPUT
 
       - name: Configure
         run: cmake -S . -B build -A x64
@@ -26,12 +39,46 @@ jobs:
       - name: Test (AI simulations)
         run: ctest --test-dir build -C Release --output-on-failure
 
+      # ---- code signing (SignPath Foundation) ----
+      # Switches on once the repository variable SIGNPATH_ORGANIZATION_ID and the secret SIGNPATH_API_TOKEN exist.
+      # Signing happens for release runs only: start one from Actions > Build > Run workflow (tick "release"),
+      # or push a v* tag. Each request waits for manual approval in SignPath.
+      - name: Upload unsigned executable for signing
+        id: upload-unsigned
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-exe
+          path: build/Release/RebirthOfCivilisation.exe
+          if-no-files-found: error
+
+      - name: Sign with SignPath
+        id: sign
+        if: vars.SIGNPATH_ORGANIZATION_ID != '' && ((github.event_name == 'workflow_dispatch' && inputs.release) || startsWith(github.ref, 'refs/tags/v'))
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'rebirth-of-civilisation' }}
+          signing-policy-slug: ${{ vars.SIGNPATH_POLICY_SLUG || 'release-signing' }}
+          github-artifact-id: ${{ steps.upload-unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 3600   # time to approve the request
+          output-artifact-directory: signed
+          parameters: |
+            version: ${{ toJSON(steps.ver.outputs.version) }}
+
       - name: Package
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force dist | Out-Null
-          Copy-Item build/Release/RebirthOfCivilisation.exe dist/
-          Copy-Item README.md, LICENSE dist/
+          if (Test-Path signed/RebirthOfCivilisation.exe) {
+            Copy-Item signed/RebirthOfCivilisation.exe dist/
+            Write-Host "Packaging the SIGNED executable"
+          } else {
+            Copy-Item build/Release/RebirthOfCivilisation.exe dist/
+            Write-Host "Packaging an unsigned executable"
+          }
+          Copy-Item README.md, LICENSE, CODE_SIGNING_POLICY.md dist/
           Compress-Archive -Path dist/* -DestinationPath RebirthOfCivilisation-windows-x64.zip -Force
 
       - name: Upload build artifact
@@ -40,17 +87,13 @@ jobs:
           name: RebirthOfCivilisation-windows-x64
           path: dist/
 
-      - name: Read version
-        id: ver
-        shell: pwsh
-        run: |
-          $m = Select-String -Path CMakeLists.txt -Pattern 'project\(RebirthOfCivilisation VERSION ([0-9.]+)'
-          "version=$($m.Matches[0].Groups[1].Value)" >> $env:GITHUB_OUTPUT
-
-      # Every push to main publishes (or refreshes) the release for the version in CMakeLists.txt.
-      # Bump the version there to start a new release; pushing a v* tag also works.
+      # Before signing is set up, every push to main refreshes the release for the version in CMakeLists.txt.
+      # Once signing is set up, only signed release runs publish, so the download is always the signed one.
       - name: Publish release
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+        if: >-
+          steps.sign.outcome == 'success' ||
+          (vars.SIGNPATH_ORGANIZATION_ID == '' && github.event_name == 'push' &&
+           (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')))
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v{0}', steps.ver.outputs.version) }}
@@ -61,6 +104,10 @@ jobs:
           make_latest: true
           body: |
             Download **RebirthOfCivilisation-windows-x64.zip**, unzip it and run `RebirthOfCivilisation.exe`. No installation needed (Windows 7-11, 64-bit).
+
+            ${{ steps.sign.outcome == 'success' && 'This release is code-signed. Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org).' || 'This build is not code-signed yet, so Windows 11 Smart App Control may block it. Signing through the SignPath Foundation open-source programme is in progress.' }}
+
+            **Code signing policy:** https://github.com/${{ github.repository }}/blob/main/CODE_SIGNING_POLICY.md
 
   linux-tests:
     name: Rules engine tests (Linux)

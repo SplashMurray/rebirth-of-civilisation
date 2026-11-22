@@ -13,6 +13,8 @@
 * **Download:** open the [Releases](../../releases) page and download `RebirthOfCivilisation-windows-x64.zip`. Every push also produces a build under **Actions → latest run → Artifacts**.
 * **Install:** none. Unzip the file and run `RebirthOfCivilisation.exe`. It is one native Win32 program with no runtime dependencies, and it runs on Windows 7 through 11.
 * **Saves:** stored in `%APPDATA%\RebirthOfCivilisation\savegame.roc`. The game also autosaves every 5 turns.
+* **Code signing policy:** see [CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md). Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org) (application in progress; current downloads are unsigned, so Windows 11 Smart App Control may block them).
+* **Privacy:** the game never connects to the internet and collects no data. See the privacy policy in [CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md#privacy-policy).
 
 ## The story
 
@@ -226,4 +228,8 @@ Pull requests are welcome, from balance tweaks and new primates to better AI, so
 
 ## Licence
 
-[MIT](LICENSE)
+[MIT](LICENSE). Contributors are expected to follow the [Code of conduct](CODE_OF_CONDUCT.md). Security issues: see [SECURITY.md](SECURITY.md).
+
+## Code signing policy
+
+Windows releases are built only by GitHub Actions from this repository. Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org). See the full [Code signing policy](CODE_SIGNING_POLICY.md), including team roles and the privacy policy.

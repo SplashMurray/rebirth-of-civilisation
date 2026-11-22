@@ -35,9 +35,12 @@ endif()
 # ---- the Windows game (native Win32 + GDI)
 if(WIN32)
   enable_language(RC)
+  # one version for everything: the .exe's product/file version comes from project(VERSION ...)
+  set(REBIRTH_RES_DIR "${CMAKE_CURRENT_SOURCE_DIR}/res")
+  configure_file(res/rebirth.rc.in "${CMAKE_CURRENT_BINARY_DIR}/rebirth.rc" @ONLY)
   add_executable(RebirthOfCivilisation WIN32
     src/platform/win32/main_win32.cpp
-    res/rebirth.rc
+    "${CMAKE_CURRENT_BINARY_DIR}/rebirth.rc"
   )
   target_link_libraries(RebirthOfCivilisation PRIVATE rebirth_game gdiplus gdi32 user32 ole32)
   target_compile_definitions(RebirthOfCivilisation PRIVATE _WIN32_WINNT=0x0601 WINVER=0x0601)
