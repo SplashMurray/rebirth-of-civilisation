@@ -28,10 +28,11 @@
 
 * **Hex map**, randomly generated, with grassland, plains, desert, tundra, snow, coast and ocean, plus forest, jungle, hills, mountains and resources. Small, Standard and Large sizes (4, 6 or 8 primate civilisations).
 * **Eight playable primates**, each with its own bonuses, a unique unit and a preferred starting terrain (see below).
-* **Evolution: from grunts to grammar.** At the start your species cannot speak, so only the most basic discoveries are possible: **Fire, Foraging and Stone Tools**, then Cooking and Woodcraft. *Evolutionary pressures* earn Evolution points, and the points unlock traits in order:
+* **Evolution: from grunts to grammar.** At the start your species cannot learn deliberately: it **earns no science at all** until it evolves an **Enlarged Neocortex**. Even then it cannot speak, so only the most basic discoveries are possible: **Fire, Foraging and Stone Tools**, then Cooking and Woodcraft. *Evolutionary pressures* earn Evolution points, and the points unlock traits in order:
 
   | Trait | Effect |
   |---|---|
+  | **Enlarged Neocortex** | **Science is earned at all**; required for Awakening-era technologies |
   | Expressive Gestures | +1 Culture per city |
   | Proto-Speech | +10% Science |
   | **Speech** | **Required for every Tribal-era technology**; +1 Science per city |

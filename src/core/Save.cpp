@@ -5,7 +5,7 @@
 #include <sstream>
 
 namespace {
-const int SAVE_VERSION = 3;
+const int SAVE_VERSION = 4;
 
 struct Archive {
     bool writing;

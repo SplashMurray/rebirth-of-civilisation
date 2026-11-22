@@ -184,7 +184,7 @@ void initData() {
             t.cost = COST_BY_COL[t.col];
             t.row = rowCount[t.col]++;
             // evolution gates: no real science without language
-            t.trait = t.era == 0 ? -1 : t.era == 1 ? TR_SPEECH : t.era == 2 ? TR_ADV_SPEECH : TR_ABSTRACT;
+            t.trait = t.era == 0 ? TR_NEOCORTEX : t.era == 1 ? TR_SPEECH : t.era == 2 ? TR_ADV_SPEECH : TR_ABSTRACT;
         }
         for (auto& t : g_techs)
             for (auto& p : t.prereqNames) t.prereqs.push_back(needTech(p));
@@ -241,11 +241,14 @@ void initData() {
 
     // ------------------------------------------------------------ evolution
     g_traits = {
+        {"Enlarged Neocortex", 20, "Science can now be earned. Unlocks Awakening-era technologies",
+         "Generation by generation the forebrain grows. For the first time your primates can learn deliberately - to experiment, "
+         "to remember what worked and to plan ahead. Until now, nothing could be researched."},
         {"Expressive Gestures", 20, "+1 Culture in every city",
          "Pointing, beckoning, a raised hand for silence. The troop begins to share what it means."},
-        {"Proto-Speech", 40, "+10% Science",
+        {"Proto-Speech", 35, "+10% Science",
          "Calls grow more varied: a cry for snake, another for eagle, another for food. Each sound means one thing."},
-        {"Speech", 75, "Unlocks Tribal-era technologies. +1 Science in every city",
+        {"Speech", 70, "Unlocks Tribal-era technologies. +1 Science in every city",
          "The throat and the brain have changed. Sounds combine into words, and words name everything. Ideas can now be taught."},
         {"Advanced Speech", 140, "Unlocks Ancient-era technologies. +15% Culture",
          "Grammar, tense and question. The troop can speak of yesterday and tomorrow, of what is and what might be."},

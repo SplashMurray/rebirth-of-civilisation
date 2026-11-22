@@ -349,7 +349,7 @@ void Game::newGame(const GameSettings& s) {
           "You lead the " + pp.plural + " under " + pp.leader + ". " + pp.flavor + "\n\n"
           "Keep your troop away from the human cities. When the end comes - and it will come soon - the survivors will inherit the Earth, "
           "and the wreckage of humanity will one day reveal its secrets to those wise enough to understand them.\n\n"
-          "Your species cannot yet speak. Early discoveries are simple - fire, foraging, stone tools - but real science needs language. Evolutionary pressures (group living, crowding, conflict, even radiation) will slowly give your people Speech and then Advanced Speech.\n\n"
+          "Your species cannot yet learn deliberately, let alone speak: until its brain evolves an Enlarged Neocortex it earns no science at all. The first discoveries will be simple - fire, foraging, stone tools - and real science needs language. Evolutionary pressures (group living, crowding, conflict, even radiation) will slowly give your people Speech and then Advanced Speech.\n\n"
           "Tip: found your first settlement with the Elder Troop (press B), then choose something to research.");
     notify(player, "The year is 2032. Humanity is on the brink of nuclear war.");
 }

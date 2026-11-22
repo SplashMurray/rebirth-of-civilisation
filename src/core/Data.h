@@ -104,7 +104,7 @@ struct TechDef {
 };
 
 // ---------------------------------------------------------------- evolution
-enum TraitId { TR_GESTURES, TR_PROTO_SPEECH, TR_SPEECH, TR_ADV_SPEECH, TR_ABSTRACT, TR_CHILDHOOD, TR_COLLECTIVE, TR_COUNT };
+enum TraitId { TR_NEOCORTEX, TR_GESTURES, TR_PROTO_SPEECH, TR_SPEECH, TR_ADV_SPEECH, TR_ABSTRACT, TR_CHILDHOOD, TR_COLLECTIVE, TR_COUNT };
 struct TraitDef {
     std::string name;
     int cost;

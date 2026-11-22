@@ -352,8 +352,13 @@ void GameUI::renderTopBar() {
     cv->fillCircle(x + 8, TOP / 2, 9, me.color);
     cv->circle(x + 8, TOP / 2, 9, rgb(0, 0, 0), 1);
     x += 26;
-    item((compact ? "Sci +" : "Science +") + std::to_string(me.sciencePerTurn), C_SCI, "Science per turn. Science is used to research new technologies.",
-         [this] { overlay = OV_TECH; });
+    if (g.hasTrait(g.player, TR_NEOCORTEX))
+        item((compact ? "Sci +" : "Science +") + std::to_string(me.sciencePerTurn), C_SCI, "Science per turn. Science is used to research new technologies.",
+             [this] { overlay = OV_TECH; });
+    else
+        item(compact ? "Sci: none" : "Science: none", rgb(110, 130, 160),
+             "Your primates' brains cannot yet learn deliberately, so no science is earned. Evolve an Enlarged Neocortex first (see Evolution).",
+             [this] { overlay = OV_EVO; });
     if (me.evoStage < (int)g_traits.size())
         item((compact ? "Evo " : "Evolution ") + std::to_string(me.evolution) + "/" + std::to_string(g_traits[me.evoStage].cost) + " (+" +
                  std::to_string(g.evolutionRate(g.player)) + ")",
@@ -389,7 +394,8 @@ void GameUI::renderTopBar() {
     if (me.research < 0) {
         bool any = false;
         for (size_t t = 0; t < g_techs.size(); t++) if (g.canResearch(g.player, (int)t)) any = true;
-        if (!any && me.evoStage < (int)g_traits.size()) rs = "Awaiting " + g_traits[me.evoStage].name + " (" + std::to_string(me.scienceBank) + " science stored)";
+        if (!any && !g.hasTrait(g.player, TR_NEOCORTEX)) rs = "No science until Enlarged Neocortex";
+        else if (!any && me.evoStage < (int)g_traits.size()) rs = "Awaiting " + g_traits[me.evoStage].name + " (" + std::to_string(me.scienceBank) + " science stored)";
     }
     double frac = me.research >= 0 ? (double)me.techProgress[me.research] / g_techs[me.research].cost : 0;
     int rw = std::min(300, limit - x);
@@ -850,7 +856,7 @@ void GameUI::renderTech() {
         int x0 = ox + eraStart[e] * colW - 8, x1 = ox + eraStart[e + 1] * colW - 14;
         cv->fillRect(x0, top + 8, x1 - x0, 28, e % 2 ? rgb(34, 40, 54) : rgb(40, 34, 50));
         std::string hdr = std::string(ERA_NAMES[e]) + " Era";
-        int need = e == 0 ? -1 : e == 1 ? TR_SPEECH : e == 2 ? TR_ADV_SPEECH : TR_ABSTRACT;
+        int need = e == 0 ? TR_NEOCORTEX : e == 1 ? TR_SPEECH : e == 2 ? TR_ADV_SPEECH : TR_ABSTRACT;
         if (need >= 0 && e <= 3) hdr += g.hasTrait(g.player, need) ? "" : "  -  requires " + g_traits[need].name;
         cv->text((x0 + x1) / 2, top + 14, hdr, 14, need >= 0 && !g.hasTrait(g.player, need) ? rgb(240, 140, 110) : C_GOLD, AL_CENTER, true);
     }
@@ -1032,7 +1038,8 @@ void GameUI::renderEvolution() {
     button(px + pw - 40, py + 12, 28, 28, "X", true, [this] { overlay = OV_NONE; });
     textBlock(px + 20, py + 50, pw - 40,
               "Your species is still evolving. Pressures on survival reshape brain, throat and society, earning Evolution points. "
-              "Without Speech there can be no teaching, and without Advanced Speech no real science.", 13, C_DIM, 3);
+              "Without an Enlarged Neocortex no science is earned at all; without Speech there can be no teaching, and without Advanced Speech no real science.",
+              13, C_DIM, 3);
     // trait chain
     int n = (int)g_traits.size();
     int gap = 8, cw = (pw - 40 - gap * (n - 1)) / n, ch = 200;
@@ -1047,7 +1054,7 @@ void GameUI::renderEvolution() {
         if (i + 1 < n) cv->line(x + cw, y + ch / 2, x + cw + gap, y + ch / 2, rgb(110, 140, 120), 2);
         int ty = textBlock(x + 8, y + 8, cw - 16, t.name, 14, has ? rgb(200, 250, 210) : C_TEXT, 2, true);
         cv->text(x + 8, ty + 2, has ? "Gained" : std::to_string(t.cost) + " points", 11, has ? rgb(130, 220, 150) : C_DIM);
-        textBlock(x + 8, ty + 22, cw - 16, t.effect, 12, i == TR_SPEECH || i == TR_ADV_SPEECH || i == TR_ABSTRACT ? C_GOLD : rgb(210, 220, 230), 2);
+        textBlock(x + 8, ty + 22, cw - 16, t.effect, 12, i == TR_NEOCORTEX || i == TR_SPEECH || i == TR_ADV_SPEECH || i == TR_ABSTRACT ? C_GOLD : rgb(210, 220, 230), 2);
         if (cur) {
             bar(x + 8, y + ch - 20, cw - 16, 8, (double)me.evolution / t.cost, rgb(110, 210, 130));
             int left = t.cost - me.evolution, rate = std::max(1, g.evolutionRate(g.player));
@@ -1098,9 +1105,9 @@ void GameUI::renderHelp() {
         "You lead a band of primates. Survive the Fall, then build a new civilisation from the ashes.\n"
         "WINNING  Rebirth victory: research Rebirth and complete the Rebirth Project. Domination: control every original primate capital. "
         "Cultural: adopt every Tradition. Otherwise the highest score wins when time runs out.\n"
-        "EVOLUTION  Your species starts without language, so only the most basic discoveries - Fire, Foraging, Stone Tools, Cooking, Woodcraft - "
-        "are possible. Evolutionary pressures (survival, group living, crowding, conflict, predators, harsh climate, the nuclear winter and even "
-        "radiation) earn Evolution points that unlock traits in order: Expressive Gestures, Proto-Speech, Speech, Advanced Speech, Abstract Thought "
+        "EVOLUTION  Your species starts unable to learn deliberately: it earns no science until it evolves an Enlarged Neocortex. Even then it has no "
+        "language, so only the most basic discoveries - Fire, Foraging, Stone Tools, Cooking, Woodcraft - are possible. Evolutionary pressures (survival, group living, crowding, conflict, predators, harsh climate, the nuclear winter and even "
+        "radiation) earn Evolution points that unlock traits in order: Enlarged Neocortex, Expressive Gestures, Proto-Speech, Speech, Advanced Speech, Abstract Thought "
         "and beyond. Speech is required for Tribal technologies, Advanced Speech for Ancient ones and Abstract Thought for everything after. "
         "Science earned while you wait is stored, not lost. Press V to see the Evolution screen.\n"
         "THE RUINS  The Fall leaves ruined cities, towns, bases, labs and power plants. Each holds up to four layers of salvage - Scrap, Books, "

@@ -249,6 +249,7 @@ void Game::grantTech(int c, int t, bool announce) {
 void Game::addScience(int c, int amount) {
     Civ& cv = civs[c];
     if (amount <= 0) return;
+    if (c >= FIRST_PRIMATE_CIV && !hasTrait(c, TR_NEOCORTEX)) return;  // brains not yet able to learn
     if (cv.research < 0) {
         cv.scienceBank += amount;
         return;
@@ -495,6 +496,7 @@ void Game::computeCity(City& city) {
     total.food = applyPct(total.food, pct.food);
     total.prod = applyPct(total.prod, pct.prod);
     total.sci = applyPct(total.sci, pct.sci);
+    if (c >= FIRST_PRIMATE_CIV && !hasTrait(c, TR_NEOCORTEX)) total.sci = 0;  // no deliberate learning yet
     total.cult = applyPct(total.cult, pct.cult);
     total.gold = hasGold(c) ? applyPct(total.gold, pct.gold) : 0;
     city.yields = total;
