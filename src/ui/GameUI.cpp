@@ -215,6 +215,7 @@ void GameUI::renderTitle() {
     button(bx, by + 58, bw, 46, "Load Game", hasSave, [this] { loadGame(); }, hasSave ? "" : "No saved game found", rgb(70, 60, 50), 18);
     button(bx, by + 116, bw, 46, "How to Play", true, [this] { overlay = OV_HELP; }, "", rgb(70, 60, 50), 18);
     button(bx, by + 174, bw, 46, "Exit", true, [this] { quit = true; }, "", rgb(70, 60, 50), 18);
+    uiScaleControl(bx, by + 232, bw);
     cv->text(W - 12, H - 22, "Open source - MIT licence", 12, rgb(170, 200, 170), AL_RIGHT);
     if (overlay == OV_HELP) renderHelp();
 }
@@ -1173,8 +1174,18 @@ void GameUI::renderEvolution() {
 }
 
 // ============================================================ menu, help, log
+// "Interface size  [-]  100%  [+]" row, 40 px tall
+void GameUI::uiScaleControl(int x, int y, int w) {
+    cv->fillRectA(x, y, w, 40, rgb(20, 24, 30), 215);
+    cv->text(x + 12, y + 11, "Interface size", 15, C_TEXT);
+    std::string tip = "Make text, buttons and the map bigger or smaller (Ctrl + / Ctrl - / Ctrl 0)";
+    button(x + w - 128, y + 5, 30, 30, "-", uiScalePct > UI_SCALE_MIN, [this] { adjustUiScale(-1); }, tip, C_PANEL2, 18);
+    cv->text(x + w - 64, y + 11, std::to_string(uiScalePct) + "%", 15, C_GOLD, AL_CENTER, true);
+    button(x + w - 34, y + 5, 30, 30, "+", uiScalePct < UI_SCALE_MAX, [this] { adjustUiScale(1); }, tip, C_PANEL2, 18);
+}
+
 void GameUI::renderMenu() {
-    int pw = 320, ph = 360, px = (W - pw) / 2, py = (H - ph) / 2;
+    int pw = 320, ph = 412, px = (W - pw) / 2, py = (H - ph) / 2;
     hot(0, 0, W, H, [this] { overlay = OV_NONE; });
     panel(px, py, pw, ph);
     cv->text(px + pw / 2, py + 16, "Menu", 24, C_TEXT, AL_CENTER, true);
@@ -1184,6 +1195,8 @@ void GameUI::renderMenu() {
     b("Save Game (Ctrl+S)", [this] { saveGame(); overlay = OV_NONE; });
     b("Load Game (Ctrl+L)", [this] { loadGame(); });
     b("How to Play (F1)", [this] { overlay = OV_HELP; });
+    uiScaleControl(px + 30, y, pw - 60);
+    y += 52;
     b("Main Menu", [this] { overlay = OV_NONE; screen = SCR_TITLE; });
     b("Exit Game", [this] { quit = true; });
 }
@@ -1226,7 +1239,7 @@ void GameUI::renderHelp() {
         "Capture cities by reducing their HP to zero with a melee unit. Beware the feral packs that roam the wastelands.\n"
         "CONTROLS  Left-click: select.  Right-click: move / attack.  Drag or arrow keys: scroll.  Wheel or +/-: zoom.  Enter: end turn.  "
         "Space: skip unit.  Tab: next unit.  B: found city.  F: fortify.  S: sleep.  E: excavate.  X: decontaminate.  M: move mode.  C: centre on unit.  "
-        "T: technologies.  V: evolution.  P: traditions.  D: diplomacy.  L: log.  Ctrl+S / Ctrl+L: save / load.  Esc: menu / close.";
+        "T: technologies.  V: evolution.  P: traditions.  D: diplomacy.  L: log.  Ctrl+S / Ctrl+L: save / load.  Ctrl + / Ctrl - / Ctrl 0: interface size.  Esc: menu / close.";
     textBlock(px + 20, py + 56, pw - 40, text, 14, C_TEXT, 5);
 }
 
@@ -1608,8 +1621,19 @@ void GameUI::wheel(int x, int y, int delta) {
     clampCamera();
 }
 
+void GameUI::adjustUiScale(int dir) {
+    if (dir == 0) uiScalePct = 100;
+    else uiScalePct = std::max(UI_SCALE_MIN, std::min(UI_SCALE_MAX, uiScalePct + dir * UI_SCALE_STEP));
+    toast = "Interface size " + std::to_string(uiScalePct) + "%";
+    toastMs = 1500;
+}
+
 void GameUI::key(int k, bool shift, bool ctrl) {
     (void)shift;
+    if (ctrl && (k == KEY_PLUS || k == KEY_MINUS || k == '0')) {
+        adjustUiScale(k == KEY_PLUS ? 1 : k == KEY_MINUS ? -1 : 0);
+        return;
+    }
     if (screen == SCR_TITLE) {
         if (overlay == OV_HELP && (k == KEY_ESC || k == KEY_ENTER)) { overlay = OV_NONE; return; }
         if (k == KEY_ENTER || k == 'N') screen = SCR_SETUP;

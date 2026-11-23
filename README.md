@@ -153,6 +153,7 @@
 | `B` `F` `S` `E` `X` `M` | Found city / fortify / sleep / excavate ruins / decontaminate / move mode |
 | `T` `V` `P` `D` `L` | Technology tree / evolution / traditions / diplomacy / event log |
 | `Ctrl+S` / `Ctrl+L` | Save / load |
+| `Ctrl +` / `Ctrl -` / `Ctrl 0` | Interface size bigger / smaller / reset (also in the menu and on the title screen) |
 | `F1` | How to play |
 | `Esc` | Menu / close the current window |
 

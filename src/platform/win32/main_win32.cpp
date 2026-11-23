@@ -16,10 +16,15 @@ using std::max;
 using std::min;
 }
 #include <gdiplus.h>
+#include <cstdio>
 #include <string>
 #include <unordered_map>
 #include <memory>
 #include "../../ui/GameUI.h"
+
+#ifndef WM_DPICHANGED
+#define WM_DPICHANGED 0x02E0
+#endif
 
 namespace {
 
@@ -36,14 +41,17 @@ class GdiCanvas : public Canvas {
 public:
     HDC dc = nullptr;                 // back buffer DC
     Gdiplus::Graphics* g = nullptr;   // current target (back buffer or a cached layer)
-    int w = 0, h = 0;
+    int w = 0, h = 0;                 // logical size seen by the UI
+    int pw = 0, ph = 0;               // physical pixel size of the back buffer
+    float scale = 1.0f;               // physical pixels per logical pixel
 
     ~GdiCanvas() override {
         for (auto& f : fonts) delete f.second;
         delete fmt;
         for (auto& L : layers) freeLayer(L);
     }
-    static void setup(Gdiplus::Graphics& gr) {
+    static void setup(Gdiplus::Graphics& gr, float scale = 1.0f) {
+        if (scale != 1.0f) gr.ScaleTransform(scale, scale);
         gr.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
         gr.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
         gr.SetTextRenderingHint(Gdiplus::TextRenderingHintClearTypeGridFit);
@@ -111,24 +119,25 @@ public:
     bool layerBegin(int id, uint64_t key) override {
         if (id < 0 || id >= 2 || layerG) return false;
         Layer& L = layers[id];
-        if (L.valid && L.key == key && L.w == w && L.h == h) {
+        if (L.valid && L.key == key && L.w == pw && L.h == ph && L.scale == scale) {
             g->Flush(Gdiplus::FlushIntentionSync);
-            BitBlt(dc, 0, 0, w, h, L.dc, 0, 0, SRCCOPY);
+            BitBlt(dc, 0, 0, pw, ph, L.dc, 0, 0, SRCCOPY);
             return true;
         }
-        if (!L.dc || L.w != w || L.h != h) {
+        if (!L.dc || L.w != pw || L.h != ph) {
             freeLayer(L);
             L.dc = CreateCompatibleDC(dc);
-            L.bmp = CreateCompatibleBitmap(dc, std::max(1, w), std::max(1, h));
+            L.bmp = CreateCompatibleBitmap(dc, std::max(1, pw), std::max(1, ph));
             L.old = SelectObject(L.dc, L.bmp);
-            L.w = w;
-            L.h = h;
+            L.w = pw;
+            L.h = ph;
         }
+        L.scale = scale;
         L.key = key;
         L.valid = true;
         saved = g;
         layerG = new Gdiplus::Graphics(L.dc);
-        setup(*layerG);
+        setup(*layerG, scale);
         g = layerG;
         return false;
     }
@@ -139,7 +148,7 @@ public:
         g = saved;
         saved = nullptr;
         g->Flush(Gdiplus::FlushIntentionSync);
-        BitBlt(dc, 0, 0, w, h, layers[id].dc, 0, 0, SRCCOPY);
+        BitBlt(dc, 0, 0, pw, ph, layers[id].dc, 0, 0, SRCCOPY);
     }
 
 private:
@@ -148,6 +157,7 @@ private:
         HBITMAP bmp = nullptr;
         HGDIOBJ old = nullptr;
         int w = 0, h = 0;
+        float scale = 1.0f;
         uint64_t key = 0;
         bool valid = false;
     };
@@ -193,6 +203,61 @@ std::unique_ptr<GdiCanvas> g_canvas;
 HDC g_memDC = nullptr;
 HBITMAP g_bmp = nullptr;
 int g_bw = 0, g_bh = 0;
+UINT g_dpi = 96;            // DPI of the monitor the window is on
+int g_appliedPct = -1;      // uiScalePct last saved to the settings file
+const int MIN_LOGICAL_W = 1000, MIN_LOGICAL_H = 620;
+
+// Effective scale: Windows display scaling x the in-game interface size, limited so the
+// logical canvas never drops below the size the UI was laid out for.
+float scaleFor(int physW, int physH) {
+    float s = (float)g_dpi / 96.0f * (float)g_ui->uiScalePct / 100.0f;
+    if (physW > 0 && physH > 0) {
+        s = std::min(s, (float)physW / MIN_LOGICAL_W);
+        s = std::min(s, (float)physH / MIN_LOGICAL_H);
+    }
+    return std::max(0.5f, s);
+}
+float currentScale(HWND hwnd) {
+    RECT rc;
+    GetClientRect(hwnd, &rc);
+    return scaleFor(rc.right - rc.left, rc.bottom - rc.top);
+}
+int lx(HWND hwnd, int x) { return (int)((float)x / currentScale(hwnd)); }
+
+UINT dpiForWindow(HWND hwnd) {
+    typedef UINT(WINAPI * GetDpiForWindowFn)(HWND);
+    static GetDpiForWindowFn fn = (GetDpiForWindowFn)(void*)GetProcAddress(GetModuleHandleW(L"user32.dll"), "GetDpiForWindow");
+    if (fn && hwnd) return fn(hwnd);
+    HDC sdc = GetDC(nullptr);
+    UINT d = (UINT)GetDeviceCaps(sdc, LOGPIXELSX);
+    ReleaseDC(nullptr, sdc);
+    return d ? d : 96;
+}
+
+void enableDpiAwareness() {
+    // Per-monitor v2 (Windows 10 1703+) gives crisp rendering and DPI change notifications.
+    typedef BOOL(WINAPI * SetCtxFn)(HANDLE);
+    SetCtxFn fn = (SetCtxFn)(void*)GetProcAddress(GetModuleHandleW(L"user32.dll"), "SetProcessDpiAwarenessContext");
+    if (fn && fn((HANDLE)-4 /* DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 */)) return;
+    SetProcessDPIAware();
+}
+
+std::string settingsPath();
+void loadSettings() {
+    FILE* f = fopen(settingsPath().c_str(), "r");
+    if (!f) return;
+    int pct = 0;
+    if (fscanf(f, "uiscale=%d", &pct) == 1 && pct >= GameUI::UI_SCALE_MIN && pct <= GameUI::UI_SCALE_MAX) g_ui->uiScalePct = pct;
+    fclose(f);
+}
+void saveSettingsIfChanged() {
+    if (g_ui->uiScalePct == g_appliedPct) return;
+    g_appliedPct = g_ui->uiScalePct;
+    FILE* f = fopen(settingsPath().c_str(), "w");
+    if (!f) return;
+    fprintf(f, "uiscale=%d\n", g_appliedPct);
+    fclose(f);
+}
 
 void ensureBackBuffer(HDC wdc, int w, int h) {
     if (g_memDC && w == g_bw && h == g_bh) return;
@@ -229,6 +294,7 @@ int mapKey(WPARAM vk) {
 }
 
 void afterInput(HWND hwnd) {
+    saveSettingsIfChanged();
     if (g_ui->wantsQuit()) DestroyWindow(hwnd);
     else InvalidateRect(hwnd, nullptr, FALSE);
 }
@@ -248,13 +314,17 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             int w = rc.right - rc.left, h = rc.bottom - rc.top;
             if (w > 0 && h > 0) {
                 ensureBackBuffer(dc, w, h);
+                float s = scaleFor(w, h);
                 {
                     Gdiplus::Graphics gfx(g_memDC);
-                    GdiCanvas::setup(gfx);
+                    GdiCanvas::setup(gfx, s);
                     g_canvas->dc = g_memDC;
                     g_canvas->g = &gfx;
-                    g_canvas->w = w;
-                    g_canvas->h = h;
+                    g_canvas->scale = s;
+                    g_canvas->pw = w;
+                    g_canvas->ph = h;
+                    g_canvas->w = (int)((float)w / s + 0.999f);
+                    g_canvas->h = (int)((float)h / s + 0.999f);
                     g_ui->render(*g_canvas);
                     gfx.Flush(Gdiplus::FlushIntentionSync);
                     g_canvas->g = nullptr;
@@ -269,24 +339,31 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             if (g_ui->wantsQuit()) DestroyWindow(hwnd);
             return 0;
         case WM_MOUSEMOVE:
-            g_ui->mouseMove(GET_X_LPARAM(lp), GET_Y_LPARAM(lp));
+            g_ui->mouseMove(lx(hwnd, GET_X_LPARAM(lp)), lx(hwnd, GET_Y_LPARAM(lp)));
             InvalidateRect(hwnd, nullptr, FALSE);
             return 0;
         case WM_LBUTTONDOWN:
             SetCapture(hwnd);
-            g_ui->mouseDown(GET_X_LPARAM(lp), GET_Y_LPARAM(lp), MOUSE_LEFT);
+            g_ui->mouseDown(lx(hwnd, GET_X_LPARAM(lp)), lx(hwnd, GET_Y_LPARAM(lp)), MOUSE_LEFT);
             afterInput(hwnd);
             return 0;
         case WM_LBUTTONUP:
             ReleaseCapture();
-            g_ui->mouseUp(GET_X_LPARAM(lp), GET_Y_LPARAM(lp), MOUSE_LEFT);
+            g_ui->mouseUp(lx(hwnd, GET_X_LPARAM(lp)), lx(hwnd, GET_Y_LPARAM(lp)), MOUSE_LEFT);
             afterInput(hwnd);
             return 0;
+        case WM_DPICHANGED: {
+            g_dpi = HIWORD(wp);
+            RECT* r = (RECT*)lp;
+            SetWindowPos(hwnd, nullptr, r->left, r->top, r->right - r->left, r->bottom - r->top, SWP_NOZORDER | SWP_NOACTIVATE);
+            InvalidateRect(hwnd, nullptr, FALSE);
+            return 0;
+        }
         case WM_RBUTTONDOWN:
-            g_ui->mouseDown(GET_X_LPARAM(lp), GET_Y_LPARAM(lp), MOUSE_RIGHT);
+            g_ui->mouseDown(lx(hwnd, GET_X_LPARAM(lp)), lx(hwnd, GET_Y_LPARAM(lp)), MOUSE_RIGHT);
             return 0;
         case WM_RBUTTONUP:
-            g_ui->mouseUp(GET_X_LPARAM(lp), GET_Y_LPARAM(lp), MOUSE_RIGHT);
+            g_ui->mouseUp(lx(hwnd, GET_X_LPARAM(lp)), lx(hwnd, GET_Y_LPARAM(lp)), MOUSE_RIGHT);
             afterInput(hwnd);
             return 0;
         case WM_MOUSEWHEEL: {
@@ -295,7 +372,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             p.y = GET_Y_LPARAM(lp);
             ScreenToClient(hwnd, &p);
             int d = GET_WHEEL_DELTA_WPARAM(wp);
-            g_ui->wheel(p.x, p.y, d > 0 ? 1 : -1);
+            g_ui->wheel(lx(hwnd, p.x), lx(hwnd, p.y), d > 0 ? 1 : -1);
             afterInput(hwnd);
             return 0;
         }
@@ -311,8 +388,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         }
         case WM_GETMINMAXINFO: {
             MINMAXINFO* mm = (MINMAXINFO*)lp;
-            mm->ptMinTrackSize.x = 1024;
-            mm->ptMinTrackSize.y = 640;
+            mm->ptMinTrackSize.x = MulDiv(1024, (int)g_dpi, 96);
+            mm->ptMinTrackSize.y = MulDiv(640, (int)g_dpi, 96);
             return 0;
         }
         case WM_DESTROY:
@@ -323,27 +400,31 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     return DefWindowProcW(hwnd, msg, wp, lp);
 }
 
-std::string savePathFor() {
+std::string dataDir() {
     char buf[MAX_PATH * 2];
     DWORD n = GetEnvironmentVariableA("APPDATA", buf, (DWORD)sizeof(buf));
     if (n > 0 && n < sizeof(buf)) {
         std::string dir = std::string(buf) + "\\RebirthOfCivilisation";
         CreateDirectoryA(dir.c_str(), nullptr);
-        return dir + "\\savegame.roc";
+        return dir + "\\";
     }
-    return "savegame.roc";
+    return "";
 }
+std::string savePathFor() { return dataDir() + "savegame.roc"; }
+std::string settingsPath() { return dataDir() + "settings.ini"; }
 
 }  // namespace
 
 int WINAPI WinMain(HINSTANCE inst, HINSTANCE, LPSTR, int show) {
-    SetProcessDPIAware();
+    enableDpiAwareness();
     Gdiplus::GdiplusStartupInput gdipInput;
     ULONG_PTR gdipToken = 0;
     if (Gdiplus::GdiplusStartup(&gdipToken, &gdipInput, nullptr) != Gdiplus::Ok) return 1;
     g_ui.reset(new GameUI());
     g_ui->savePath = savePathFor();
     g_canvas.reset(new GdiCanvas());
+    loadSettings();
+    g_appliedPct = g_ui->uiScalePct;
 
     WNDCLASSEXW wc;
     ZeroMemory(&wc, sizeof(wc));
@@ -358,11 +439,14 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE, LPSTR, int show) {
     RegisterClassExW(&wc);
 
     int sw = GetSystemMetrics(SM_CXSCREEN), sh = GetSystemMetrics(SM_CYSCREEN);
-    int w = std::min(1600, sw * 9 / 10), h = std::min(900, sh * 85 / 100);
+    g_dpi = dpiForWindow(nullptr);
+    // 1600x900 logical, in physical pixels for this display, capped to the screen
+    int w = std::min(MulDiv(1600, (int)g_dpi, 96), sw * 9 / 10), h = std::min(MulDiv(900, (int)g_dpi, 96), sh * 85 / 100);
     HWND hwnd = CreateWindowExW(0, wc.lpszClassName, L"Rebirth of Civilisation", WS_OVERLAPPEDWINDOW, (sw - w) / 2, (sh - h) / 2, w, h,
                                 nullptr, nullptr, inst, nullptr);
     if (!hwnd) return 1;
-    ShowWindow(hwnd, sw <= 1600 ? SW_MAXIMIZE : show);
+    g_dpi = dpiForWindow(hwnd);
+    ShowWindow(hwnd, MulDiv(sw, 96, (int)g_dpi) <= 1600 ? SW_MAXIMIZE : show);
     UpdateWindow(hwnd);
 
     MSG m;

@@ -19,6 +19,11 @@ public:
     bool tick(int ms);                             // returns true if a redraw is needed
     bool wantsQuit() const { return quit; }
     std::string savePath = "rebirth_save.roc";
+    // Interface size as a percentage on top of the system display scaling. The platform layer
+    // reads this after each input event and rescales the canvas when it changes.
+    int uiScalePct = 100;
+    static constexpr int UI_SCALE_MIN = 60, UI_SCALE_MAX = 200, UI_SCALE_STEP = 10;
+    void adjustUiScale(int dir);  // dir: +1 bigger, -1 smaller, 0 reset
 
     // ---- used by tests / screenshot tool
     enum Screen { SCR_TITLE, SCR_SETUP, SCR_GAME };
@@ -96,6 +101,7 @@ private:
     void renderPolicies();
     void renderDiplomacy();
     void renderMenu();
+    void uiScaleControl(int x, int y, int w);
     void renderHelp();
     void renderLog();
     void renderEvolution();
