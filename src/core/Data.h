@@ -55,7 +55,7 @@ extern const char* RUIN_TIER_NAME[RUIN_TIERS];
 extern int g_ruinTierTech[RUIN_TIERS];
 
 // ---------------------------------------------------------------- units
-enum class UnitClass { Settler, Worker, Recon, Melee, Ranged, Mounted, Siege, Armor, Band };
+enum class UnitClass { Settler, Worker, Recon, Melee, Ranged, Mounted, Siege, Armor, Band, Nuke };
 
 struct UnitDef {
     std::string name, abbr;
@@ -69,7 +69,7 @@ struct UnitDef {
     int replacesId = -1;
     std::vector<int> needs;  // strategic resources required to train it
     bool civilian() const { return cls == UnitClass::Settler || cls == UnitClass::Worker || cls == UnitClass::Band; }
-    bool military() const { return !civilian(); }
+    bool military() const { return !civilian() && cls != UnitClass::Nuke; }
     bool ranged() const { return rstr > 0; }
 };
 
@@ -215,11 +215,11 @@ std::string needsText(const std::vector<int>& needs);
 
 // commonly referenced ids (filled by initData)
 struct DataIds {
-    int uElder, uGatherer, uScout, uWarband, uTinkerer, uBand;
+    int uElder, uGatherer, uScout, uWarband, uTinkerer, uBand, uNuke;
     int bPalace, bRebirth;
     int tCurrency, tRafts, tNavigation, tRadiology, tSalvaging, tDeciphering, tReverse, tComputing, tRebirth;
     int tCooking;
-    int tForaging;
+    int tForaging, tFission;
     int tCultivation, tDigging, tWoodcraft, tIndustrial, tChemistry;
 };
 extern DataIds ID;

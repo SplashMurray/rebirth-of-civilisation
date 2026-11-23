@@ -100,6 +100,8 @@
 * **Feral packs:** feral dogs, then mutant hounds, then rogue human war machines roam the wastelands. They take the place of barbarians.
 * **Diplomacy:** AI rivals declare war based on their personality and relative strength. You can declare war or sue for peace.
 * **AI opponents** that forage, settle, expand, research, excavate ruins, wage war and race you to victory.
+* **Nuclear weapons, again.** *Nuclear Fission* lets a city build a **Nuclear Warhead** (needs Uranium). Warheads wait in your silos; click the warhead count on the top bar, pick any tile within 12 of one of your cities and confirm. Everything next to the blast is destroyed, cities are wrecked and lose buildings, fallout spreads, your victims declare war and others who know you may join them. Hard and Expert rivals will use them too - rarely.
+* **Achievements** - 33 of them, from *Spark of Genius* (discover Fire) to *Full Troop* (win with every primate), including the essential **Here We Go Again** for detonating a nuclear weapon. They belong to your profile rather than a saved game (`%APPDATA%\RebirthOfCivilisation\achievements.ini`), pop up as you earn them, and are listed under *Achievements* on the title screen and in the menu. Each has a stable API name (e.g. `HERE_WE_GO_AGAIN`) so a future Steam build can map them straight onto Steam achievements. Games where every civilisation is AI-controlled earn nothing.
 * **Difficulty means a smarter AI, not a cheating one.** Unlike *Civilization*, no level gives the computer extra yields, units or settlers - every species plays by the same rules as you. Difficulty sets how well the rivals play:
 
   | Level | How the rivals play |
@@ -176,6 +178,7 @@
 |---|---|
 | ![Evolution tree](docs/screenshots/11b_evolution_mid.png) | ![Early tech tree](docs/screenshots/04c_tech_start.png) |
 | ![A roaming band foraging](docs/screenshots/05_roaming_band.png) | ![The first settlement](docs/screenshots/07b_first_settlement.png) |
+| ![Here We Go Again](docs/screenshots/18_here_we_go_again.png) | ![Achievements](docs/screenshots/17_achievements.png) |
 | ![Start](docs/screenshots/04_start_map.png) | ![The Fall](docs/screenshots/07_fall_popup.png) |
 | ![A drought](docs/screenshots/11c_disaster.png) | ![Late game](docs/screenshots/16_lategame.png) |
 | ![Excavating ruins](docs/screenshots/09_unit_panel.png) | ![Tech tree](docs/screenshots/10_tech_tree.png) |
@@ -219,6 +222,8 @@ src/core/        Rules engine - no platform code
   Turn.cpp         turn processing, the nuclear war, fallout, ferals, diplomacy, victory
   MapGen.cpp       world generation, human settlements, start positions
   Bands.cpp        the nomadic age: roaming bands, foraging, settling
+  Nukes.cpp        nuclear warheads: building, launching, the world's reaction
+  Achievements.cpp achievement list, unlock checks and the profile file
   AI.cpp           computer opponents
   Save.cpp         save games
 src/ui/          User interface, drawn through the small Canvas interface

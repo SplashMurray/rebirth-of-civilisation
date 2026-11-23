@@ -457,6 +457,14 @@ void GameUI::drawUnitIcon(int type, int cx, int cy, int s, Color ic, Color accen
         return;
     }
     switch (d.cls) {
+        case UnitClass::Nuke:  // radiation trefoil
+            circ(0, 0, 0.16, ic);
+            for (int k = 0; k < 3; k++) {
+                double a0 = -1.5708 + k * 2.0944 - 0.5, a1 = a0 + 1.0;
+                poly({0.3 * std::cos(a0), 0.3 * std::sin(a0), 0.85 * std::cos(a0), 0.85 * std::sin(a0),
+                      0.85 * std::cos(a1), 0.85 * std::sin(a1), 0.3 * std::cos(a1), 0.3 * std::sin(a1)}, ic);
+            }
+            break;
         case UnitClass::Band:  // a family: two adults and a youngster
             circ(-0.42, -0.42, 0.2, ic); poly({-0.72, 0.65, -0.62, -0.12, -0.22, -0.12, -0.12, 0.65}, ic);
             circ(0.42, -0.42, 0.2, ic); poly({0.12, 0.65, 0.22, -0.12, 0.62, -0.12, 0.72, 0.65}, ic);
@@ -574,7 +582,7 @@ void GameUI::drawUnitToken(const Unit& u, int sx, int sy, int r) {
 void GameUI::drawPathPreview() {
     Game& g = *game;
     Unit* u = sel();
-    if (!u || u->owner != g.player || hoverX < 0 || overlay != OV_NONE) return;
+    if (!u || u->owner != g.player || !g.inMap(hoverX, hoverY) || overlay != OV_NONE) return;
     if (!g.civs[g.player].explored[g.idx(hoverX, hoverY)]) return;
     if (hoverX == u->x && hoverY == u->y) return;
     bool enemy = g.isEnemyTarget(u->owner, hoverX, hoverY) && g.civs[g.player].visible[g.idx(hoverX, hoverY)];
@@ -824,7 +832,7 @@ void GameUI::renderMap() {
         drawCityBanner(c, sx, sy);
     }
     // hover
-    if (hoverX >= 0 && overlay == OV_NONE) {
+    if (g.inMap(hoverX, hoverY) && overlay == OV_NONE) {
         int sx, sy;
         tileCenter(hoverX, hoverY, sx, sy);
         int xy[12];

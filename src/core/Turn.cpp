@@ -43,6 +43,7 @@ void Game::declareWar(int a, int b) {
     if (a == b || civs[a].war[b]) return;
     civs[a].war[b] = civs[b].war[a] = 1;
     statWars++;
+    civs[a].warsDeclared++;
     civs[a].warSince[b] = civs[b].warSince[a] = turn;
     meet(a, b);
     if (b == player) popup(b, POP_WAR, "War!", civs[a].leader + " of the " + civs[a].name + " has declared war on you!");
@@ -198,7 +199,11 @@ void Game::processCity(City& city) {
             int cost = buildCost(c, city.buildKind, city.buildId);
             if (city.prod >= cost) {
                 bool done = false;
-                if (city.buildKind == BK_UNIT) {
+                if (city.buildKind == BK_UNIT && g_units[city.buildId].cls == UnitClass::Nuke) {
+                    civs[c].warheads++;
+                    notify(c, city.name + " has built a Nuclear Warhead. It waits in the silo (" + std::to_string(civs[c].warheads) + " ready).", city.x, city.y);
+                    done = true;
+                } else if (city.buildKind == BK_UNIT) {
                     const UnitDef& ud = g_units[city.buildId];
                     Pt spot = {-1, -1};
                     Unit probe;
@@ -316,6 +321,7 @@ void Game::processUnitsEndOfTurn(int c) {
                     notify(c, g_improvements[u.buildImp].name + " completed.", u.x, u.y);
                 } else {
                     if (t.fallout > 0) t.fallout--;
+                    civs[c].falloutCleaned++;
                     notify(c, "Fallout reduced.", u.x, u.y);
                 }
                 u.order = ORD_NONE;

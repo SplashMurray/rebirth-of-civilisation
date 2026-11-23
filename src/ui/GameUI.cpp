@@ -135,6 +135,7 @@ void GameUI::render(Canvas& c) {
         case SCR_GAME: renderGame(); break;
     }
     renderToast();
+    renderAchBanner();
     tooltip();
 }
 
@@ -147,6 +148,29 @@ bool GameUI::tick(int ms) {
         if (nukeT > 5200) nukeT = -1;
         redraw = true;
     }
+    if (achBannerMs > 0) {
+        achBannerMs -= ms;
+        if (achBannerMs <= 0 && !achBanners.empty()) {
+            achBanners.erase(achBanners.begin());
+            if (!achBanners.empty()) achBannerMs = 4500;
+        }
+        redraw = true;
+    }
+    if (blastT >= 0) {
+        blastT += ms;
+        if (blastT > 3400) blastT = -1;
+        redraw = true;
+    }
+    if (screen == SCR_GAME && game) {
+        achPollMs += ms;
+        if (achPollMs >= 400) {
+            achPollMs = 0;
+            size_t before = achBanners.size();
+            pollAchievements();
+            if (achBanners.size() != before) redraw = true;
+        }
+    }
+    if (screen == SCR_GAME && (nukeMode || nukeArmX >= 0)) redraw = true;
     if (screen == SCR_GAME && selUnit >= 0 && overlay == OV_NONE) redraw = true;  // pulsing selection
     if (screen == SCR_TITLE) redraw = (animMs / 100) % 2 == 0 || redraw;
     return redraw;
@@ -214,10 +238,13 @@ void GameUI::renderTitle() {
     bool hasSave = (bool)std::ifstream(savePath);
     button(bx, by + 58, bw, 46, "Load Game", hasSave, [this] { loadGame(); }, hasSave ? "" : "No saved game found", rgb(70, 60, 50), 18);
     button(bx, by + 116, bw, 46, "How to Play", true, [this] { overlay = OV_HELP; helpScroll = 0; }, "", rgb(70, 60, 50), 18);
-    button(bx, by + 174, bw, 46, "Exit", true, [this] { quit = true; }, "", rgb(70, 60, 50), 18);
-    uiScaleControl(bx, by + 232, bw);
+    button(bx, by + 174, bw, 46, "Achievements (" + std::to_string(ach.unlocked.size()) + "/" + std::to_string(g_achievements.size()) + ")", true,
+           [this] { overlay = OV_ACHIEVEMENTS; achScroll = 0; }, "", rgb(70, 60, 50), 18);
+    button(bx, by + 232, bw, 46, "Exit", true, [this] { quit = true; }, "", rgb(70, 60, 50), 18);
+    uiScaleControl(bx, by + 290, bw);
     cv->text(W - 12, H - 22, "Open source - MIT licence", 12, rgb(170, 200, 170), AL_RIGHT);
     if (overlay == OV_HELP) renderHelp();
+    if (overlay == OV_ACHIEVEMENTS) renderAchievements();
 }
 
 // ============================================================ setup
@@ -323,9 +350,12 @@ void GameUI::renderGame() {
         case OV_HELP: renderHelp(); break;
         case OV_LOG: renderLog(); break;
         case OV_EVO: renderEvolution(); break;
+        case OV_ACHIEVEMENTS: renderAchievements(); break;
         default: break;
     }
     renderTopBar();
+    if (blastT >= 0) { renderBlast(); return; }
+    if (nukeMode || nukeArmX >= 0) renderNukeTargeting();
     if (!g.popups.empty()) renderPopup();
 }
 
@@ -381,6 +411,13 @@ void GameUI::renderTopBar() {
              "Your people are wanderers: " + std::to_string(nb) + (nb == 1 ? " band" : " bands") + " with " + std::to_string(nm) +
                  " members in all. Bands forage the land around them; keep them moving to fresh ground.\n" + need,
              [this] { int n = -1; for (auto& u : game->units) if (u.alive && u.owner == game->player && g_units[u.type].cls == UnitClass::Band) { n = u.id; break; } if (n >= 0) selectUnit(n, true); });
+    }
+    if (g.civs[g.player].warheads > 0) {
+        int n = g.civs[g.player].warheads;
+        item((compact ? "Nukes " : "Nuclear warheads: ") + std::to_string(n), rgb(255, 120, 90),
+             "You have " + std::to_string(n) + (n == 1 ? " nuclear warhead" : " nuclear warheads") +
+                 " in your silos.\nClick to choose a target within 12 tiles of one of your cities.",
+             [this] { nukeMode = true; nukeArmX = nukeArmY = -1; selUnit = -1; overlay = OV_NONE; });
     }
     if (g.hasTrait(g.player, TR_NEOCORTEX))
         item((compact ? "Sci +" : "Science +") + std::to_string(me.sciencePerTurn), C_SCI, "Science per turn. Science is used to research new technologies.",
@@ -500,7 +537,7 @@ std::string GameUI::combatPreview(const Unit& u, int tx, int ty) {
 
 void GameUI::renderTileInfo() {
     Game& g = *game;
-    if (hoverX < 0 || !g.civs[g.player].explored[g.idx(hoverX, hoverY)]) return;
+    if (!g.inMap(hoverX, hoverY) || !g.civs[g.player].explored[g.idx(hoverX, hoverY)]) return;
     if (over(0, H - 190, 420, 190) || over(W - 260, H - 260, 260, 260)) return;
     const Tile& t = g.at(hoverX, hoverY);
     std::vector<std::pair<std::string, Color>> lines;
@@ -1228,7 +1265,7 @@ void GameUI::uiScaleControl(int x, int y, int w) {
 }
 
 void GameUI::renderMenu() {
-    int pw = 320, ph = 412, px = (W - pw) / 2, py = (H - ph) / 2;
+    int pw = 320, ph = 460, px = (W - pw) / 2, py = (H - ph) / 2;
     hot(0, 0, W, H, [this] { overlay = OV_NONE; });
     panel(px, py, pw, ph);
     cv->text(px + pw / 2, py + 16, "Menu", 24, C_TEXT, AL_CENTER, true);
@@ -1238,6 +1275,7 @@ void GameUI::renderMenu() {
     b("Save Game (Ctrl+S)", [this] { saveGame(); overlay = OV_NONE; });
     b("Load Game (Ctrl+L)", [this] { loadGame(); });
     b("How to Play (F1)", [this] { overlay = OV_HELP; helpScroll = 0; });
+    b("Achievements", [this] { overlay = OV_ACHIEVEMENTS; achScroll = 0; });
     uiScaleControl(px + 30, y, pw - 60);
     y += 52;
     b("Main Menu", [this] { overlay = OV_NONE; screen = SCR_TITLE; });
@@ -1245,8 +1283,9 @@ void GameUI::renderMenu() {
 }
 
 void GameUI::renderHelp() {
-    int pw = std::min(1000, W - 40), ph = H - 40;
-    int px = (W - pw) / 2, py = (H - ph) / 2;
+    int top0 = screen == SCR_GAME ? TOP + 8 : 20;
+    int pw = std::min(1000, W - 40), ph = H - top0 - 20;
+    int px = (W - pw) / 2, py = top0;
     hot(0, 0, W, H, nullptr);
     panel(px, py, pw, ph, rgb(24, 28, 36));
     cv->text(px + 20, py + 14, "How to Play", 26, C_GOLD, AL_LEFT, true);
@@ -1267,7 +1306,11 @@ void GameUI::renderHelp() {
         "over and recovers slowly, so keep the band moving to fresh forest, jungle and grassland. A well-fed band grows to at most 8 members. Split "
         "a big band in two (G), or turn members into a War Party (R) or a Scout to guard and explore. Bands that go hungry lose members. Only once "
         "your species has evolved Speech and discovered Cultivation can a band settle (B) and found a city - the end of the wandering age.\n"
-        "DISASTERS  Wildfires, droughts, floods, epidemics, earthquakes, harsh winters, reactor leaks and predator migrations strike at random - "
+        "NUCLEAR WEAPONS  Nuclear Fission lets a city build a Nuclear Warhead (needs Uranium). Warheads wait in your silos: click the warhead "
+        "count on the top bar, pick a tile within 12 of one of your cities and confirm. Everything next to the blast is destroyed, cities are "
+        "wrecked, fallout spreads, your victims declare war and others who know you may join them.\n"
+        "ACHIEVEMENTS  Earned across all your games and kept in your profile - see Achievements on the title screen or in the menu.\n"
+                "DISASTERS  Wildfires, droughts, floods, epidemics, earthquakes, harsh winters, reactor leaks and predator migrations strike at random - "
         "but which ones depends on where you live: forests burn, coasts flood, crowded cities catch disease, ruined reactors leak. Each one hurts, "
         "and each one adds evolutionary pressure - a burst of points plus lingering pressure for a few turns.\n"
         "TIME  The calendar follows progress: while species are still evolving each turn spans thousands of years; once the leading species "
@@ -1499,6 +1542,12 @@ void GameUI::unitCommand(char cmd) {
 
 void GameUI::clickMap(int tx, int ty) {
     Game& g = *game;
+    if (nukeMode) {
+        std::string why;
+        if (g.canNukeAt(g.player, tx, ty, &why)) { nukeArmX = tx; nukeArmY = ty; nukeMode = false; }
+        else { toast = why; toastMs = 2500; }
+        return;
+    }
     if (moveMode && sel()) {
         Unit& u = *sel();
         g.orderMoveOrAttack(u, tx, ty);
@@ -1550,6 +1599,12 @@ void GameUI::endTurnNow() {
     g.endTurn();
     moveMode = false;
     disbandArm = -1;
+    nukeMode = false;
+    nukeArmX = nukeArmY = -1;
+    for (auto& b : g.blasts)
+        if (g.civs[g.player].explored[g.idx(b.x, b.y)]) { startBlast(b.x, b.y); break; }
+    g.blasts.clear();
+    pollAchievements();
     if (g.nukeAnimPending) {
         g.nukeAnimPending = false;
         nukeT = 0;
@@ -1678,6 +1733,7 @@ void GameUI::wheel(int x, int y, int delta) {
         if (overlay == OV_TECH) techScroll -= delta * 120;
         else if (overlay == OV_LOG) logScroll -= delta * 3;
         else if (overlay == OV_HELP) helpScroll -= delta * 60;
+        else if (overlay == OV_ACHIEVEMENTS) achScroll -= delta * 60;
         else listScroll -= delta * 60;
         return;
     }
@@ -1711,7 +1767,7 @@ void GameUI::key(int k, bool shift, bool ctrl) {
         return;
     }
     if (screen == SCR_TITLE) {
-        if (overlay == OV_HELP && (k == KEY_ESC || k == KEY_ENTER)) { overlay = OV_NONE; return; }
+        if ((overlay == OV_HELP || overlay == OV_ACHIEVEMENTS) && (k == KEY_ESC || k == KEY_ENTER)) { overlay = OV_NONE; return; }
         if (k == KEY_ENTER || k == 'N') screen = SCR_SETUP;
         if (k == 'L') loadGame();
         return;
@@ -1742,6 +1798,7 @@ void GameUI::key(int k, bool shift, bool ctrl) {
     if (ctrl && k == 'L') { loadGame(); return; }
     if (k == KEY_ESC) {
         if (moveMode) moveMode = false;
+        else if (nukeMode || nukeArmX >= 0) { nukeMode = false; nukeArmX = nukeArmY = -1; }
         else if (overlay != OV_NONE) overlay = OV_NONE;
         else overlay = OV_MENU;
         return;
@@ -1784,4 +1841,201 @@ void GameUI::key(int k, bool shift, bool ctrl) {
         case KEY_DELETE: if (sel()) { if (disbandArm == selUnit) unitCommand('D'); else disbandArm = selUnit; } return;
         default: return;
     }
+}
+
+// ============================================================ achievements
+void GameUI::pollAchievements() {
+    if (!game) return;
+    size_t won = ach.primatesWon.size();
+    std::vector<std::string> got = checkAchievements(*game, ach);
+    if (!got.empty() || ach.primatesWon.size() != won) ach.save(achievementsPath);
+    for (auto& id : got) {
+        achBanners.push_back(id);
+        if (achBannerMs <= 0) achBannerMs = 4500;
+    }
+}
+
+void GameUI::drawTrophy(int x, int y, int s, bool lit) {
+    Color c = lit ? rgb(240, 196, 70) : rgb(78, 84, 96), d = lit ? rgb(176, 130, 30) : rgb(58, 62, 72);
+    int r = s * 2 / 5;
+    // handles
+    cv->fillCircle(x - r, y - s / 6, s / 5, d);
+    cv->fillCircle(x + r, y - s / 6, s / 5, d);
+    cv->fillCircle(x - r, y - s / 6, s / 9, lit ? rgb(30, 26, 20) : rgb(28, 30, 36));
+    cv->fillCircle(x + r, y - s / 6, s / 9, lit ? rgb(30, 26, 20) : rgb(28, 30, 36));
+    // bowl
+    cv->fillRect(x - r, y - s / 2, r * 2, s / 3, c);
+    cv->fillCircle(x, y - s / 6, r, c);
+    // stem and base
+    cv->fillRect(x - s / 14, y + s / 5, s / 7 + 1, s / 6, d);
+    cv->fillRect(x - s / 4, y + s / 3, s / 2, s / 8 + 1, c);
+    if (lit) cv->fillCircle(x - r / 3, y - s / 3, s / 12, rgb(255, 240, 190));
+}
+
+void GameUI::renderAchBanner() {
+    if (achBannerMs <= 0 || achBanners.empty()) return;
+    const AchievementDef* a = findAchievement(achBanners.front());
+    if (!a) return;
+    int bw = std::min(400, W - 40), bh = 74;
+    int shown = 4500 - achBannerMs;
+    int slide = shown < 250 ? (250 - shown) * (bw + 20) / 250 : achBannerMs < 250 ? (250 - achBannerMs) * (bw + 20) / 250 : 0;
+    int x = W - bw - 14 + slide, y = (screen == SCR_GAME ? TOP : 0) + 14;
+    cv->fillRectA(x + 4, y + 4, bw, bh, rgb(0, 0, 0), 120);
+    cv->fillRect(x, y, bw, bh, rgb(26, 30, 38));
+    cv->rect(x, y, bw, bh, C_GOLD, 2);
+    drawTrophy(x + 38, y + bh / 2, 40, true);
+    cv->text(x + 72, y + 9, "ACHIEVEMENT UNLOCKED", 11, C_GOLD, AL_LEFT, true);
+    cv->text(x + 72, y + 24, a->name, 18, C_TEXT, AL_LEFT, true);
+    cv->text(x + 72, y + 48, a->desc, 13, C_DIM);
+}
+
+void GameUI::renderAchievements() {
+    int top0 = screen == SCR_GAME ? TOP + 8 : 20;
+    int pw = std::min(1000, W - 40), ph = H - top0 - 20;
+    int px = (W - pw) / 2, py = top0;
+    hot(0, 0, W, H, nullptr);
+    panel(px, py, pw, ph, rgb(24, 28, 36));
+    cv->text(px + 20, py + 14, "Achievements", 26, C_GOLD, AL_LEFT, true);
+    std::string count = std::to_string(ach.unlocked.size()) + " of " + std::to_string(g_achievements.size()) + " unlocked";
+    cv->text(px + 220, py + 22, count, 15, C_DIM);
+    button(px + pw - 40, py + 12, 28, 28, "X", true, [this] { overlay = OV_NONE; });
+    int top = py + 56, viewH = ph - 66;
+    hots.push_back(Hot{px, top, pw, viewH, nullptr, "", true});
+    int cols = pw >= 760 ? 2 : 1, colW = (pw - 40 - (cols - 1) * 16) / cols, rowH = 62;
+    // lay out: group headings span the row, entries flow in columns
+    int y = 0, total = 0;
+    std::string group;
+    int col = 0;
+    std::vector<std::function<void(int)>> draws;  // draw at scrolled offset
+    for (auto& a : g_achievements) {
+        if (group != a.group) {
+            if (col) { y += rowH; col = 0; }
+            group = a.group;
+            int gy = y;
+            std::string gname = group;
+            draws.push_back([this, px, gy, gname](int off) { cv->text(px + 20, gy - off + 8, gname, 16, C_GOLD, AL_LEFT, true); });
+            y += 34;
+        }
+        int ex = px + 20 + col * (colW + 16), ey = y;
+        const AchievementDef* ap = &a;
+        draws.push_back([this, ex, ey, colW, rowH, ap](int off) {
+            int yy = ey - off;
+            bool lit = ach.has(ap->id);
+            cv->fillRect(ex, yy, colW, rowH - 8, lit ? rgb(40, 44, 34) : rgb(32, 36, 44));
+            if (lit) cv->rect(ex, yy, colW, rowH - 8, rgb(120, 100, 40), 1);
+            drawTrophy(ex + 28, yy + (rowH - 8) / 2, 32, lit);
+            cv->text(ex + 54, yy + 7, ap->name, 15, lit ? C_TEXT : rgb(170, 176, 186), AL_LEFT, true);
+            std::string desc = ap->desc;
+            if (std::string(ap->id) == "FULL_TROOP")
+                desc += "  (" + std::to_string(ach.primatesWon.size()) + "/" + std::to_string(g_primates.size()) + ")";
+            cv->text(ex + 54, yy + 29, desc, 12, C_DIM);
+            if (lit) {
+                std::string when = ach.unlocked.at(ap->id);
+                cv->text(ex + colW - 10, yy + 8, when == "yes" ? "Unlocked" : when, 11, C_GOLD, AL_RIGHT);
+            }
+        });
+        if (++col >= cols) { col = 0; y += rowH; }
+    }
+    if (col) y += rowH;
+    total = y;
+    achScroll = std::clamp(achScroll, 0, std::max(0, total - viewH + 10));
+    cv->clip(px + 1, top, pw - 2, viewH);
+    for (auto& d : draws) d(achScroll - top);
+    cv->unclip();
+    if (total > viewH) {
+        int th = std::max(30, viewH * viewH / total);
+        int ty = top + (viewH - th) * achScroll / std::max(1, total - viewH + 10);
+        cv->fillRect(px + pw - 14, top, 6, viewH, rgb(40, 46, 58));
+        cv->fillRect(px + pw - 14, ty, 6, th, rgb(120, 136, 160));
+    }
+}
+
+// ============================================================ nuclear weapons
+void GameUI::launchPlayerNuke() {
+    Game& g = *game;
+    int x = nukeArmX, y = nukeArmY;
+    nukeArmX = nukeArmY = -1;
+    nukeMode = false;
+    if (!g.launchNuke(g.player, x, y)) return;
+    g.blasts.clear();
+    g.updateVisibility(g.player);
+    startBlast(x, y);
+    pollAchievements();
+}
+
+void GameUI::startBlast(int x, int y) {
+    blastT = 0;
+    blastX = x;
+    blastY = y;
+    centerOn(x, y);
+}
+
+void GameUI::renderNukeTargeting() {
+    Game& g = *game;
+    // the area that would be hit around the hovered (or chosen) tile
+    int tx = nukeArmX >= 0 ? nukeArmX : hoverX, ty = nukeArmX >= 0 ? nukeArmY : hoverY;
+    if (!g.inMap(tx, ty)) tx = ty = -1;
+    std::string why;
+    bool ok = tx >= 0 && g.canNukeAt(g.player, tx, ty, &why);
+    if (tx >= 0) {
+        for (auto& p : g.ring(tx, ty, 2)) {
+            int sx, sy, xy[12];
+            tileCenter(p.x, p.y, sx, sy);
+            hexCorners(sx, sy, hs - 2, xy);
+            int d = g.dist(tx, ty, p.x, p.y);
+            if (ok) cv->fillPolyA(xy, 6, d <= 1 ? rgb(255, 60, 30) : rgb(255, 150, 40), d <= 1 ? 120 : 70);
+            else cv->fillPolyA(xy, 6, rgb(120, 120, 120), 60);
+        }
+    }
+    if (nukeMode) {
+        std::string msg = "Choose a target for your nuclear warhead  (Esc to cancel)";
+        int tw = cv->textWidth(msg, 16, true) + 40;
+        cv->fillRectA((W - tw) / 2, TOP + 10, tw, 34, rgb(60, 14, 10), 230);
+        cv->text(W / 2, TOP + 18, msg, 16, rgb(255, 220, 200), AL_CENTER, true);
+        if (tx >= 0 && !ok) cv->text(mouseX + 18, mouseY + 14, why, 13, rgb(255, 180, 160), AL_LEFT, true);
+        return;
+    }
+    // confirmation
+    std::vector<std::string> lines;
+    for (auto& ci : g.cities)
+        if (ci.alive && g.dist(ci.x, ci.y, tx, ty) <= 2 && g.civs[g.player].explored[g.idx(ci.x, ci.y)])
+            lines.push_back((ci.owner == g.player ? "YOUR city " : "") + ci.name + (g.dist(ci.x, ci.y, tx, ty) == 0 ? " (direct hit)" : " (blast edge)"));
+    int own = 0;
+    for (auto& u : g.units) if (u.alive && u.owner == g.player && g.dist(u.x, u.y, tx, ty) <= 2) own++;
+    if (own) lines.push_back(std::to_string(own) + " of your own units are in the blast area!");
+    int pw = 440, ph = 150 + (int)lines.size() * 20, px = (W - pw) / 2, py = H / 2 + 40;
+    hot(0, 0, W, H, nullptr);
+    panel(px, py, pw, ph, rgb(40, 18, 16));
+    cv->text(px + pw / 2, py + 14, "Launch a nuclear warhead?", 20, rgb(255, 200, 170), AL_CENTER, true);
+    int yy = py + 48;
+    if (lines.empty()) lines.push_back("No cities in the blast area.");
+    for (auto& l : lines) { cv->text(px + 24, yy, l, 14, C_TEXT); yy += 20; }
+    cv->text(px + 24, yy + 2, "Everyone who knows you will remember this.", 13, C_DIM);
+    button(px + 24, py + ph - 52, 180, 38, "Launch", true, [this] { launchPlayerNuke(); }, "", rgb(150, 40, 30), 16);
+    button(px + pw - 204, py + ph - 52, 180, 38, "Cancel", true, [this] { nukeArmX = nukeArmY = -1; }, "", C_PANEL2, 16);
+}
+
+void GameUI::renderBlast() {
+    int t = blastT, sx, sy;
+    tileCenter(blastX, blastY, sx, sy);
+    int big = hs * 3;
+    double k = std::min(1.0, t / 1400.0);
+    int r = (int)(big * (0.3 + k));
+    if (t < 2600) {
+        cv->fillCircleA(sx, sy, r * 3 / 2, rgb(255, 200, 120), (int)(90 * (1 - k)));
+        cv->fillCircle(sx, sy, r, blend(rgb(255, 250, 220), rgb(130, 70, 40), (float)k));
+        cv->fillCircle(sx, sy, r * 2 / 3, blend(rgb(255, 255, 255), rgb(230, 120, 40), (float)k));
+        if (t > 500) {
+            int rise = std::min(t - 500, 2000) * big / 1300;
+            cv->fillRect(sx - big / 6, sy - rise, big / 3, rise, rgb(150, 100, 80));
+            cv->fillCircle(sx, sy - rise, big * 2 / 3, rgb(170, 110, 80));
+            cv->fillCircle(sx - big / 2, sy - rise + big / 6, big / 2, rgb(150, 96, 72));
+            cv->fillCircle(sx + big / 2, sy - rise + big / 6, big / 2, rgb(150, 96, 72));
+            cv->fillCircle(sx, sy - rise - big / 8, big / 3, rgb(240, 170, 90));
+        }
+    } else {
+        cv->fillCircleA(sx, sy, big, rgb(150, 100, 80), (int)(200 * (3400 - t) / 800.0));
+    }
+    if (t < 300) cv->fillRectA(0, 0, W, H, rgb(255, 255, 255), 255 - t * 255 / 300);
+    hot(0, 0, W, H, [this] { if (blastT > 900) blastT = -1; }, "");
 }

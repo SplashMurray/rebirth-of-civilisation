@@ -921,11 +921,15 @@ void Game::captureCity(City& city, int newOwner) {
         notify(old, city.name + " has been razed to the ground!", city.x, city.y);
         notify(newOwner, "You razed " + city.name + ".", city.x, city.y);
         statRazes++;
+        civs[newOwner].citiesCaptured++;
+        if (old >= 0) civs[old].citiesLost++;
         city.alive = false;
         for (auto& t : tiles) if (t.city == city.id) { t.city = -1; t.owner = -1; }
         for (size_t b = 0; b < g_buildings.size(); b++) if (wonderCity[b] == city.id) wonderCity[b] = -2;  // lost forever
     } else {
         statCaptures++;
+        civs[newOwner].citiesCaptured++;
+        if (old >= 0) civs[old].citiesLost++;
         city.owner = newOwner;
         city.pop = std::max(1, city.pop - (city.pop + 2) / 3);
         city.food = 0;

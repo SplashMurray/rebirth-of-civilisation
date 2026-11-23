@@ -314,6 +314,7 @@ bool Game::triggerDisaster(int c, int type) {
         default: return false;
     }
     statDisasters++;
+    cv.disastersSuffered++;
     statDisasterKind[type]++;
     notify(c, "Disaster: " + title + ".", fx, fy);
     popup(c, POP_DISASTER, title, body + "\n\nEvolutionary pressure:" + pressureText, fx, fy);

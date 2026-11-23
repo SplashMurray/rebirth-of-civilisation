@@ -179,6 +179,7 @@ void initData() {
         {"Mass Media", 12, {"Electricity", "Printing"}, "Voices carried across the whole world."},
         {"Computing", 13, {"Electricity", "Mass Media"}, "The humans' silicon minds wake again. Their data archives can be read."},
         {"Motorised Warfare", 13, {"Combustion", "Ballistics"}, "The humans' tanks roll once more."},
+        {"Nuclear Fission", 13, {"Radiology", "Electricity"}, "The power that ended the old world. Now it is yours."},
         {"Genetics", 14, {"Computing", "Radiology"}, "We understand what we are, and what we were."},
         {"Rocketry", 14, {"Computing", "Combustion"}, "The sky is no longer the limit."},
         {"Rebirth", 15, {"Genetics", "Rocketry"}, "Civilisation reborn - wiser than the last."},
@@ -346,6 +347,9 @@ void initData() {
         {"Field Guns", "FG", 280, 20, 40, 3, 2, "Ballistics", UC::Siege, "", -1, "Long range artillery."},
         {"Infantry", "If", 300, 50, 0, 0, 2, "Combustion", UC::Melee, "", -1, "Motorised infantry."},
         {"Rebuilt Tanks", "Tk", 380, 66, 0, 0, 5, "Motorised Warfare", UC::Armor, "", -1, "Human tanks, restored and crewed by primates."},
+        {"Nuclear Warhead", "NW", 600, 0, 0, 0, 0, "Nuclear Fission", UC::Nuke, "", -1,
+         "The weapon that ended the old world. Kept in your silos: launch it at any tile within 12 of one of your cities. "
+         "Destroys everything nearby, wrecks cities and leaves fallout - and the whole world will remember."},
         {"Exo-Primates", "EP", 520, 90, 0, 0, 3, "Genetics", UC::Melee, "", -1, "Soldiers in powered exoskeletons."},
         // hostile wildlife and leftovers of humanity (never buildable, primate == -2)
         {"Feral Dogs", "FD", 0, 7, 0, 0, 2, "", UC::Melee, "", -2, "Packs of former pets, gone wild."},
@@ -402,6 +406,7 @@ void initData() {
     needU("Bombard", {R_IRON});
     needU("Rebuilt Tanks", {R_OIL});
     needU("Exo-Primates", {R_URANIUM});
+    needU("Nuclear Warhead", {R_URANIUM});
     for (auto& u : g_units) if (u.replacesId >= 0 && u.needs.empty()) u.needs = g_units[u.replacesId].needs;
     needB("Factory", {R_COAL});
     needB("Power Station", {R_COAL});
@@ -440,6 +445,8 @@ void initData() {
     ID.tCooking = techIndex("Cooking");
     ID.uElder = unitIndex("Elder Troop");
     ID.uBand = unitIndex("Roaming Band");
+    ID.uNuke = unitIndex("Nuclear Warhead");
+    ID.tFission = techIndex("Nuclear Fission");
     ID.uGatherer = unitIndex("Gatherer");
     ID.uTinkerer = unitIndex("Tinkerer");
     ID.uScout = unitIndex("Scout");

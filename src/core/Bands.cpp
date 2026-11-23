@@ -99,6 +99,7 @@ void Game::processBands(int c, int& sci, int& cult) {
                 if (u.band < BAND_MAX) {
                     u.band++;
                     u.bandFood -= need;
+                    civs[c].maxBand = std::max(civs[c].maxBand, u.band);
                     if (u.band == BAND_MAX)
                         notify(c, "A band has grown to " + std::to_string(BAND_MAX) + " - as large as the land can feed. It could split in two.", u.x, u.y);
                 } else {
@@ -169,6 +170,7 @@ bool Game::splitBand(Unit& u) {
     u.band -= size;
     u.bandFood -= food;
     u.moves = 0;
+    civs[owner].bandSplits++;
     int id = spawnUnit(owner, ID.uBand, spot.x, spot.y);  // may reallocate units: don't touch u after this
     units[id].band = size;
     units[id].bandFood = food;
@@ -412,6 +414,7 @@ bool Game::nomadDisaster(int c) {
         }
     }
     statDisasters++;
+    cv.disastersSuffered++;
     notify(c, "Disaster: " + title + ".", bx, by);
     popup(c, POP_DISASTER, title, body + "\n\nEvolutionary pressure:" + ptext, bx, by);
     return true;

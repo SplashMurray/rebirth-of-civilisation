@@ -240,7 +240,10 @@ void Game::aiTurn(int c) {
         if (p < 0) break;
         adoptPolicy(c, p);
     }
-    if (skillOf(c) >= 2) aiPlanWar(c);
+    if (skillOf(c) >= 2) {
+        aiPlanWar(c);
+        aiNukes(c);
+    }
     aiDiplomacy(c);
     for (size_t i = 0; i < cities.size(); i++)
         if (cities[i].alive && cities[i].owner == c) aiCity(cities[i]);
@@ -328,6 +331,10 @@ void Game::aiCity(City& city) {
     else if (mil < milWant) { kind = BK_UNIT; id = bestMilitary(mil % 3 == 2); }
     else if (workers < workWant && city.pop >= 2) { kind = BK_UNIT; id = uniqueFor(c, ID.uGatherer); }
     else if (myCities + settlers < targetCities && settlers < settlerSlots && city.pop >= 2 && turn < dur(260) && canBuild(city, BK_UNIT, ID.uElder)) { kind = BK_UNIT; id = ID.uElder; }
+    else if (sk >= 2 && atWarAny && pd && pd->aggression >= 6 && cv.warheads == 0 && canBuild(city, BK_UNIT, ID.uNuke) && rng.chance(0.15)) {
+        kind = BK_UNIT;
+        id = ID.uNuke;
+    }
     else if (atWarAny && mil < myCities * 3 && rng.chance(0.6)) {
         kind = BK_UNIT;
         id = bestMilitary(rng.chance(0.35));

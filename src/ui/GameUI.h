@@ -3,6 +3,7 @@
 #pragma once
 #include "Canvas.h"
 #include "../core/Game.h"
+#include "../core/Achievements.h"
 #include <functional>
 #include <memory>
 
@@ -27,7 +28,7 @@ public:
 
     // ---- used by tests / screenshot tool
     enum Screen { SCR_TITLE, SCR_SETUP, SCR_GAME };
-    enum Overlay { OV_NONE, OV_CITY, OV_TECH, OV_POLICY, OV_DIPLO, OV_MENU, OV_HELP, OV_LOG, OV_EVO };
+    enum Overlay { OV_NONE, OV_CITY, OV_TECH, OV_POLICY, OV_DIPLO, OV_MENU, OV_HELP, OV_LOG, OV_EVO, OV_ACHIEVEMENTS };
     Screen screen = SCR_TITLE;
     Overlay overlay = OV_NONE;
     std::unique_ptr<Game> game;
@@ -41,6 +42,20 @@ public:
     int mouseX = 0, mouseY = 0;
     int nukeT = -1;                // nuclear war animation timer (ms), -1 = off
     void renderUnitGallery(Canvas& c);  // test helper: every unit flag at large size
+
+    // ---- achievements (kept in the player's profile, not in saved games)
+    AchievementStore ach;
+    std::string achievementsPath;  // empty: don't persist (tests)
+    void loadAchievements() { if (!achievementsPath.empty()) ach.load(achievementsPath); }
+    void pollAchievements();
+    std::vector<std::string> achBanners;  // waiting to be shown
+    int achBannerMs = 0;
+
+    // ---- nuclear weapons
+    bool nukeMode = false;          // choosing a target
+    int nukeArmX = -1, nukeArmY = -1;  // target picked, waiting for confirmation
+    int blastT = -1, blastX = -1, blastY = -1;  // detonation animation
+    void launchPlayerNuke();
 
 private:
     // ---- hotspots registered while rendering
@@ -66,7 +81,14 @@ private:
     double dragCamX = 0, dragCamY = 0;
     bool moveMode = false;
     int animMs = 0;
-    int listScroll = 0, techScroll = 0, logScroll = 0, helpScroll = 0;
+    int listScroll = 0, techScroll = 0, logScroll = 0, helpScroll = 0, achScroll = 0;
+    int achPollMs = 0;
+    void renderAchievements();
+    void renderAchBanner();
+    void drawTrophy(int x, int y, int s, bool lit);
+    void renderNukeTargeting();
+    void renderBlast();
+    void startBlast(int x, int y);
     int disbandArm = -1;
     std::string toast;
     int toastMs = 0;

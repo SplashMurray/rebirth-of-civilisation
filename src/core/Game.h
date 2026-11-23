@@ -119,6 +119,10 @@ struct Civ {
     int battles = 0;                        // fights this turn (conflict pressure)
     TraitFx fx;                             // summed trait effects (derived, not saved)
     std::vector<TempPressure> tempPressures;  // lingering pressure from disasters
+    int warheads = 0;       // nuclear warheads in the silos
+    // lifetime counters (achievements, statistics)
+    int nukesLaunched = 0, timesNuked = 0, citiesCaptured = 0, citiesLost = 0, bandSplits = 0;
+    int disastersSuffered = 0, warsDeclared = 0, falloutCleaned = 0, maxBand = 0;
     int lastDisaster = -100;
 };
 
@@ -196,7 +200,7 @@ public:
     int dur(int turns) const { return turns * speedPct / 100; }
     int techCost(int t) const { return sc(g_techs[t].cost); }
     int traitCost(int t, int k) const { return sc(g_traits[t].cost[k]); }
-    int statWars = 0, statCaptures = 0, statRazes = 0;  // diagnostics only (not saved)
+    int statWars = 0, statCaptures = 0, statRazes = 0, statNukes = 0;  // diagnostics only (not saved)
 
     // ---- setup (MapGen.cpp)
     void newGame(const GameSettings& s);
@@ -302,6 +306,12 @@ public:
     void regrowForage();
     bool nomadDisaster(int c);
     void aiBand(Unit& u);
+    // ---- nuclear weapons (Nukes.cpp)
+    static const int NUKE_RANGE = 12;
+    bool canNukeAt(int c, int x, int y, std::string* why = nullptr) const;
+    bool launchNuke(int c, int x, int y);
+    void aiNukes(int c);
+    std::vector<Pt> blasts;  // detonations this turn, for the UI to show (not saved)
     void claimTile(City& city, int x, int y);
     bool canBuild(const City& city, int kind, int id) const;
     int buildCost(int c, int kind, int id) const;

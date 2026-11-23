@@ -422,6 +422,8 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE, LPSTR, int show) {
     if (Gdiplus::GdiplusStartup(&gdipToken, &gdipInput, nullptr) != Gdiplus::Ok) return 1;
     g_ui.reset(new GameUI());
     g_ui->savePath = savePathFor();
+    g_ui->achievementsPath = dataDir() + "achievements.ini";
+    g_ui->loadAchievements();
     g_canvas.reset(new GdiCanvas());
     loadSettings();
     g_appliedPct = g_ui->uiScalePct;
