@@ -215,8 +215,12 @@ void Game::processCity(City& city) {
                         Pt nb[6];
                         int n = neighbors(city.x, city.y, nb);
                         for (int k = 0; k < n; k++)
-                            if (!isWater(nb[k].x, nb[k].y) && !at(nb[k].x, nb[k].y).mountain && canEnter(probe, nb[k].x, nb[k].y) &&
-                                !isEnemyTarget(c, nb[k].x, nb[k].y)) { spot = nb[k]; break; }
+                        {
+                            // ships launch onto the water next to the city, everything else steps onto land
+                            bool terrainOk = ud.naval() ? isWater(nb[k].x, nb[k].y) && moveCost(probe, city.x, city.y, nb[k].x, nb[k].y) >= 0
+                                                        : !isWater(nb[k].x, nb[k].y) && !at(nb[k].x, nb[k].y).mountain;
+                            if (terrainOk && canEnter(probe, nb[k].x, nb[k].y) && !isEnemyTarget(c, nb[k].x, nb[k].y)) { spot = nb[k]; break; }
+                        }
                     }
                     if (spot.x >= 0) {
                         if (ud.cls == UnitClass::Settler) city.pop--;
