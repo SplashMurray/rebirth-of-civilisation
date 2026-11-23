@@ -85,6 +85,8 @@ void Game::beginTurn(int c) {
                 }
             u.hp = std::min(100, u.hp + heal);
         }
+        // bands tend their sick and wounded even while on the move
+        if (u.acted && u.hp < 100 && g_units[u.type].cls == UnitClass::Band && !at(u.x, u.y).fallout) u.hp = std::min(100, u.hp + 10);
         if (u.order == ORD_FORTIFY) u.fortTurns++;
         if (u.order == ORD_SKIP) u.order = ORD_NONE;
         u.acted = false;
@@ -114,6 +116,7 @@ void Game::endTurn() {
     for (int c = FIRST_PRIMATE_CIV; c < (int)civs.size(); c++)
         if (civs[c].alive && !civs[c].player) aiTurn(c);
     feralTurn();
+    regrowForage();
     for (int c = 0; c < (int)civs.size(); c++)
         if (civs[c].alive && !civs[c].humans) processCiv(c);
 
@@ -146,6 +149,7 @@ void Game::processCiv(int c) {
         cult += ci.yields.cult;
         gold += ci.yields.gold;
     }
+    processBands(c, sci, cult);
     cv.sciencePerTurn = sci;
     cv.culturePerTurn = cult;
     cv.goldPerTurn = hasGold(c) ? gold : 0;
@@ -465,6 +469,8 @@ void Game::feralTurn() {
             if (seen) continue;
             bool nearCity = false;
             for (auto& ci : cities) if (ci.alive && dist(ci.x, ci.y, x, y) < 5) nearCity = true;
+            for (auto& b : units)  // nor right next to wandering bands
+                if (b.alive && g_units[b.type].cls == UnitClass::Band && dist(b.x, b.y, x, y) < 6) nearCity = true;
             if (nearCity) continue;
             int type = unitIndex(turn < dur(90) ? "Feral Dogs" : turn < dur(190) ? "Mutant Hounds" : "Rogue Machines");
             spawnUnit(CIV_FERAL, type, x, y);
@@ -506,7 +512,8 @@ void Game::checkElimination() {
         if (!cv.alive) continue;
         if (numCities(c) > 0) continue;
         bool settler = false;
-        for (auto& u : units) if (u.alive && u.owner == c && g_units[u.type].cls == UnitClass::Settler) settler = true;
+        for (auto& u : units)
+            if (u.alive && u.owner == c && (g_units[u.type].cls == UnitClass::Settler || g_units[u.type].cls == UnitClass::Band)) settler = true;
         if (settler) continue;
         cv.alive = false;
         for (auto& u : units) if (u.alive && u.owner == c) killUnit(u);

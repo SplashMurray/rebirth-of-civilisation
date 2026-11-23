@@ -51,10 +51,8 @@ int main(int argc, char** argv) {
     ui.overlay = GameUI::OV_TECH;
     shot(ui, "04c_tech_start");
     ui.overlay = GameUI::OV_NONE;
-    // found the capital and look at the city screen
-    ui.key('B', false, false);
-    shot(ui, "05_city_screen");
-    ui.key(KEY_ESC, false, false);
+    // the roaming band, with its foraging overlay
+    shot(ui, "05_roaming_band");
     autoplay(ui, 5);
     // trigger the Fall
     ui.game->aiTurn(ui.game->player);
@@ -64,7 +62,28 @@ int main(int argc, char** argv) {
     ui.nukeT = -1;
     shot(ui, "07_fall_popup");
     ui.game->popups.clear();
-    autoplay(ui, 110);
+    // wander until the species settles down, and catch the moment
+    int wandered = 0;
+    {
+        Game& g0 = *ui.game;
+        while (wandered < 150 && g0.numCities(g0.player) == 0 && !g0.gameOver) {
+            g0.popups.clear();
+            g0.aiTurn(g0.player);
+            if (g0.civs[g0.player].evoGoal < 0) g0.setEvoGoal(g0.player, g0.aiChooseTrait(g0.player));
+            ui.endTurnNow();
+            ui.nukeT = -1;
+            wandered++;
+        }
+        std::vector<Popup> keep;
+        for (auto& p : g0.popups) if (p.kind == POP_SETTLE) keep.push_back(p);
+        g0.popups = keep;
+        if (!keep.empty()) ui.centerOn(keep[0].x, std::min(g0.H - 1, keep[0].y + 5));  // city above the popup
+        ui.selUnit = -1;
+        std::printf("settled after %d turns of wandering (turn %d)\n", wandered, g0.turn);
+        shot(ui, "07b_first_settlement");
+        g0.popups.clear();
+    }
+    autoplay(ui, std::max(10, 110 - wandered));
     Game& g = *ui.game;
     ui.selUnit = -1;
     if (g.civs[g.player].capital >= 0) ui.centerOn(g.cities[g.civs[g.player].capital].x, g.cities[g.civs[g.player].capital].y);

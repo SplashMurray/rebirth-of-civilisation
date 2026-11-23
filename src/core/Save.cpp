@@ -5,7 +5,7 @@
 #include <sstream>
 
 namespace {
-const int SAVE_VERSION = 8;
+const int SAVE_VERSION = 9;
 
 struct Archive {
     bool writing;
@@ -105,7 +105,7 @@ void ioGame(Archive& a, Game& g) {
     if (!a.writing) g.tiles.assign((size_t)std::max(0LL, nt), Tile());
     for (auto& t : g.tiles) {
         a.io(t.terrain); a.io(t.veg); a.io(t.hills); a.io(t.mountain); a.io(t.res); a.io(t.imp);
-        a.io(t.owner); a.io(t.city); a.io(t.ruin); a.io(t.ruinDone); a.io(t.site); a.io(t.fallout);
+        a.io(t.owner); a.io(t.city); a.io(t.ruin); a.io(t.ruinDone); a.io(t.site); a.io(t.fallout); a.io(t.foraged);
     }
     long long ns = (long long)g.sites.size();
     a.num(ns);
@@ -133,7 +133,7 @@ void ioGame(Archive& a, Game& g) {
     for (auto& u : g.units) {
         a.io(u.id); a.io(u.type); a.io(u.owner); a.io(u.x); a.io(u.y); a.io(u.hp); a.io(u.moves);
         a.io(u.order); a.io(u.gx); a.io(u.gy); a.io(u.work); a.io(u.buildImp); a.io(u.fortTurns);
-        a.io(u.acted); a.io(u.attacked); a.io(u.alive);
+        a.io(u.acted); a.io(u.attacked); a.io(u.alive); a.io(u.band); a.io(u.bandFood);
     }
     long long ncity = (long long)g.cities.size();
     a.num(ncity);

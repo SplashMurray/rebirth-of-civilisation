@@ -105,7 +105,7 @@ int Game::score(int c) const {
     for (auto t : cv.techs) if (t) s += 5;
     for (size_t b = 0; b < g_buildings.size(); b++)
         if (g_buildings[b].wonder && wonderCity[b] >= 0 && cities[wonderCity[b]].owner == c) s += 25;
-    s += cv.policiesAdopted * 8 + cv.ruinsExcavated * 5 + traitCount(c) * 5;
+    s += cv.policiesAdopted * 8 + cv.ruinsExcavated * 5 + traitCount(c) * 5 + bandMembers(c);
     return s;
 }
 
@@ -257,6 +257,9 @@ void Game::grantTech(int c, int t, bool announce) {
             if (im.techId == t && !im.name.empty()) unlocks += (unlocks.empty() ? "" : ", ") + im.name;
         std::string extra;
         if (t == ID.tCurrency) extra = "\n\nYour civilisation now earns GOLD. Gold can be used to purchase units and buildings in cities.";
+        if (t == ID.tCultivation)
+            extra = "\n\nTHE END OF WANDERING. Your bands can now settle down and found cities (B). A band of N members founds a city of "
+                    "size 1 + (N-1)/2. Choose the spot well - this will be the heart of your civilisation.";
         if (t == ID.tRafts) extra = "\n\nLand units can now embark onto coastal waters.";
         if (t == ID.tNavigation) extra = "\n\nEmbarked units can now cross the open ocean.";
         if (t == ID.tRadiology) extra = "\n\nGatherers can now decontaminate fallout.";
@@ -317,12 +320,22 @@ std::vector<Pressure> Game::evolutionPressures(int c) const {
     int nc = 0, pop = 0;
     for (auto& ci : cities) if (ci.alive && ci.owner == c) { nc++; pop += ci.pop; }
     // social
-    out.push_back({"Group living", std::min(8, 1 + nc), PC_SOCIAL, "Living in larger, settled groups rewards communication (+1, +1 per city, up to +8)."});
+    int members = bandMembers(c), bands = numBands(c);
+    if (nc == 0)
+        out.push_back({"Band life", std::min(5, 1 + members / 4), PC_SOCIAL, "Living in close-knit bands rewards communication (+1, +1 per 4 band members, up to +5)."});
+    else
+        out.push_back({"Group living", std::min(8, 1 + nc), PC_SOCIAL, "Living in larger, settled groups rewards communication (+1, +1 per city, up to +8)."});
     if (pop / 3) out.push_back({"Crowding", std::min(8, pop / 3), PC_SOCIAL, "Dense populations compete for status and mates (+1 per 3 population, up to +8)."});
     int stories = std::min(6, cv.culturePerTurn / 3);
     if (stories) out.push_back({"Shared stories", stories, PC_SOCIAL, "Culture rewards those who speak and remember (+1 per 3 Culture per turn, up to +6)."});
     // ecological
     out.push_back({"Survival", 2, PC_ECOLOGY, "Every generation, the cleverest at finding food survive."});
+    if (bands > 0 && nc == 0)
+        out.push_back({"Roaming", 2, PC_ECOLOGY, "Always on the move: new lands, new food, new dangers."});
+    int hungry = 0;
+    for (auto& u : units)
+        if (u.alive && u.owner == c && g_units[u.type].cls == UnitClass::Band && bandForage(u) < u.band) hungry++;
+    if (hungry) out.push_back({"Hunger", std::min(3, 1 + hungry), PC_ECOLOGY, "Bands that cannot find enough food (+1, +1 per hungry band, up to +3)."});
     int land = 0, harsh = 0;
     for (int y = 0; y < H; y++)
         for (int x = 0; x < W; x++) {
@@ -345,9 +358,11 @@ std::vector<Pressure> Game::evolutionPressures(int c) const {
         if (!u.alive || u.owner != CIV_FERAL) continue;
         bool near = false;
         for (auto& ci : cities) if (ci.alive && ci.owner == c && dist(ci.x, ci.y, u.x, u.y) <= 4) near = true;
+        for (auto& b : units)
+            if (b.alive && b.owner == c && g_units[b.type].cls == UnitClass::Band && dist(b.x, b.y, u.x, u.y) <= 3) near = true;
         if (near) beasts++;
     }
-    if (beasts) out.push_back({"Predators", std::min(3, beasts), PC_CONFLICT, "Feral packs prowling near your settlements (up to +3)."});
+    if (beasts) out.push_back({"Predators", std::min(3, beasts), PC_CONFLICT, "Feral packs prowling near your settlements or bands (up to +3)."});
     // mutation
     int fall = 0;
     for (auto& t : tiles) if (t.owner == c && t.fallout) fall++;
@@ -723,6 +738,7 @@ bool Game::canFoundAt(int c, int x, int y, std::string* why) const {
     auto fail = [&](const char* w) { if (why) *why = w; return false; };
     if (!inMap(x, y)) return fail("Off the map");
     const Tile& t = at(x, y);
+    if (!canSettle(c)) return fail("Your people are still nomads: evolve Speech and discover Cultivation to settle down");
     if (isWater(x, y) || t.mountain) return fail("Cannot settle here");
     if (t.fallout > 0) return fail("The land is poisoned by fallout");
     if (t.site >= 0) return fail("Cannot settle on top of human structures");
@@ -806,7 +822,7 @@ bool Game::unitObsolete(int c, int u) const {
 std::vector<int> Game::availableUnits(int c) const {
     std::vector<int> out;
     for (size_t u = 0; u < g_units.size(); u++) {
-        if (!unitBelongs(*this, c, (int)u)) continue;
+        if (!unitBelongs(*this, c, (int)u) || g_units[u].cls == UnitClass::Band) continue;
         if (!hasTech(c, g_units[u].techId) || !hasNeeds(c, g_units[u].needs)) continue;
         if (unitObsolete(c, (int)u)) continue;
         out.push_back((int)u);
@@ -825,7 +841,7 @@ bool Game::canBuild(const City& city, int kind, int id) const {
     int c = city.owner;
     if (kind == BK_UNIT) {
         if (id < 0 || id >= (int)g_units.size()) return false;
-        if (!unitBelongs(*this, c, id) || !hasTech(c, g_units[id].techId)) return false;
+        if (!unitBelongs(*this, c, id) || !hasTech(c, g_units[id].techId) || g_units[id].cls == UnitClass::Band) return false;
         if (!hasNeeds(c, g_units[id].needs)) return false;
         if (g_units[id].cls == UnitClass::Settler && city.pop < 2) return false;
         return true;
@@ -1083,7 +1099,10 @@ bool Game::stepUnit(Unit& u, int nx, int ny) {
     if (g_units[u.type].military()) {
         Unit* civ = civilianAt(nx, ny);
         if (civ && civ->owner != u.owner && atWar(u.owner, civ->owner) && !militaryAt(nx, ny) && !cityAt(nx, ny)) {
-            if (u.owner != CIV_FERAL && g_units[civ->type].cls == UnitClass::Worker) {
+            if (g_units[civ->type].cls == UnitClass::Band) {
+                hurtBand(*civ, civ->band >= 6 ? 2 : 1, "attacked by " + (u.owner == CIV_FERAL ? std::string("predators") : "the " + civs[u.owner].name));
+                if (civ->alive) return false;  // the survivors stand their ground
+            } else if (u.owner != CIV_FERAL && g_units[civ->type].cls == UnitClass::Worker) {
                 notify(civ->owner, "Your " + g_units[civ->type].name + " was captured!", nx, ny);
                 civ->owner = u.owner;
                 civ->type = uniqueFor(u.owner, ID.uGatherer);
@@ -1201,7 +1220,7 @@ CombatResult Game::attack(Unit& u, int tx, int ty) {
     civs[u.owner].battles++;
     if (const City* tc = cityAt(tx, ty)) civs[tc->owner].battles++;
     for (auto& o : units) if (o.alive && o.x == tx && o.y == ty && o.owner != u.owner) { civs[o.owner].battles++; break; }
-    std::string an = (u.owner == player ? "Your " : civs[u.owner].adjective + " ") + d.name;
+    std::string an = (u.owner == player ? "Your " : u.owner == CIV_FERAL ? std::string("Wild ") : civs[u.owner].adjective + " ") + d.name;
     City* city = cityAt(tx, ty);
     if (city && atWar(u.owner, city->owner)) {
         meet(u.owner, city->owner);
@@ -1241,6 +1260,20 @@ CombatResult Game::attack(Unit& u, int tx, int ty) {
         double D = unitStrength(*def, false, false, tx, ty);
         res.dmgToDef = combatDamage(A, D);
         if (g_units[def->type].civilian()) res.dmgToDef = 100;
+        if (g_units[def->type].cls == UnitClass::Band) {
+            // bands scatter rather than die: they lose members until none are left
+            int loss = def->band >= 6 ? 2 : def->band >= 3 && rng.chance(0.4) ? 0 : 1;
+            res.dmgToDef = 0;
+            res.dmgToAtt = ranged ? 0 : std::min(45, 10 + 5 * def->band);  // the band fights back
+            std::string by = u.owner == CIV_FERAL ? std::string("attacked by predators") : "attacked by the " + civs[u.owner].name;
+            res.defenderDied = hurtBand(*def, loss, by);
+            if (!res.defenderDied) {
+                u.hp = std::max(1, u.hp - res.dmgToAtt);
+                notify(u.owner, "Your " + d.name + " attacked a " + civs[def->owner].adjective + " band.", tx, ty);
+                u.attacked = true; u.acted = true; u.moves = 0; u.order = ORD_NONE; u.fortTurns = 0;
+                return res;
+            }
+        }
         if (!ranged && g_units[def->type].military()) res.dmgToAtt = combatDamage(D, A);
         def->hp -= res.dmgToDef;
         u.hp -= res.dmgToAtt;
@@ -1249,7 +1282,7 @@ CombatResult Game::attack(Unit& u, int tx, int ty) {
             if (res.defenderDied) u.hp = 1;
             else res.attackerDied = true;
         }
-        std::string dn = (def->owner == player ? "your " : civs[def->owner].adjective + " ") + g_units[def->type].name;
+        std::string dn = (def->owner == player ? "your " : def->owner == CIV_FERAL ? std::string("wild ") : civs[def->owner].adjective + " ") + g_units[def->type].name;
         std::string msg = an + " attacked " + dn + ": dealt " + std::to_string(res.dmgToDef) + ", took " + std::to_string(res.dmgToAtt);
         if (res.defenderDied) msg += ". The " + g_units[def->type].name + " was destroyed";
         if (res.attackerDied) msg += ". The attacker was destroyed";

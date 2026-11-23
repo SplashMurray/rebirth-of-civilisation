@@ -20,8 +20,9 @@
 
 | Phase | What happens |
 |---|---|
-| **The last days (Jan 2032 – Aug 2034)** | Six turns of the prologue. Human cities still glow on the horizon and their radios grow more frightening each turn. Use the time to explore and found your first settlement, but keep your troop away from the human cities. |
+| **The last days (Jan 2032 – Aug 2034)** | Six turns of the prologue. Human cities still glow on the horizon and their radios grow more frightening each turn. Your people are still wandering bands: use the time to explore and forage, but keep away from the human cities. |
 | **The Fall (August 2034)** | A global nuclear war wipes out humanity completely. Every human city, town, military base, laboratory and power plant becomes a ruin surrounded by radioactive fallout. Units caught in the blasts die. |
+| **The wandering age** | For tens of thousands of years after the Fall the primates are nomads. Roaming bands forage, grow, split and fight off predators while their brains evolve towards speech. Only a species that has evolved **Speech** and discovered **Cultivation** can settle down and found its first city - the great transition from roaming pack to settled people. |
 | **The rebirth (Year 1 AF onward)** | Years are counted *After the Fall*. Pressured by a changing world, the primates evolve speech, then advance from fire and stone tools to writing, currency, industry, computing and finally the **Rebirth Project**. |
 
 ![The Fall](docs/screenshots/06_nuke_anim.png)
@@ -31,13 +32,14 @@
 * **Anti-aliased graphics** (GDI+): shaded and textured hex terrain, sandy coastlines, waves, lit mountains, forests and jungles, settlements that grow from huts to towers, translucent fog of war, glowing borders and Civ-style unit flags with an icon for every unit type. The terrain is cached so the map stays smooth.
 * **Hex map**, randomly generated, with grassland, plains, desert, tundra, snow, coast and ocean, plus forest, jungle, hills, mountains and resources. Small, Standard and Large sizes (4, 6 or 8 primate civilisations).
 * **Eight playable primates**, each with its own bonuses, a unique unit and a preferred starting terrain (see below).
+* **A nomadic beginning.** There are no cities at the start. Each species begins as a **Roaming Band** that forages the tiles around it (one per member, plus one). Foraged land is picked over and recovers slowly, so bands must keep moving to fresh forest, jungle and grassland. Well-fed bands grow to at most 8 members; a band can **split** in two, or turn members into a **war party** or a **scout**. Hungry bands lose members, and predators, droughts, wildfires, sickness and cold strike the wanderers. Settling needs **Speech** (evolution) and **Cultivation** (technology); a band of N members founds a city of size 1 + (N-1)/2.
 * **Evolution: a branching tree driven by real pressures.** At the start your species cannot learn deliberately and **earns no science at all** until it evolves an **Enlarged Neocortex**. Four kinds of *evolutionary pressure* fill four separate pools every turn:
 
   | Pressure | Comes from |
   |---|---|
-  | **Social** | Group living (cities), crowding (population), shared stories (culture) |
-  | **Ecological** | Survival, ranging over a large territory, harsh lands (tundra, desert, mountains), the nuclear winter after the Fall |
-  | **Conflict** | Being at war, battles fought, feral predators near your settlements |
+  | **Social** | Band life (before settling), group living (cities), crowding (population), shared stories (culture) |
+  | **Ecological** | Survival, roaming and hunger (before settling), ranging over a large territory, harsh lands (tundra, desert, mountains), the nuclear winter after the Fall |
+  | **Conflict** | Being at war, battles fought, feral predators near your settlements or bands |
   | **Mutation** | Fallout in your lands and on your units, plus fading background radiation after the Fall |
 
   On the Evolution screen (`V`) you **choose** which trait to evolve towards, and it develops once your pools can pay its cost. Every trait needs particular pressures:
@@ -150,7 +152,8 @@
 | Mouse wheel, or `+` / `-` | Zoom |
 | `Enter` | End the turn |
 | `Space` / `Tab` | Skip the unit / go to the next unit |
-| `B` `F` `S` `E` `X` `M` | Found city / fortify / sleep / excavate ruins / decontaminate / move mode |
+| `B` `F` `S` `E` `X` `M` | Settle / found city, fortify, sleep, excavate ruins, decontaminate, move mode |
+| `G` / `R` | Split band / raise a war party from a band |
 | `T` `V` `P` `D` `L` | Technology tree / evolution / traditions / diplomacy / event log |
 | `Ctrl+S` / `Ctrl+L` | Save / load |
 | `Ctrl +` / `Ctrl -` / `Ctrl 0` | Interface size bigger / smaller / reset (also in the menu and on the title screen) |
@@ -162,6 +165,7 @@
 | | |
 |---|---|
 | ![Evolution tree](docs/screenshots/11b_evolution_mid.png) | ![Early tech tree](docs/screenshots/04c_tech_start.png) |
+| ![A roaming band foraging](docs/screenshots/05_roaming_band.png) | ![The first settlement](docs/screenshots/07b_first_settlement.png) |
 | ![Start](docs/screenshots/04_start_map.png) | ![The Fall](docs/screenshots/07_fall_popup.png) |
 | ![A drought](docs/screenshots/11c_disaster.png) | ![Late game](docs/screenshots/16_lategame.png) |
 | ![Excavating ruins](docs/screenshots/09_unit_panel.png) | ![Tech tree](docs/screenshots/10_tech_tree.png) |
@@ -204,6 +208,7 @@ src/core/        Rules engine - no platform code
   Game.cpp         tiles, cities, units, movement, combat, research, ruin excavation
   Turn.cpp         turn processing, the nuclear war, fallout, ferals, diplomacy, victory
   MapGen.cpp       world generation, human settlements, start positions
+  Bands.cpp        the nomadic age: roaming bands, foraging, settling
   AI.cpp           computer opponents
   Save.cpp         save games
 src/ui/          User interface, drawn through the small Canvas interface

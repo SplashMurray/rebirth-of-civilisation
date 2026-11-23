@@ -141,7 +141,7 @@ void initData() {
         {"Cooking", 1, {"Fire", "Foraging"}, "Food held over the fire is easier to eat and feeds a bigger brain."},
         {"Woodcraft", 1, {"Stone Tools"}, "Branches shaped with purpose."},
         {"Storytelling", 2, {"Cooking"}, "Around the fire, the elders speak of what came before."},
-        {"Cultivation", 2, {"Foraging"}, "Seeds dropped by the troop become gardens."},
+        {"Cultivation", 2, {"Foraging"}, "Seeds dropped by the band sprout where it camped last season. A garden must be tended - and so, for the first time, the band can stay."},
         {"Digging", 2, {"Stone Tools", "Fire"}, "Beneath the soil lie stone, metal and secrets."},
         {"Spearcraft", 2, {"Fire", "Woodcraft"}, "Fire-hardened points."},
         {"Rafts", 2, {"Woodcraft"}, "Lashed logs carry the troop across the shallows."},
@@ -318,6 +318,7 @@ void initData() {
     // ------------------------------------------------------------ units
     // name, abbr, cost, str, rstr, range, moves, tech, class, replaces, primate, desc
     g_units = {
+        {"Roaming Band", "RB", 0, 0, 0, 0, 2, "", UC::Band, "", -1, "Your wandering people. Forages the land around it; grows, splits and raises war parties. Settles once you have Speech and Cultivation."},
         {"Elder Troop", "ET", 45, 0, 0, 0, 2, "", UC::Settler, "", -1, "Founds a new settlement. City must be size 2; costs 1 population."},
         {"Gatherer", "Ga", 35, 0, 0, 0, 2, "", UC::Worker, "", -1, "Builds tile improvements, excavates human ruins and clears fallout."},
         {"Tinkerer", "Ti", 35, 0, 0, 0, 2, "", UC::Worker, "Gatherer", 5, "Capuchin Gatherer. Works 2 turns faster."},
@@ -438,6 +439,7 @@ void initData() {
     }
     ID.tCooking = techIndex("Cooking");
     ID.uElder = unitIndex("Elder Troop");
+    ID.uBand = unitIndex("Roaming Band");
     ID.uGatherer = unitIndex("Gatherer");
     ID.uTinkerer = unitIndex("Tinkerer");
     ID.uScout = unitIndex("Scout");
@@ -454,6 +456,7 @@ void initData() {
     ID.tComputing = techIndex("Computing");
     ID.tRebirth = techIndex("Rebirth");
     ID.tCultivation = techIndex("Cultivation");
+    ID.tForaging = techIndex("Foraging");
     ID.tDigging = techIndex("Digging");
     ID.tWoodcraft = techIndex("Woodcraft");
     ID.tIndustrial = techIndex("Industrialisation");

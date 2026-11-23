@@ -213,7 +213,7 @@ void GameUI::renderTitle() {
     button(bx, by, bw, 46, "New Game", true, [this] { screen = SCR_SETUP; }, "", rgb(70, 60, 50), 18);
     bool hasSave = (bool)std::ifstream(savePath);
     button(bx, by + 58, bw, 46, "Load Game", hasSave, [this] { loadGame(); }, hasSave ? "" : "No saved game found", rgb(70, 60, 50), 18);
-    button(bx, by + 116, bw, 46, "How to Play", true, [this] { overlay = OV_HELP; }, "", rgb(70, 60, 50), 18);
+    button(bx, by + 116, bw, 46, "How to Play", true, [this] { overlay = OV_HELP; helpScroll = 0; }, "", rgb(70, 60, 50), 18);
     button(bx, by + 174, bw, 46, "Exit", true, [this] { quit = true; }, "", rgb(70, 60, 50), 18);
     uiScaleControl(bx, by + 232, bw);
     cv->text(W - 12, H - 22, "Open source - MIT licence", 12, rgb(170, 200, 170), AL_RIGHT);
@@ -284,7 +284,7 @@ void GameUI::startGame(const GameSettings& s) {
     hs = 36;
     int first = nextUnitNeedingOrders(-1);
     for (auto& u : game->units)
-        if (u.alive && u.owner == game->player && g_units[u.type].cls == UnitClass::Settler) first = u.id;
+        if (u.alive && u.owner == game->player && (g_units[u.type].cls == UnitClass::Settler || g_units[u.type].cls == UnitClass::Band)) first = u.id;
     if (first >= 0) {
         selectUnit(first, true);
     }
@@ -363,6 +363,16 @@ void GameUI::renderTopBar() {
     cv->fillCircle(x + 8, TOP / 2, 9, me.color);
     cv->circle(x + 8, TOP / 2, 9, rgb(0, 0, 0), 1);
     x += 26;
+    if (g.numCities(g.player) == 0 && g.numBands(g.player) > 0) {
+        int nb = g.numBands(g.player), nm = g.bandMembers(g.player);
+        std::string need = g.canSettle(g.player) ? "Your people can now settle: move a band to a good spot and press B."
+                         : !g.hasTrait(g.player, TR_SPEECH) ? "To settle down your species must first evolve Speech (see Evolution), then discover Cultivation."
+                                                             : "Discover Cultivation to settle down.";
+        item((compact ? "Nomads " : "Nomads: ") + std::to_string(nb) + (nb == 1 ? " band, " : " bands, ") + std::to_string(nm), rgb(222, 190, 130),
+             "Your people are wanderers: " + std::to_string(nb) + (nb == 1 ? " band" : " bands") + " with " + std::to_string(nm) +
+                 " members in all. Bands forage the land around them; keep them moving to fresh ground.\n" + need,
+             [this] { int n = -1; for (auto& u : game->units) if (u.alive && u.owner == game->player && g_units[u.type].cls == UnitClass::Band) { n = u.id; break; } if (n >= 0) selectUnit(n, true); });
+    }
     if (g.hasTrait(g.player, TR_NEOCORTEX))
         item((compact ? "Sci +" : "Science +") + std::to_string(me.sciencePerTurn), C_SCI, "Science per turn. Science is used to research new technologies.",
              [this] { overlay = OV_TECH; });
@@ -565,16 +575,40 @@ void GameUI::renderUnitPanel() {
     cv->text(px + 62, py + 12, d.name, 19, C_TEXT, AL_LEFT, true);
     std::string stats;
     if (d.military()) stats = "Strength " + std::to_string(d.str) + (d.ranged() ? "   Ranged " + std::to_string(d.rstr) + " (range " + std::to_string(d.range) + ")" : "");
-    else stats = d.cls == UnitClass::Settler ? "Founds settlements" : "Builds improvements, excavates ruins";
+    else if (d.cls == UnitClass::Band) {
+        int forage = g.bandForage(u);
+        stats = "Band of " + std::to_string(u.band) + "   Forage " + std::to_string(forage) + " food, eats " + std::to_string(u.band) +
+                " (" + (forage - u.band >= 0 ? "+" : "") + std::to_string(forage - u.band) + ")";
+    } else stats = d.cls == UnitClass::Settler ? "Founds settlements" : "Builds improvements, excavates ruins";
     cv->text(px + 62, py + 36, stats, 13, C_DIM);
     cv->text(px + 62, py + 54, "Moves " + std::to_string(u.moves) + "/" + std::to_string(g.maxMoves(u)) + "    HP " + std::to_string(u.hp) + "    " +
              orderName(u.order) + (u.order == ORD_BUILD || u.order == ORD_EXCAVATE || u.order == ORD_DECON ? " (" + std::to_string(u.work) + " turns)" : ""),
              13, u.moves > 0 ? C_TEXT : C_DIM);
     bar(px + 62, py + 72, 200, 5, u.hp / 100.0, u.hp > 50 ? rgb(90, 210, 90) : C_RED);
+    if (d.cls == UnitClass::Band) {
+        int need = g.bandGrowth(u.band);
+        bool full = u.band >= Game::BAND_MAX;
+        bar(px + 270, py + 72, 140, 5, full ? 1.0 : (double)u.bandFood / need, rgb(120, 200, 80));
+        hot(px + 262, py + 62, 156, 20, nullptr, full ? "The band is as large as the land can feed (" + std::to_string(Game::BAND_MAX) + "). Split it to grow further."
+                           : "Food stored " + std::to_string(u.bandFood) + "/" + std::to_string(need) + " towards the next member. "
+                             "A band forages the best tiles around it, one per member plus one. Foraged land is picked over and recovers slowly - keep moving.");
+    }
     // actions
     struct Act { std::string label; bool en; std::function<void()> fn; std::string tip; };
     std::vector<Act> acts;
     int uid = u.id;
+    if (d.cls == UnitClass::Band) {
+        std::string why;
+        bool ok = g.canFoundAt(u.owner, u.x, u.y, &why);
+        acts.push_back({"Settle Here (B)", ok && u.moves > 0, [this] { unitCommand('B'); },
+                        ok ? "End the wandering: found a city of size " + std::to_string(g.settlePop(u)) + " here" : why});
+        acts.push_back({"Split Band (G)", u.band >= 4 && u.moves > 0, [this] { unitCommand('G'); },
+                        u.band >= 4 ? "Half the band leaves to forage on its own" : "The band needs at least 4 members to split"});
+        acts.push_back({"War Party (R)", u.band >= 3 && u.moves > 0, [this] { unitCommand('R'); },
+                        u.band >= 3 ? "Two members become a " + g_units[g.uniqueFor(u.owner, ID.uWarband)].name + " to guard the band" : "The band needs at least 3 members"});
+        acts.push_back({"Send Scout", u.band >= 3 && u.moves > 0, [this, uid] { game->sendScout(game->units[uid]); afterUnitAction(); },
+                        u.band >= 3 ? "One member becomes a " + g_units[g.uniqueFor(u.owner, ID.uScout)].name : "The band needs at least 3 members"});
+    }
     if (d.cls == UnitClass::Settler) {
         std::string why;
         bool ok = g.canFoundAt(u.owner, u.x, u.y, &why);
@@ -1194,7 +1228,7 @@ void GameUI::renderMenu() {
     b("Resume", [this] { overlay = OV_NONE; });
     b("Save Game (Ctrl+S)", [this] { saveGame(); overlay = OV_NONE; });
     b("Load Game (Ctrl+L)", [this] { loadGame(); });
-    b("How to Play (F1)", [this] { overlay = OV_HELP; });
+    b("How to Play (F1)", [this] { overlay = OV_HELP; helpScroll = 0; });
     uiScaleControl(px + 30, y, pw - 60);
     y += 52;
     b("Main Menu", [this] { overlay = OV_NONE; screen = SCR_TITLE; });
@@ -1202,7 +1236,7 @@ void GameUI::renderMenu() {
 }
 
 void GameUI::renderHelp() {
-    int pw = std::min(960, W - 40), ph = std::min(680, H - 40);
+    int pw = std::min(1000, W - 40), ph = H - 40;
     int px = (W - pw) / 2, py = (H - ph) / 2;
     hot(0, 0, W, H, nullptr);
     panel(px, py, pw, ph, rgb(24, 28, 36));
@@ -1220,6 +1254,10 @@ void GameUI::renderHelp() {
         "Abstract Thought) is needed for science: Speech for Tribal technologies, Advanced Speech for Ancient ones, Abstract Thought for the rest. "
         "Four strands - Tool Brain, Social Brain, Predator Brain and the Mutant Line - each need their own kind of pressure, so a peaceful species "
         "will struggle to become predators. A species may commit to only two strands, and can only ever have one final adaptation.\n"
+        "NOMADS  Your people begin as Roaming Bands. A band forages the land around it (one tile per member, plus one); foraged land is picked "
+        "over and recovers slowly, so keep the band moving to fresh forest, jungle and grassland. A well-fed band grows to at most 8 members. Split "
+        "a big band in two (G), or turn members into a War Party (R) or a Scout to guard and explore. Bands that go hungry lose members. Only once "
+        "your species has evolved Speech and discovered Cultivation can a band settle (B) and found a city - the end of the wandering age.\n"
         "DISASTERS  Wildfires, droughts, floods, epidemics, earthquakes, harsh winters, reactor leaks and predator migrations strike at random - "
         "but which ones depends on where you live: forests burn, coasts flood, crowded cities catch disease, ruined reactors leak. Each one hurts, "
         "and each one adds evolutionary pressure - a burst of points plus lingering pressure for a few turns.\n"
@@ -1234,13 +1272,27 @@ void GameUI::renderHelp() {
         "buildings - Copper plus Tin for the Bronze Phalanx, Horses for riders, Iron (or salvaged Scrap Metal) for Iron Blades, Coal for Factories, "
         "Oil for tanks. Wheat, Rice and Maize are crops: build a Farm on them for extra food. Build Pastures on Horses and Mines on minerals.\n"
         "GOLD  Your people only learn the value of money with the Currency technology. From then on cities earn Gold, used to buy items.\n"
-        "CITIES  Found settlements with an Elder Troop. Click a city to choose what it builds. Cities grow with surplus food and claim land with culture.\n"
+        "CITIES  Your first cities are founded by bands; after that, cities train Elder Troops to found more. Click a city to choose what it builds. Cities grow with surplus food and claim land with culture.\n"
         "COMBAT  Move a military unit onto an enemy to attack. Ranged units attack from a distance. Hills, forest, jungle and fortifying help defence. "
         "Capture cities by reducing their HP to zero with a melee unit. Beware the feral packs that roam the wastelands.\n"
         "CONTROLS  Left-click: select.  Right-click: move / attack.  Drag or arrow keys: scroll.  Wheel or +/-: zoom.  Enter: end turn.  "
-        "Space: skip unit.  Tab: next unit.  B: found city.  F: fortify.  S: sleep.  E: excavate.  X: decontaminate.  M: move mode.  C: centre on unit.  "
+        "Space: skip unit.  Tab: next unit.  B: settle / found city.  G: split band.  R: war party.  F: fortify.  S: sleep.  E: excavate.  X: decontaminate.  M: move mode.  C: centre on unit.  "
         "T: technologies.  V: evolution.  P: traditions.  D: diplomacy.  L: log.  Ctrl+S / Ctrl+L: save / load.  Ctrl + / Ctrl - / Ctrl 0: interface size.  Esc: menu / close.";
-    textBlock(px + 20, py + 56, pw - 40, text, 14, C_TEXT, 5);
+    int top = py + 56, viewH = ph - 70;
+    Hot area{px, top, pw, viewH, nullptr, "", true};
+    hots.push_back(area);
+    int total = (int)wrap(text, pw - 50, 14).size() * 19;
+    helpScroll = std::clamp(helpScroll, 0, std::max(0, total - viewH + 10));
+    cv->clip(px + 1, top, pw - 2, viewH);
+    textBlock(px + 20, top - helpScroll, pw - 50, text, 14, C_TEXT, 5);
+    cv->unclip();
+    if (total > viewH) {  // scroll bar
+        int th = std::max(30, viewH * viewH / total);
+        int ty = top + (viewH - th) * helpScroll / std::max(1, total - viewH + 10);
+        cv->fillRect(px + pw - 14, top, 6, viewH, rgb(40, 46, 58));
+        cv->fillRect(px + pw - 14, ty, 6, th, rgb(120, 136, 160));
+        if (helpScroll < total - viewH) cv->text(px + pw / 2, py + ph - 20, "Scroll for more", 12, C_DIM, AL_CENTER);
+    }
 }
 
 void GameUI::renderLog() {
@@ -1288,7 +1340,7 @@ void GameUI::renderPopup() {
     if (p.kind == POP_NUKE) ph = std::max(ph, 330);
     int px = (W - pw) / 2, py = std::max(TOP + 10, (H - ph) / 2);
     Color head = p.kind == POP_NUKE ? rgb(150, 50, 30) : p.kind == POP_WAR ? rgb(140, 40, 40) : p.kind == POP_VICTORY ? rgb(150, 120, 40) :
-                 p.kind == POP_DEFEAT ? rgb(80, 40, 40) : p.kind == POP_RUIN ? rgb(130, 84, 40) : p.kind == POP_TECH ? rgb(40, 80, 130) : p.kind == POP_EVOLUTION ? rgb(40, 110, 70) : p.kind == POP_DISASTER ? rgb(150, 70, 20) : rgb(56, 70, 92);
+                 p.kind == POP_DEFEAT ? rgb(80, 40, 40) : p.kind == POP_RUIN ? rgb(130, 84, 40) : p.kind == POP_TECH ? rgb(40, 80, 130) : p.kind == POP_EVOLUTION ? rgb(40, 110, 70) : p.kind == POP_DISASTER ? rgb(150, 70, 20) : p.kind == POP_SETTLE ? rgb(150, 112, 40) : rgb(56, 70, 92);
     cv->fillRect(px - 2, py - 2, pw + 4, ph + 4, rgb(0, 0, 0));
     cv->fillRect(px, py, pw, ph, rgb(26, 30, 38));
     cv->fillRect(px, py, pw, 46, head);
@@ -1406,6 +1458,14 @@ void GameUI::unitCommand(char cmd) {
     Game& g = *game;
     switch (cmd) {
         case 'B':
+            if (g_units[u.type].cls == UnitClass::Band) {
+                int cid = g.settleBand(u);
+                if (cid < 0) return;
+                g.updateVisibility(g.player);
+                selUnit = -1;
+                openCity(cid);
+                return;
+            }
             if (g_units[u.type].cls == UnitClass::Settler && u.moves > 0 && g.canFoundAt(u.owner, u.x, u.y)) {
                 int cid = g.foundCity(u.owner, u.x, u.y);
                 g.killUnit(g.units[selUnit]);
@@ -1415,6 +1475,8 @@ void GameUI::unitCommand(char cmd) {
                 return;
             }
             return;
+        case 'G': if (!g.splitBand(u)) return; break;
+        case 'R': if (!g.raiseWarParty(u)) return; break;
         case 'F': if (g_units[u.type].military()) { u.order = ORD_FORTIFY; } break;
         case 'S': u.order = ORD_SLEEP; break;
         case 'W': u.order = ORD_NONE; return;
@@ -1606,6 +1668,7 @@ void GameUI::wheel(int x, int y, int delta) {
         if (!hots[i].wheelArea || !inside(hots[i])) continue;
         if (overlay == OV_TECH) techScroll -= delta * 120;
         else if (overlay == OV_LOG) logScroll -= delta * 3;
+        else if (overlay == OV_HELP) helpScroll -= delta * 60;
         else listScroll -= delta * 60;
         return;
     }
@@ -1632,6 +1695,10 @@ void GameUI::key(int k, bool shift, bool ctrl) {
     (void)shift;
     if (ctrl && (k == KEY_PLUS || k == KEY_MINUS || k == '0')) {
         adjustUiScale(k == KEY_PLUS ? 1 : k == KEY_MINUS ? -1 : 0);
+        return;
+    }
+    if (overlay == OV_HELP && (k == KEY_DOWN || k == KEY_UP || k == KEY_PGDN || k == KEY_PGUP)) {
+        helpScroll += k == KEY_DOWN ? 40 : k == KEY_UP ? -40 : k == KEY_PGDN ? 400 : -400;
         return;
     }
     if (screen == SCR_TITLE) {
@@ -1684,7 +1751,7 @@ void GameUI::key(int k, bool shift, bool ctrl) {
         case KEY_DOWN: camY += pan; clampCamera(); return;
         case KEY_PLUS: wheel(W / 2, H / 2, 1); return;
         case KEY_MINUS: wheel(W / 2, H / 2, -1); return;
-        case KEY_F1: overlay = OV_HELP; return;
+        case KEY_F1: overlay = OV_HELP; helpScroll = 0; return;
         case KEY_ENTER: endTurnNow(); return;
         default: break;
     }
@@ -1704,7 +1771,7 @@ void GameUI::key(int k, bool shift, bool ctrl) {
         case KEY_TAB: { int n = nextUnitNeedingOrders(selUnit); if (n >= 0) selectUnit(n, true); return; }
         case 'C': if (sel()) centerOn(sel()->x, sel()->y); return;
         case 'M': if (sel()) moveMode = !moveMode; return;
-        case 'B': case 'F': case 'S': case 'W': case 'E': case 'X': case KEY_SPACE: unitCommand((char)k); return;
+        case 'B': case 'F': case 'S': case 'W': case 'E': case 'X': case 'G': case 'R': case KEY_SPACE: unitCommand((char)k); return;
         case KEY_DELETE: if (sel()) { if (disbandArm == selUnit) unitCommand('D'); else disbandArm = selUnit; } return;
         default: return;
     }

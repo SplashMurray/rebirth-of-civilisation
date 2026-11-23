@@ -1,6 +1,7 @@
 // Rebirth of Civilisation - hex map rendering
 // SPDX-License-Identifier: MIT
 #include "GameUI.h"
+#include <algorithm>
 #include <cmath>
 
 static const double SQ3 = 1.7320508075688772;
@@ -456,6 +457,11 @@ void GameUI::drawUnitIcon(int type, int cx, int cy, int s, Color ic, Color accen
         return;
     }
     switch (d.cls) {
+        case UnitClass::Band:  // a family: two adults and a youngster
+            circ(-0.42, -0.42, 0.2, ic); poly({-0.72, 0.65, -0.62, -0.12, -0.22, -0.12, -0.12, 0.65}, ic);
+            circ(0.42, -0.42, 0.2, ic); poly({0.12, 0.65, 0.22, -0.12, 0.62, -0.12, 0.72, 0.65}, ic);
+            circ(0.0, 0.0, 0.14, ic); poly({-0.18, 0.65, -0.12, 0.18, 0.12, 0.18, 0.18, 0.65}, ic);
+            break;
         case UnitClass::Settler:  // a hut with a door
             poly({-0.7, 0.6, -0.7, -0.05, 0.0, -0.7, 0.7, -0.05, 0.7, 0.6}, ic);
             poly({-0.18, 0.6, -0.18, 0.1, 0.18, 0.1, 0.18, 0.6}, accent);
@@ -545,6 +551,11 @@ void GameUI::drawUnitToken(const Unit& u, int sx, int sy, int r) {
     if (u.hp < 100) {
         cv->fillRectA(sx - r, sy + r + 3, 2 * r, 5, rgb(0, 0, 0), 170);
         cv->fillRect(sx - r + 1, sy + r + 4, (2 * r - 2) * u.hp / 100, 3, u.hp > 50 ? rgb(90, 210, 90) : u.hp > 25 ? rgb(230, 190, 50) : rgb(220, 60, 50));
+    }
+    if (u.band > 0 && r >= 9) {  // band size badge
+        int ms = std::max(9, r * 6 / 10);
+        cv->fillCircle(sx - r, sy - r, ms * 6 / 10 + 2, rgb(20, 20, 24));
+        cv->text(sx - r, sy - r - ms / 2 - 1, std::to_string(u.band), ms, rgb(160, 235, 120), AL_CENTER, true);
     }
     const char* mark = nullptr;
     switch (u.order) {
@@ -698,6 +709,39 @@ void GameUI::renderMap() {
         }
     cv->layerEnd(0);
     }  // terrain layer
+    // selected band: what it can forage, and how picked-over the land around it is
+    if (overlay == OV_NONE && sel() && g_units[sel()->type].cls == UnitClass::Band && sel()->owner == g.player) {
+        const Unit& b = *sel();
+        for (auto& p : g.ring(b.x, b.y, 3)) {
+            int i = g.idx(p.x, p.y);
+            if (!me.visible[i] || g.isWater(p.x, p.y)) continue;
+            int fo = g.tiles[i].foraged;
+            if (!fo) continue;
+            int sx, sy;
+            tileCenter(p.x, p.y, sx, sy);
+            int xy[12];
+            hexCorners(sx, sy, hs - 2, xy);
+            cv->fillPolyA(xy, 6, rgb(120, 84, 40), 40 + fo * 30);  // brown: picked over
+        }
+        std::vector<int> picked;
+        g.bandForage(b, &picked);
+        for (auto& p : g.ring(b.x, b.y, 1)) {
+            int i = g.idx(p.x, p.y);
+            int f = g.forageFood(b.owner, p.x, p.y);
+            int sx, sy;
+            tileCenter(p.x, p.y, sx, sy);
+            bool used = std::find(picked.begin(), picked.end(), i) != picked.end();
+            if (used) {
+                int xy[12];
+                hexCorners(sx, sy, hs - 3, xy);
+                for (int k = 0; k < 6; k++) cv->lineA(xy[k * 2], xy[k * 2 + 1], xy[(k + 1) % 6 * 2], xy[(k + 1) % 6 * 2 + 1], rgb(255, 255, 255), 2, 200);
+            }
+            if (hs < 16) continue;
+            int r = std::max(7, hs / 4), cx = sx, cy = sy + hs / 2 - r / 2;
+            cv->fillCircleA(cx, cy, r, rgb(16, 20, 14), 200);
+            cv->text(cx, cy - r * 7 / 10, std::to_string(f), r * 13 / 10, f > 0 ? rgb(140, 230, 100) : rgb(150, 150, 150), AL_CENTER, true);
+        }
+    }
     // city screen: worked tiles and yields
     if (overlay == OV_CITY && selCity >= 0) {
         const City& c = g.cities[selCity];

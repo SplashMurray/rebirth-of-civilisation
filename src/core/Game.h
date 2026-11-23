@@ -24,6 +24,7 @@ struct Tile {
     uint8_t ruinDone = 0;   // bitmask of excavated tiers
     int16_t site = -1;      // index into Game::sites
     uint8_t fallout = 0;    // 0..3
+    uint8_t foraged = 0;    // 0..3: how picked-over the land is by roaming bands
 };
 
 struct HumanSite {
@@ -50,6 +51,8 @@ struct Unit {
     bool acted = false;
     bool attacked = false;
     bool alive = true;
+    int band = 0;       // Roaming Band: members
+    int bandFood = 0;   // Roaming Band: food store towards the next member
 };
 
 enum BuildKind { BK_NONE = 0, BK_UNIT = 1, BK_BUILDING = 2 };
@@ -124,7 +127,7 @@ struct Notification {
     int x = -1, y = -1;
 };
 
-enum PopupKind { POP_INFO, POP_NUKE, POP_INTRO, POP_TECH, POP_RUIN, POP_WAR, POP_VICTORY, POP_DEFEAT, POP_WONDER, POP_EVOLUTION, POP_DISASTER };
+enum PopupKind { POP_INFO, POP_NUKE, POP_INTRO, POP_TECH, POP_RUIN, POP_WAR, POP_VICTORY, POP_DEFEAT, POP_WONDER, POP_EVOLUTION, POP_DISASTER, POP_SETTLE };
 struct Popup {
     int kind = POP_INFO;
     std::string title, body;
@@ -276,6 +279,28 @@ public:
     City* cityAt(int x, int y);
     const City* cityAt(int x, int y) const;
     int foundCity(int c, int x, int y);
+    // ---- roaming bands (Bands.cpp): the nomadic age before the first settlement
+    static const int BAND_MAX = 8;
+    bool canSettle(int c) const;                  // Speech evolved and Cultivation discovered
+    bool nomadic(int c) const { return numCities(c) == 0; }
+    int numBands(int c) const;
+    int bandMembers(int c) const;
+    int forageFood(int c, int x, int y) const;    // food a band would gather from one tile now
+    int bandForage(const Unit& u, std::vector<int>* tiles = nullptr) const;  // food gathered this turn
+    int bandGrowth(int size) const;               // food needed for the next member
+    int bandScience(const Unit& u) const;
+    int bandCulture(const Unit& u) const;
+    int settlePop(const Unit& u) const { return 1 + (u.band - 1) / 2; }
+    int settleBand(Unit& u);                      // found a city with the band; city id or -1
+    bool splitBand(Unit& u);
+    bool raiseWarParty(Unit& u);
+    bool sendScout(Unit& u);
+    bool hurtBand(Unit& u, int loss, const std::string& why);  // true if the band was wiped out
+    bool bandSpawnSpot(const Unit& u, bool military, Pt& out) const;
+    void processBands(int c, int& sci, int& cult);
+    void regrowForage();
+    bool nomadDisaster(int c);
+    void aiBand(Unit& u);
     void claimTile(City& city, int x, int y);
     bool canBuild(const City& city, int kind, int id) const;
     int buildCost(int c, int kind, int id) const;

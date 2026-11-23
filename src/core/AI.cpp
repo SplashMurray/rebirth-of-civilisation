@@ -44,6 +44,8 @@ void Game::aiResearch(int c) {
         if (isTierTech((int)t)) s *= 0.6;
         if ((int)t == ID.tCurrency) s *= 0.7;
         if ((int)t == ID.tRebirth) s *= 0.3;
+        if ((int)t == ID.tCultivation && numCities(c) == 0) s *= 0.2;  // the road to settling down
+        if ((int)t == ID.tForaging && numCities(c) == 0) s *= 0.6;
         bool mil = false;
         for (auto& u : g_units) if (u.techId == (int)t && u.military() && u.primate != -2) mil = true;
         if (mil && war) s *= 0.7;
@@ -202,6 +204,10 @@ void Game::aiUnit(Unit& uref) {
     const UnitDef& d = g_units[U().type];
     if (U().order == ORD_BUILD || U().order == ORD_EXCAVATE || U().order == ORD_DECON) return;
 
+    if (d.cls == UnitClass::Band) {
+        aiBand(U());
+        return;
+    }
     // ---------------- settlers
     if (d.cls == UnitClass::Settler) {
         if (numCities(c) == 0 && (turn >= 2 || aiSiteScore(c, U().x, U().y) >= 40) && canFoundAt(c, U().x, U().y)) {
@@ -392,6 +398,32 @@ void Game::aiUnit(Unit& uref) {
             }
         U().order = ORD_FORTIFY;
         return;
+    }
+    // nomads: warriors guard the bands
+    if (numCities(c) == 0) {
+        int ward = -1, wd = 99;
+        for (auto& b : units) {
+            if (!b.alive || b.owner != c || g_units[b.type].cls != UnitClass::Band) continue;
+            int dd = dist(b.x, b.y, U().x, U().y);
+            if (dd == 0) { ward = b.id; wd = 0; break; }
+            bool guarded = false;
+            for (auto& o : units)
+                if (o.alive && o.id != uid && o.owner == c && o.x == b.x && o.y == b.y && g_units[o.type].military()) guarded = true;
+            if (!guarded && dd < wd) { wd = dd; ward = b.id; }
+        }
+        if (ward >= 0) {
+            int wx = units[ward].x, wy = units[ward].y;
+            for (auto& e : units)
+                if (e.alive && atWar(c, e.owner) && g_units[e.type].military() && dist(e.x, e.y, wx, wy) <= 2 && canAttack(U(), e.x, e.y)) {
+                    double A = unitStrength(U(), true, d.ranged(), U().x, U().y), D = unitStrength(e, false, false, e.x, e.y);
+                    if (A > D * 0.8 || e.hp < U().hp) { attack(U(), e.x, e.y); return; }
+                }
+            if (wd == 0) return;
+            U().order = ORD_GOTO; U().gx = wx; U().gy = wy;
+            continueGoto(U());
+            if (U().alive && U().order == ORD_GOTO) U().order = ORD_NONE;
+            return;
+        }
     }
     if (U().hp < 40) {
         City* home = nullptr;

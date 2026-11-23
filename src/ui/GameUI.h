@@ -66,7 +66,7 @@ private:
     double dragCamX = 0, dragCamY = 0;
     bool moveMode = false;
     int animMs = 0;
-    int listScroll = 0, techScroll = 0, logScroll = 0;
+    int listScroll = 0, techScroll = 0, logScroll = 0, helpScroll = 0;
     int disbandArm = -1;
     std::string toast;
     int toastMs = 0;

@@ -336,7 +336,8 @@ void Game::newGame(const GameSettings& s) {
     for (int i = 0; i < nPrim; i++) {
         int c = FIRST_PRIMATE_CIV + i;
         Pt p = starts[i];
-        spawnUnit(c, ID.uElder, p.x, p.y);
+        int bid = spawnUnit(c, ID.uBand, p.x, p.y);
+        units[bid].band = 4;
         spawnUnit(c, uniqueFor(c, ID.uWarband), p.x, p.y);
         // scout on a neighbouring land tile
         Pt nb[6];
@@ -359,6 +360,8 @@ void Game::newGame(const GameSettings& s) {
           "Keep your troop away from the human cities. When the end comes - and it will come soon - the survivors will inherit the Earth, "
           "and the wreckage of humanity will one day reveal its secrets to those wise enough to understand them.\n\n"
           "Your species cannot yet learn deliberately, let alone speak: until its brain evolves an Enlarged Neocortex it earns no science at all. The first discoveries will be simple - fire, foraging, stone tools - and real science needs language. Evolution is driven by four kinds of pressure - Social, Ecological, Conflict and Mutation. Choose which trait to evolve towards on the Evolution screen (V): the language trunk leads to Speech and Advanced Speech, while the Tool, Social, Predator and Mutant strands each need their own kind of pressure.\n\n"
-          "Tip: found your first settlement with the Elder Troop (press B), then choose something to research.");
+          "Your people are wanderers. Your Roaming Band forages the land around it, but picked-over land takes time to recover: keep the band on the move "
+          "to fresh fruit and forest. Well-fed bands grow, and large bands can split in two or send members off as war parties and scouts. "
+          "Only when your species has evolved Speech and discovered Cultivation can a band settle down and found your first city.");
     notify(player, "The year is 2032. Humanity is on the brink of nuclear war.");
 }

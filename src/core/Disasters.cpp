@@ -12,10 +12,14 @@ enum DisasterType { DS_WILDFIRE, DS_DROUGHT, DS_FLOOD, DS_EPIDEMIC, DS_EARTHQUAK
 
 void Game::disasterTurn(int c) {
     Civ& cv = civs[c];
-    if (turn < 3 || numCities(c) == 0) return;
+    if (turn < 3) return;
     if (turn - cv.lastDisaster < dur(6)) return;
     // roughly one disaster every 14 turns at Quick speed, proportionally rarer (per turn) on longer games
     if (!rng.chance(0.10 * 100.0 / speedPct)) return;
+    if (numCities(c) == 0) {  // still wandering: disasters strike the bands
+        if (nomadDisaster(c)) cv.lastDisaster = turn;
+        return;
+    }
 
     int forest = 0, dry = 0, rough = 0, cold = 0;
     for (int y = 0; y < H; y++)

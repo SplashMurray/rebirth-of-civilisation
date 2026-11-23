@@ -55,12 +55,15 @@ int main(int argc, char** argv) {
         s.allAI = true;
         s.speed = speed;
         g.newGame(s);
-        int firstCity = -1, currencyTurn = -1, deciphTurn = -1;
+        int firstCity = -1, currencyTurn = -1, deciphTurn = -1, neoTurn = -1, speechTurn = -1, advTurn = -1;
         while (!g.gameOver && g.turn <= g.maxTurns + 1) {
             g.endTurn();
             invariants(g);
             if (firstCity < 0 && g.numCities(g.player) > 0) firstCity = g.turn;
             if (currencyTurn < 0 && g.hasGold(g.player)) currencyTurn = g.turn;
+            if (neoTurn < 0 && g.hasTrait(g.player, TR_NEOCORTEX)) neoTurn = g.turn;
+            if (speechTurn < 0 && g.hasTrait(g.player, TR_SPEECH)) speechTurn = g.turn;
+            if (advTurn < 0 && g.hasTrait(g.player, TR_ADV_SPEECH)) advTurn = g.turn;
             if (deciphTurn < 0 && g.hasTech(g.player, ID.tDeciphering)) deciphTurn = g.turn;
             if (g.turn == PROLOGUE_TURNS + 1) CHECK(g.warHappened && !g.civs[CIV_HUMANS].alive, "war did not happen");
             if (g.turn % 50 == 0 || g.gameOver) {
@@ -93,8 +96,8 @@ int main(int argc, char** argv) {
             }
         }
         double secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
-        std::printf("== game %d over at turn %d: winner %s (%s). first city t%d, currency t%d, deciphering t%d. wars %d captures %d razes %d. %.1fs\n", gi, g.turn,
-                    g.winner >= 0 ? g.civs[g.winner].name.c_str() : "-", g.victoryType.c_str(), firstCity, currencyTurn, deciphTurn, g.statWars, g.statCaptures, g.statRazes, secs);
+        std::printf("== game %d over at turn %d: winner %s (%s). first city t%d (neocortex t%d, speech t%d, adv speech t%d), currency t%d, deciphering t%d. wars %d captures %d razes %d. %.1fs\n", gi, g.turn,
+                    g.winner >= 0 ? g.civs[g.winner].name.c_str() : "-", g.victoryType.c_str(), firstCity, neoTurn, speechTurn, advTurn, currencyTurn, deciphTurn, g.statWars, g.statCaptures, g.statRazes, secs);
     }
     std::printf("%s (%d failures)\n", fails ? "FAILED" : "OK", fails);
     return fails ? 1 : 0;
