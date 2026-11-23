@@ -246,23 +246,32 @@ void GameUI::renderSetup() {
     }
     int oy = gy + 2 * (ch + gap) + 10;
     const char* sizes[] = {"Small (4 primates)", "Standard (6 primates)", "Large (8 primates)"};
-    const char* diffs[] = {"Easy", "Normal", "Hard"};
+    const char* diffs[] = {"Easy", "Normal", "Hard", "Expert"};
+    static const char* DIFF_TIPS[4] = {
+        "Easy: rivals play loosely - random research and traditions, few cities, timid and clumsy in war.",
+        "Normal: rivals play sensibly but without long-term plans.",
+        "Hard: rivals plan - they research what helps them most, choose traditions to suit, expand further, "
+        "only start wars they can win, gather armies with siege engines before attacking, and make peace when losing.",
+        "Expert: as Hard, but sharper - bigger empires, tighter decisions, opportunistic wars and a determined race to Rebirth.\n"
+        "No difficulty gives the computer free yields or units: it simply plays better."};
+    int beginX = W - 260 - gx + 20, rowW = std::min(600, beginX - 16 - (gx + 110));
+    int s3 = rowW / 3, s4 = rowW / 4;  // button pitch for 3 and 4 choices
     cv->text(gx, oy + 8, "Map size:", 16, C_TEXT, AL_LEFT, true);
     for (int i = 0; i < 3; i++)
-        button(gx + 110 + i * 200, oy, 190, 34, sizes[i], true, [this, i] { setupSize = i; }, "",
+        button(gx + 110 + i * s3, oy, s3 - 10, 34, sizes[i], true, [this, i] { setupSize = i; }, "",
                setupSize == i ? rgb(110, 90, 40) : C_PANEL2, 14);
     cv->text(gx, oy + 52, "Difficulty:", 16, C_TEXT, AL_LEFT, true);
-    for (int i = 0; i < 3; i++)
-        button(gx + 110 + i * 200, oy + 44, 190, 34, diffs[i], true, [this, i] { setupDiff = i; }, "",
+    for (int i = 0; i < 4; i++)
+        button(gx + 110 + i * s4, oy + 44, s4 - 8, 34, diffs[i], true, [this, i] { setupDiff = i; }, DIFF_TIPS[i],
                setupDiff == i ? rgb(110, 90, 40) : C_PANEL2, 14);
     cv->text(gx, oy + 96, "Game speed:", 16, C_TEXT, AL_LEFT, true);
     static const char* SPEED_TIPS[3] = {"Quick: 330 turns. Everything costs less; a shorter game.",
                                         "Standard: 500 turns, like Civilization VI's standard speed.",
                                         "Epic: 750 turns. Everything costs more; a long, slow game."};
     for (int i = 0; i < 3; i++)
-        button(gx + 110 + i * 200, oy + 88, 190, 34, std::string(SPEED_NAMES[i]) + " (" + std::to_string(SPEED_TURNS[i]) + " turns)", true,
+        button(gx + 110 + i * s3, oy + 88, s3 - 10, 34, std::string(SPEED_NAMES[i]) + " (" + std::to_string(SPEED_TURNS[i]) + " turns)", true,
                [this, i] { setupSpeed = i; }, SPEED_TIPS[i], setupSpeed == i ? rgb(110, 90, 40) : C_PANEL2, 14);
-    button(W - 260 - gx + 20, oy + 4, 220, 70, "Begin", true, [this] {
+    button(beginX, oy + 4, 220, 70, "Begin", true, [this] {
         GameSettings s;
         s.primate = setupPrimate;
         s.mapSize = setupSize;

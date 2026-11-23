@@ -278,7 +278,9 @@ void Game::aiBand(Unit& uref) {
         if (g_units[o.type].cls == UnitClass::Recon) scouts++;
         else if (g_units[o.type].military()) mil++;
     }
-    if (U().band >= 6 && bands < 3 + settings.mapSize && splitBand(U())) return;
+    int sk = skillOf(c);
+    int splitAt = sk == 0 ? 8 : sk == 1 ? 6 : 5;
+    if (U().band >= splitAt && bands < 3 + settings.mapSize + (sk >= 2 ? 1 : 0) && splitBand(U())) return;
     if (((U().band >= 5 && mil < bands) || (U().band >= 4 && mil == 0)) && raiseWarParty(U())) return;
     if (U().band >= 6 && scouts == 0 && sendScout(U())) return;
 

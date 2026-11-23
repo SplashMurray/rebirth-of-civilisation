@@ -317,7 +317,7 @@ void Game::newGame(const GameSettings& s) {
             const PrimateDef& pd = g_primates[cv.primate];
             cv.name = pd.plural; cv.adjective = pd.name; cv.leader = pd.leader; cv.color = pd.color;
             cv.player = (c == FIRST_PRIMATE_CIV) && !s.allAI;
-            if (!cv.player) cv.yieldBonusPct = s.difficulty == 0 ? -20 : s.difficulty == 2 ? 25 : 0;
+            cv.aiSkill = std::clamp(s.difficulty, 0, 3);  // difficulty = how cleverly the AI plays, never free yields
         }
     }
     player = FIRST_PRIMATE_CIV;

@@ -99,7 +99,17 @@
 * **Traditions:** 16 culture-bought policies, similar to *Civilization V*'s social policies.
 * **Feral packs:** feral dogs, then mutant hounds, then rogue human war machines roam the wastelands. They take the place of barbarians.
 * **Diplomacy:** AI rivals declare war based on their personality and relative strength. You can declare war or sue for peace.
-* **AI opponents** that expand, research, excavate ruins, wage war and race you to victory.
+* **AI opponents** that forage, settle, expand, research, excavate ruins, wage war and race you to victory.
+* **Difficulty means a smarter AI, not a cheating one.** Unlike *Civilization*, no level gives the computer extra yields, units or settlers - every species plays by the same rules as you. Difficulty sets how well the rivals play:
+
+  | Level | How the rivals play |
+  |---|---|
+  | Easy | Loosely: random research and traditions, fewer cities, slow to split and settle bands, timid and clumsy in war, never buy with gold |
+  | Normal | Sensibly, but without long-term plans: cheapest-first research, random traditions, units fight wherever they meet the enemy |
+  | Hard | With a plan: research valued by what it does for them (buildings, ruins they can dig, the road to Rebirth), traditions that suit their situation, more cities and Gatherers, walls when threatened, wars only when clearly stronger, armies that gather at a rally point with siege engines before attacking, attacks only at good odds, peace when losing |
+  | Expert | As Hard, but sharper: bigger empires, near-noiseless decisions, opportunistic wars against rivals already fighting someone else, and a determined race to Rebirth |
+
+  In AI-only test games where each species was given a different level, the levels finished in order - Expert ahead of Hard, Hard ahead of Normal, Normal ahead of Easy. Harder rivals also reach victory sooner, so the game is shorter and the race tighter.
 * **Four ways to win:**
   * **Rebirth (science):** research *Rebirth* and complete the *Rebirth Project*.
   * **Domination:** control every original primate capital.
@@ -125,7 +135,7 @@
   | Epic | 750 | Everything costs much more; AI games usually run to around turns 700–750 |
 
   Speed scales the cost of science, production, growth, culture and evolution, along with timed effects (nuclear winter, fallout decay, feral escalation).
-* Save and load, autosave, an event log, tooltips everywhere, a minimap, and three difficulty levels.
+* Save and load, autosave, an event log, tooltips everywhere, a minimap, and four difficulty levels.
 
 ## The primates
 

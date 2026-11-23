@@ -110,7 +110,8 @@ struct Civ {
     int capital = -1;
     int ruinsExcavated = 0;
     int nameIdx = 0;
-    int yieldBonusPct = 0;  // difficulty handicap for AI
+    int yieldBonusPct = 0;  // unused: difficulty no longer gives the AI free yields
+    int aiSkill = 1;        // how well this civ is played by the AI: 0 Easy, 1 Normal, 2 Hard, 3 Expert
     // evolution
     std::vector<uint8_t> traits;            // per trait: gained?
     int evoGoal = -1;                       // trait being evolved towards
@@ -137,7 +138,7 @@ struct Popup {
 struct GameSettings {
     int primate = 0;
     int mapSize = 1;     // 0 small, 1 standard, 2 large
-    int difficulty = 1;  // 0 easy, 1 normal, 2 hard
+    int difficulty = 1;  // AI skill: 0 easy, 1 normal, 2 hard, 3 expert
     uint64_t seed = 1;
     bool allAI = false;  // simulation / test mode
     int speed = 1;       // 0 quick, 1 standard, 2 epic
@@ -382,6 +383,15 @@ public:
     void aiResearch(int c);
     void aiDiplomacy(int c);
     int aiSiteScore(int c, int x, int y) const;
+    int skillOf(int c) const { return c >= FIRST_PRIMATE_CIV ? civs[c].aiSkill : 1; }
+    double aiTechValue(int c, int t) const;
+    bool aiOnRebirthPath(int t) const;
+    int aiChoosePolicy(int c);
+    // Hard/Expert war planning (recomputed every turn, not saved)
+    struct AIPlan { int target = -1; int rx = -1, ry = -1; bool assault = false; int army = 0, need = 0; };
+    std::vector<AIPlan> aiPlans;
+    void aiPlanWar(int c);
+    bool aiArmyUnit(Unit& u);   // Hard/Expert: act as part of the army; true if the unit acted
 
     // ---- messages
     void notify(int c, const std::string& text, int x = -1, int y = -1);

@@ -31,9 +31,89 @@ int Game::aiSiteScore(int c, int x, int y) const {
     return s;
 }
 
+// Hard and Expert: judge each technology by what it does for this civilisation right now.
+double Game::aiTechValue(int c, int t) const {
+    const Civ& cv = civs[c];
+    int nc = numCities(c);
+    bool war = false;
+    for (int o = FIRST_PRIMATE_CIV; o < (int)civs.size(); o++) if (cv.war[o] && civs[o].alive) war = true;
+    double v = 6;
+    for (auto& b : g_buildings) {
+        if (b.techId != t || b.special == BSpecial::Victory) continue;
+        double bv = b.flat.food * 3 + b.flat.prod * 3 + b.flat.sci * 4 + b.flat.cult * 2 + b.flat.gold * 1.5 +
+                    (b.pct.food + b.pct.prod + b.pct.sci * 1.4 + b.pct.cult * 0.7 + b.pct.gold * 0.5) / 4.0 + b.defense * (war ? 0.6 : 0.15);
+        v += b.wonder ? bv * 0.6 : bv * std::max(1, nc) * 0.6;
+    }
+    int bestStr = 0;
+    for (int u : availableUnits(c)) bestStr = std::max(bestStr, std::max(g_units[u].str, g_units[u].rstr));
+    for (auto& u : g_units)
+        if (u.techId == t && u.military() && (u.primate == -1 || u.primate == cv.primate) && std::max(u.str, u.rstr) > bestStr)
+            v += (std::max(u.str, u.rstr) - bestStr) * (war ? 2.0 : 0.6);
+    for (auto& im : g_improvements) if (im.techId == t && !im.name.empty()) v += 4 + nc;
+    for (auto& r : g_resources) if (r.revealTechId == t && !r.name.empty()) v += r.kind == RK_STRATEGIC ? 4 : 2;
+    for (auto& p : g_policies) if (p.techId == t) v += 6;
+    for (int k = 0; k < RUIN_TIERS; k++) {
+        if (g_ruinTierTech[k] != t || !warHappened) continue;
+        int ruins = 0;
+        for (auto& s : sites) {
+            const Tile& tl = at(s.x, s.y);
+            if ((g_ruins[tl.ruin].tierMask & (1 << k)) && !(tl.ruinDone & (1 << k)) && (tl.owner == c || tl.owner < 0)) {
+                for (auto& ci : cities) if (ci.alive && ci.owner == c && dist(ci.x, ci.y, s.x, s.y) <= 8) { ruins++; break; }
+            }
+        }
+        v += ruins * 6;
+    }
+    if (t == ID.tCultivation && nc == 0) v += 200;                 // the end of wandering
+    if ((t == ID.tForaging || t == ID.tCooking) && nc == 0) v += 25;  // feeds the bands
+    if (t == ID.tCurrency) v += 20;
+    // in the later eras, everything on the road to Rebirth matters most
+    if (era(c) >= 6 && aiOnRebirthPath(t)) v *= skillOf(c) >= 3 ? 1.4 : 1.2;
+    if (t == ID.tRebirth) v *= 4;
+    return v;
+}
+
+bool Game::aiOnRebirthPath(int t) const {
+    static std::vector<int> path;
+    if (path.empty()) {
+        path.assign(g_techs.size(), 0);
+        std::vector<int> stack = {ID.tRebirth};
+        while (!stack.empty()) {
+            int x = stack.back();
+            stack.pop_back();
+            if (x < 0 || path[x]) continue;
+            path[x] = 1;
+            for (int p : g_techs[x].prereqs) stack.push_back(p);
+        }
+    }
+    return t >= 0 && t < (int)path.size() && path[t];
+}
+
 void Game::aiResearch(int c) {
     Civ& cv = civs[c];
     if (cv.research >= 0) return;
+    int sk = skillOf(c);
+    if (sk == 0) {  // Easy: no plan at all
+        std::vector<int> ok;
+        for (size_t t = 0; t < g_techs.size(); t++) if (canResearch(c, (int)t)) ok.push_back((int)t);
+        if (!ok.empty()) setResearch(c, ok[rng.range((int)ok.size())]);
+        return;
+    }
+    if (sk >= 2) {
+        int best = -1;
+        double bestV = -1;
+        for (size_t t = 0; t < g_techs.size(); t++) {
+            if (!canResearch(c, (int)t)) continue;
+            double v = aiTechValue(c, (int)t) * 1000.0 / techCost((int)t);
+            // also count what this opens up next
+            for (size_t n = 0; n < g_techs.size(); n++)
+                for (int p : g_techs[n].prereqs)
+                    if (p == (int)t && !civs[c].techs[n]) v += aiTechValue(c, (int)n) * 150.0 / techCost((int)n);
+            v *= sk >= 3 ? 1.0 + 0.04 * rng.unit() : 0.9 + 0.2 * rng.unit();
+            if (v > bestV) { bestV = v; best = (int)t; }
+        }
+        if (best >= 0) setResearch(c, best);
+        return;
+    }
     bool war = false;
     for (int o = FIRST_PRIMATE_CIV; o < (int)civs.size(); o++) if (cv.war[o]) war = true;
     int best = -1;
@@ -64,9 +144,17 @@ void Game::aiDiplomacy(int c) {
     for (int o = FIRST_PRIMATE_CIV; o < (int)civs.size(); o++) {
         if (o == c || !civs[o].alive || !cv.met[o]) continue;
         int theirPow = militaryPower(o) + 1;
+        int sk = skillOf(c);
         if (cv.war[o]) {
             int len = turn - cv.warSince[o];
-            if (o != player && len > dur(12) && (myPow < theirPow || rng.chance(0.08))) proposePeace(c, o);
+            if (o == player) continue;
+            if (sk == 0 && len > dur(8) && (myPow < theirPow * 1.2 || rng.chance(0.15))) proposePeace(c, o);
+            else if (sk == 1 && len > dur(12) && (myPow < theirPow || rng.chance(0.08))) proposePeace(c, o);
+            else if (sk >= 2) {
+                bool planned = c < (int)aiPlans.size() && aiPlans[c].target >= 0 && cities[aiPlans[c].target].owner == o;
+                if ((len > dur(6) && myPow * 10 < theirPow * 9) || (len > dur(15) && !planned) || (len > dur(30) && rng.chance(0.1)))
+                    proposePeace(c, o);
+            }
             continue;
         }
         if (turn < dur(25) || wars > 0) continue;
@@ -79,7 +167,19 @@ void Game::aiDiplomacy(int c) {
         }
         if (closest > 12) continue;
         double chance = aggr * 0.004;
-        if (myPow > theirPow * 1.5) chance *= 2.5;
+        if (sk == 0) {
+            chance = myPow > theirPow * 1.3 ? aggr * 0.002 : 0;
+        } else if (sk >= 2) {
+            // only start wars that can be won: clearly stronger, an army to hand, and the enemy nearby
+            int mil = 0;
+            for (auto& u : units) if (u.alive && u.owner == c && g_units[u.type].military() && g_units[u.type].cls != UnitClass::Recon) mil++;
+            bool busy = false;  // the target is already fighting someone else
+            for (int q = FIRST_PRIMATE_CIV; q < (int)civs.size(); q++) if (q != c && civs[o].war[q] && civs[q].alive) busy = true;
+            double need = sk >= 3 ? 1.4 : 1.6;
+            if (busy) need -= 0.2;
+            if (closest > 10 || mil < 3 + numCities(c) || myPow < theirPow * need) chance = 0;
+            else chance = aggr * (sk >= 3 ? 0.010 : 0.007) * (busy ? 2 : 1);
+        } else if (myPow > theirPow * 1.5) chance *= 2.5;
         else if (myPow < theirPow) chance *= 0.2;
         if (rng.chance(chance)) {
             declareWar(c, o);
@@ -88,15 +188,59 @@ void Game::aiDiplomacy(int c) {
     }
 }
 
+int Game::aiChoosePolicy(int c) {
+    std::vector<int> ok;
+    for (size_t p = 0; p < g_policies.size(); p++) if (canAdopt(c, (int)p)) ok.push_back((int)p);
+    if (ok.empty()) return -1;
+    if (skillOf(c) < 2) return ok[rng.range((int)ok.size())];
+    const Civ& cv = civs[c];
+    int nc = std::max(1, numCities(c));
+    bool war = false, threatened = false;
+    for (int o = FIRST_PRIMATE_CIV; o < (int)civs.size(); o++) {
+        if (!civs[o].alive || o == c) continue;
+        if (cv.war[o]) war = true;
+        if (cv.met[o] && militaryPower(o) > militaryPower(c) * 3 / 2) threatened = true;
+    }
+    const PrimateDef* pd = primate(c);
+    int aggr = pd ? pd->aggression : 5;
+    int ruins = 0;
+    for (auto& s : sites) if (at(s.x, s.y).owner == c) ruins++;
+    int best = -1;
+    double bestV = -1;
+    for (int p : ok) {
+        const PolicyDef& pol = g_policies[p];
+        double w = 0;
+        switch (pol.eff) {
+            case PolicyEffect::Sci: w = 11; break;
+            case PolicyEffect::Prod: w = 10; break;
+            case PolicyEffect::Food: w = turn < dur(250) ? 9 : 5; break;
+            case PolicyEffect::Culture: w = 6; break;
+            case PolicyEffect::Gold: w = hasGold(c) ? 5 : 0; break;
+            case PolicyEffect::Combat: w = war ? 10 : aggr >= 7 ? 6 : 2; break;
+            case PolicyEffect::RuinBonus: w = warHappened ? 2 + ruins * 1.5 : 1; break;
+            case PolicyEffect::SettlerCost: w = turn < dur(200) && nc < 6 ? 8 : 0.5; break;
+            case PolicyEffect::UnitCost: w = war || aggr >= 7 ? 6 : 2; break;
+            case PolicyEffect::CityDefense: w = threatened || war ? 8 : 2; break;
+            case PolicyEffect::Borders: w = 3; break;
+            case PolicyEffect::Heal: w = war ? 6 : 1; break;
+            case PolicyEffect::FlatSci: w = 1.6 * nc; break;
+            case PolicyEffect::FlatCult: w = 1.0 * nc; break;
+        }
+        w *= pol.value / 15.0 + 0.3;
+        if (w > bestV) { bestV = w; best = p; }
+    }
+    return best;
+}
+
 void Game::aiTurn(int c) {
     Civ& cv = civs[c];
     aiResearch(c);
     for (int guard = 0; guard < 3; guard++) {
-        std::vector<int> ok;
-        for (size_t p = 0; p < g_policies.size(); p++) if (canAdopt(c, (int)p)) ok.push_back((int)p);
-        if (ok.empty()) break;
-        adoptPolicy(c, ok[rng.range((int)ok.size())]);
+        int p = aiChoosePolicy(c);
+        if (p < 0) break;
+        adoptPolicy(c, p);
     }
+    if (skillOf(c) >= 2) aiPlanWar(c);
     aiDiplomacy(c);
     for (size_t i = 0; i < cities.size(); i++)
         if (cities[i].alive && cities[i].owner == c) aiCity(cities[i]);
@@ -140,8 +284,12 @@ void Game::aiCity(City& city) {
 
     bool keep = city.buildKind != BK_NONE && canBuild(city, city.buildKind, city.buildId);
     if (keep && threat > 0 && !garrison && !(city.buildKind == BK_UNIT && g_units[city.buildId].military())) keep = false;
+    int sk = skillOf(c);
     if (keep) {
-        if (threat > 0 && hasGold(c) && buyCost(city) > 0 && cv.gold >= buyCost(city)) buy(city);
+        if (sk > 0 && threat > 0 && hasGold(c) && buyCost(city) > 0 && cv.gold >= buyCost(city)) buy(city);
+        else if (sk >= 2 && hasGold(c) && buyCost(city) > 0 && cv.gold >= buyCost(city) * 13 / 10 &&
+                 !(city.buildKind == BK_BUILDING && g_buildings[city.buildId].wonder))
+            buy(city);
         return;
     }
 
@@ -162,17 +310,35 @@ void Game::aiCity(City& city) {
         }
     bool atWarAny = false;
     for (int o = FIRST_PRIMATE_CIV; o < (int)civs.size(); o++) if (cv.war[o] && civs[o].alive) atWarAny = true;
-    int targetCities = 4 + settings.mapSize * 2;
+    int targetCities = 4 + settings.mapSize * 2 + (sk - 1);
     const PrimateDef* pd = primate(c);
     if (pd && pd->aggression >= 7) targetCities++;
+    bool neighbourThreat = false;
+    if (sk >= 2)
+        for (int o = FIRST_PRIMATE_CIV; o < (int)civs.size(); o++)
+            if (o != c && civs[o].alive && cv.met[o] && militaryPower(o) > militaryPower(c) * 3 / 2) neighbourThreat = true;
+    int milWant = 1 + myCities + (sk >= 2 && neighbourThreat ? (myCities + 1) / 2 : 0);
+    int workWant = sk >= 2 ? std::max(1, myCities) : std::max(1, (myCities + 1) * 2 / 3);
+    int settlerSlots = sk >= 3 && myCities >= 2 ? 2 : 1;
+    bool wantWalls = sk >= 2 && (threat > 0 || neighbourThreat);
 
     int kind = BK_NONE, id = -1;
     if (canBuild(city, BK_BUILDING, ID.bRebirth)) { kind = BK_BUILDING; id = ID.bRebirth; }
     else if (threat > 0 && !garrison) { kind = BK_UNIT; id = bestMilitary(false); }
-    else if (mil < 1 + myCities) { kind = BK_UNIT; id = bestMilitary(mil % 3 == 2); }
-    else if (workers < std::max(1, (myCities + 1) * 2 / 3) && city.pop >= 2) { kind = BK_UNIT; id = uniqueFor(c, ID.uGatherer); }
-    else if (myCities + settlers < targetCities && settlers == 0 && city.pop >= 2 && turn < dur(260) && canBuild(city, BK_UNIT, ID.uElder)) { kind = BK_UNIT; id = ID.uElder; }
-    else if (atWarAny && mil < myCities * 3 && rng.chance(0.6)) { kind = BK_UNIT; id = bestMilitary(rng.chance(0.35)); }
+    else if (mil < milWant) { kind = BK_UNIT; id = bestMilitary(mil % 3 == 2); }
+    else if (workers < workWant && city.pop >= 2) { kind = BK_UNIT; id = uniqueFor(c, ID.uGatherer); }
+    else if (myCities + settlers < targetCities && settlers < settlerSlots && city.pop >= 2 && turn < dur(260) && canBuild(city, BK_UNIT, ID.uElder)) { kind = BK_UNIT; id = ID.uElder; }
+    else if (atWarAny && mil < myCities * 3 && rng.chance(0.6)) {
+        kind = BK_UNIT;
+        id = bestMilitary(rng.chance(0.35));
+        if (sk >= 2) {  // a real army brings siege engines
+            int siege = 0;
+            for (auto& u : units) if (u.alive && u.owner == c && g_units[u.type].cls == UnitClass::Siege) siege++;
+            if (siege < 1 + myCities / 3)
+                for (int u : availableUnits(c))
+                    if (g_units[u].cls == UnitClass::Siege && (id < 0 || g_units[id].cls != UnitClass::Siege || g_units[u].rstr > g_units[id].rstr)) id = u;
+        }
+    }
     if (id < 0) {
         int best = -1;
         double bs = -1;
@@ -182,18 +348,19 @@ void Game::aiCity(City& city) {
             double v = bd.flat.food * 3 + bd.flat.prod * 3 + bd.flat.sci * 3 + bd.flat.cult * 2.5 + bd.flat.gold * 1.5;
             v += (bd.pct.food * city.yields.food + bd.pct.prod * city.yields.prod + bd.pct.sci * city.yields.sci +
                   bd.pct.cult * city.yields.cult + bd.pct.gold * city.yields.gold) / 30.0;
-            v += bd.defense * (atWarAny ? 1.5 : 0.4);
+            v += bd.defense * (atWarAny ? 1.5 : 0.4) * (wantWalls ? 2.5 : 1.0);
             if (bd.special == BSpecial::RuinScience || bd.special == BSpecial::RuinProd) v += ruinTilesInTerritory(city) * 2.5;
             if (bd.special == BSpecial::FreeTech) v += 10;
             if (bd.wonder) v = v * 0.8 + (city.yields.prod >= 8 ? 4 : -100);
-            v = v * 100.0 / (bd.cost + 30) * (0.8 + 0.4 * rng.unit());
+            double noise = sk == 0 ? 1.0 : sk == 1 ? 0.4 : sk == 2 ? 0.16 : 0.06;
+            v = v * 100.0 / (bd.cost + 30) * (1.0 - noise / 2 + noise * rng.unit());
             if (v > bs) { bs = v; best = b; }
         }
         if (best >= 0) { kind = BK_BUILDING; id = best; }
         else { kind = BK_UNIT; id = bestMilitary(rng.chance(0.3)); }
     }
     if (id >= 0) setProduction(city, kind, id);
-    if (hasGold(c) && city.buildKind == BK_UNIT && buyCost(city) > 0 && cv.gold > buyCost(city) * 2) buy(city);
+    if (sk > 0 && hasGold(c) && city.buildKind == BK_UNIT && buyCost(city) > 0 && cv.gold > buyCost(city) * 2) buy(city);
 }
 
 void Game::aiUnit(Unit& uref) {
@@ -425,7 +592,7 @@ void Game::aiUnit(Unit& uref) {
             return;
         }
     }
-    if (U().hp < 40) {
+    if (U().hp < (skillOf(c) >= 2 ? 50 : 40)) {
         City* home = nullptr;
         for (auto& ci : cities)
             if (ci.alive && ci.owner == c && (!home || dist(ci.x, ci.y, U().x, U().y) < dist(home->x, home->y, U().x, U().y))) home = &ci;
@@ -435,6 +602,9 @@ void Game::aiUnit(Unit& uref) {
             return;
         }
     }
+    if (skillOf(c) >= 2) {
+        if (aiArmyUnit(U())) return;
+    } else {
     // attack nearby enemies
     {
         int bx = -1, by = -1, bs = -1;
@@ -461,12 +631,13 @@ void Game::aiUnit(Unit& uref) {
                     Unit* m = militaryAt(bx, by);
                     D = m ? unitStrength(*m, false, false, bx, by) : 1;
                 }
-                if (A >= D * 0.75 || U().hp > 80) { attack(U(), bx, by); return; }
+                if (A >= D * (skillOf(c) == 0 ? 0.5 : 0.75) || U().hp > 80) { attack(U(), bx, by); return; }
             } else if (!d.ranged() || dist(U().x, U().y, bx, by) > d.range) {
                 orderMoveOrAttack(U(), bx, by);
                 return;
             }
         }
+    }
     }
     // ungarrisoned city needs us?
     for (auto& ci : cities) {
@@ -485,7 +656,7 @@ void Game::aiUnit(Unit& uref) {
         }
     }
     // offensive: march on the nearest enemy city
-    {
+    if (skillOf(c) < 2) {
         City* tgt = nullptr;
         for (auto& ci : cities)
             if (ci.alive && atWar(c, ci.owner) && ci.owner >= FIRST_PRIMATE_CIV &&
@@ -512,4 +683,133 @@ void Game::aiUnit(Unit& uref) {
         if (home && dist(home->x, home->y, U().x, U().y) > 2) { U().order = ORD_GOTO; U().gx = home->x; U().gy = home->y; continueGoto(U()); }
         else U().order = ORD_FORTIFY;
     }
+}
+
+// ============================================================ Hard / Expert: planned wars
+// Instead of every unit charging the nearest enemy on its own, the army picks one target city,
+// gathers at a rally point a few tiles short of it, and only attacks once it is strong enough.
+void Game::aiPlanWar(int c) {
+    if ((int)aiPlans.size() < (int)civs.size()) aiPlans.resize(civs.size());
+    AIPlan old = aiPlans[c];
+    AIPlan P;
+    if (numCities(c) == 0) { aiPlans[c] = P; return; }
+    int best = -1;
+    double bs = 1e9;
+    for (auto& ci : cities) {
+        if (!ci.alive || ci.owner < FIRST_PRIMATE_CIV || !atWar(c, ci.owner)) continue;
+        int d = 99;
+        for (auto& m : cities) if (m.alive && m.owner == c) d = std::min(d, dist(m.x, m.y, ci.x, ci.y));
+        if (d > 14) continue;
+        double s = d * 3 + cityStrength(ci) / 10.0 * ci.hp / std::max(1, cityMaxHP(ci)) - (old.target == ci.id ? 15 : 0);
+        if (s < bs) { bs = s; best = ci.id; }
+    }
+    if (best < 0) { aiPlans[c] = P; return; }
+    const City& T = cities[best];
+    P.target = best;
+    const City* home = nullptr;
+    for (auto& m : cities)
+        if (m.alive && m.owner == c && (!home || dist(m.x, m.y, T.x, T.y) < dist(home->x, home->y, T.x, T.y))) home = &m;
+    P.rx = home->x; P.ry = home->y;
+    Unit probe;
+    probe.type = ID.uWarband;
+    probe.owner = c;
+    probe.x = home->x; probe.y = home->y;
+    std::vector<Pt> path = findPath(probe, T.x, T.y, true);
+    if (path.size() >= 4) { P.rx = path[path.size() - 4].x; P.ry = path[path.size() - 4].y; }
+    for (auto& u : units) {
+        if (!u.alive || u.owner != c || !g_units[u.type].military() || g_units[u.type].cls == UnitClass::Recon || u.hp < 50) continue;
+        if (dist(u.x, u.y, P.rx, P.ry) <= 2 || dist(u.x, u.y, T.x, T.y) <= 3) P.army++;
+    }
+    P.need = 3 + T.pop / 3 + (skillOf(c) >= 3 ? 0 : 1);
+    P.assault = old.target == best && old.assault ? P.army >= std::max(2, P.need - 2) : P.army >= P.need;
+    aiPlans[c] = P;
+}
+
+bool Game::aiArmyUnit(Unit& uref) {
+    int uid = uref.id;
+    auto U = [&]() -> Unit& { return units[uid]; };
+    int c = U().owner;
+    const UnitDef& d = g_units[U().type];
+    int sk = skillOf(c);
+    if (U().moves <= 0) return true;
+    auto odds = [&](const Unit& e) {  // expected damage we deal / take
+        double A = unitStrength(U(), true, d.ranged(), U().x, U().y), D = unitStrength(e, false, false, e.x, e.y);
+        return std::make_pair(combatDamage(A, D), d.ranged() || g_units[e.type].civilian() ? 0 : combatDamage(D, A));
+    };
+    // 1. strikes with good odds on anything in reach
+    {
+        int bx = -1, by = -1;
+        double bv = 0;
+        for (auto& e : units) {
+            if (!e.alive || !atWar(c, e.owner) || !canAttack(U(), e.x, e.y)) continue;
+            auto o = odds(e);
+            bool kill = o.first >= e.hp;
+            double v = kill ? 300 + o.first : o.first - o.second * 1.2;
+            if (g_units[e.type].civilian()) v = 250;
+            if (!d.ranged() && !kill && o.second >= U().hp - 10) continue;  // would die or nearly
+            if (v > bv) { bv = v; bx = e.x; by = e.y; }
+        }
+        if (bx >= 0 && (bv > 0 || d.ranged())) { attack(U(), bx, by); return true; }
+        if (d.ranged())
+            for (auto& ci : cities)
+                if (ci.alive && canAttack(U(), ci.x, ci.y)) { attack(U(), ci.x, ci.y); return true; }
+    }
+    // 2. drive out intruders in our own lands
+    {
+        int bx = -1, by = -1, bd = 99;
+        for (auto& e : units) {
+            if (!e.alive || !atWar(c, e.owner) || !g_units[e.type].military()) continue;
+            if (at(e.x, e.y).owner != c) continue;
+            int dd = dist(e.x, e.y, U().x, U().y);
+            if (dd > 5 || dd >= bd) continue;
+            auto o = odds(e);
+            if (o.first < o.second && e.hp > 40) continue;
+            bd = dd; bx = e.x; by = e.y;
+        }
+        if (bx >= 0) {
+            std::vector<Pt> p = findPath(U(), bx, by, true);
+            if (p.size() >= 2) {
+                Pt stand = p[p.size() - 1 - std::min((int)p.size() - 1, d.ranged() ? d.range : 1)];
+                U().order = ORD_GOTO; U().gx = stand.x; U().gy = stand.y;
+                continueGoto(U());
+                if (U().alive && U().order == ORD_GOTO) U().order = ORD_NONE;
+                return true;
+            }
+        }
+    }
+    // 3. the war plan
+    if (c >= (int)aiPlans.size() || aiPlans[c].target < 0) return false;
+    const AIPlan& P = aiPlans[c];
+    const City& T = cities[P.target];
+    if (!T.alive || !atWar(c, T.owner)) return false;
+    int dT = dist(U().x, U().y, T.x, T.y);
+    if (!P.assault) {
+        if (dist(U().x, U().y, P.rx, P.ry) > 1) {
+            U().order = ORD_GOTO; U().gx = P.rx; U().gy = P.ry;
+            continueGoto(U());
+            if (U().alive && U().order == ORD_GOTO) U().order = ORD_NONE;
+        } else {
+            U().order = ORD_FORTIFY;  // wait for the rest of the army
+        }
+        return true;
+    }
+    // assault
+    int want = d.ranged() ? d.range : 1;
+    if (dT > want) {
+        std::vector<Pt> p = findPath(U(), T.x, T.y, true);
+        if (p.size() < 2) return false;
+        int k = std::max(0, (int)p.size() - 1 - want);
+        U().order = ORD_GOTO; U().gx = p[k].x; U().gy = p[k].y;
+        continueGoto(U());
+        if (U().alive && U().order == ORD_GOTO) U().order = ORD_NONE;
+    }
+    if (!U().alive || U().moves <= 0 || !canAttack(U(), T.x, T.y)) return true;
+    if (d.ranged()) { attack(U(), T.x, T.y); return true; }
+    double A = unitStrength(U(), true, false, U().x, U().y) * (d.cls == UnitClass::Siege ? 3.0 : 1.5);
+    int taken = combatDamage(cityStrength(T), A);
+    int dealt = combatDamage(A, cityStrength(T));
+    bool capture = dealt >= T.hp;
+    if (capture || (U().hp - taken >= (sk >= 3 ? 30 : 20) && T.hp < cityMaxHP(T) * 3 / 4)) attack(U(), T.x, T.y);
+    else U().order = ORD_FORTIFY;
+    return true;
 }
