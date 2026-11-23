@@ -626,6 +626,13 @@ void GameUI::renderUnitPanel() {
         stats = "Band of " + std::to_string(u.band) + "   Forage " + std::to_string(forage) + " food, eats " + std::to_string(u.band) +
                 " (" + (forage - u.band >= 0 ? "+" : "") + std::to_string(forage - u.band) + ")";
     } else stats = d.cls == UnitClass::Settler ? "Founds settlements" : "Builds improvements, excavates ruins";
+    if (d.naval() && d.cargo > 0) {
+        std::string aboard;
+        for (auto& o : g.units) if (o.alive && o.carrier == u.id) aboard += std::string(aboard.empty() ? "" : ", ") + g_units[o.type].name;
+        stats += "   Cargo " + std::to_string(g.cargoCount(u)) + "/" + std::to_string(d.cargo);
+        if (!aboard.empty()) hot(px + 62, py + 32, 340, 20, nullptr, "Aboard: " + aboard);
+    }
+    if (u.carrier >= 0 && u.carrier < (int)g.units.size()) stats += "   Aboard " + g_units[g.units[u.carrier].type].name;
     cv->text(px + 62, py + 36, stats, 13, C_DIM);
     cv->text(px + 62, py + 54, "Moves " + std::to_string(u.moves) + "/" + std::to_string(g.maxMoves(u)) + "    HP " + std::to_string(u.hp) + "    " +
              orderName(u.order) + (u.order == ORD_BUILD || u.order == ORD_EXCAVATE || u.order == ORD_DECON ? " (" + std::to_string(u.work) + " turns)" : ""),
@@ -684,15 +691,41 @@ void GameUI::renderUnitPanel() {
         }
         if (g.canDecon(u)) acts.push_back({"Decontaminate (X)", u.moves > 0, [this] { unitCommand('X'); }, "Reduce fallout on this tile by one level"});
     }
+    if (d.military()) {
+        int to = g.upgradeTarget(u);
+        if (to >= 0) {
+            std::string why;
+            bool ok = g.canUpgrade(u, &why);
+            std::string price = g.hasGold(u.owner) ? std::to_string(g.upgradeGold(u, to)) + " gold"
+                                                    : std::to_string(g.upgradeProd(u, to)) + " production from the city it stands in";
+            acts.push_back({"Upgrade: " + g_units[to].name + " (U)", ok, [this] { unitCommand('U'); },
+                            ok ? "Refit as a " + g_units[to].name + " for " + price + ". Keeps its health; ends its turn."
+                               : why + " (refit as a " + g_units[to].name + " for " + price + ")"});
+        }
+    }
+    if (!d.naval() && d.cls != UnitClass::Nuke) {
+        if (u.carrier >= 0 && !g.isWater(u.x, u.y))
+            acts.push_back({"Leave Ship (K)", true, [this] { unitCommand('K'); }, "Step ashore in this harbour"});
+        else if (u.carrier < 0 && !g.isWater(u.x, u.y) && g.transportAt(u.owner, u.x, u.y, u.id))
+            acts.push_back({"Board Ship (K)", u.moves > 0, [this] { unitCommand('K'); }, "Go aboard the ship docked here. It will carry this unit wherever it sails."});
+    }
+    if (d.naval() && g.cargoCount(u) > 0)
+        for (auto& o : g.units)
+            if (o.alive && o.carrier == u.id) {
+                int oid = o.id;
+                acts.push_back({"Select " + g_units[o.type].name, true, [this, oid] { selectUnit(oid, false); },
+                                "Select this unit aboard, then move it onto an adjacent land tile to land it"});
+            }
     if (d.military()) acts.push_back({"Fortify (F)", u.order != ORD_FORTIFY, [this] { unitCommand('F'); }, "+25% defence after one turn. Heals while resting."});
     acts.push_back({"Sleep (S)", u.order != ORD_SLEEP, [this] { unitCommand('S'); }, "Stay put until woken or an enemy appears"});
     if (u.order != ORD_NONE) acts.push_back({"Wake (W)", true, [this] { unitCommand('W'); }, "Cancel current orders"});
     acts.push_back({moveMode ? "Pick target..." : "Move (M)", u.moves > 0, [this] { moveMode = !moveMode; }, "Then left-click a destination. Right-click also moves."});
     acts.push_back({"Skip (Space)", true, [this] { unitCommand(' '); }, "Do nothing this turn"});
-    acts.push_back({disbandArm == uid ? "Confirm?" : "Disband", true, [this, uid] {
+    bool loaded = d.naval() && g.cargoCount(u) > 0;
+    acts.push_back({disbandArm == uid ? "Confirm?" : "Disband", !loaded, [this, uid] {
         if (disbandArm == uid) { unitCommand('D'); }
         else disbandArm = uid;
-    }, "Delete this unit"});
+    }, loaded ? "Land the units aboard first" : "Delete this unit"});
     int bx = px + 10, by = py + 86, bw = 98, bh = 26;
     for (size_t i = 0; i < acts.size() && i < 12; i++) {
         auto& a = acts[i];
@@ -1312,6 +1345,12 @@ void GameUI::renderHelp() {
         "coastal cities, where they can share the tile with a land garrison. Melee ships ram ships and embarked units and can storm a "
         "coastal city; ranged ships bombard anything in range, including the shore. Embarked land units are easy prey - escort them. "
         "Some coastal military-base ruins hold a warship that can be raised from the harbour.\n"
+        "TRANSPORTS  Canoes and War Galleys carry 1 land unit, Caravels 2, Frigates 1 and Salvaged Freighters (Steam Power) 4. Move a land unit "
+        "onto your ship's tile to board it (or press K in a harbour city); it sails with the ship and lands by moving onto an adjacent land tile. "
+        "Units aboard cannot fight, and if the ship sinks they are lost.\n"
+        "UPGRADES  Inside your own territory, a unit can be refitted (U) as the best unit of its line you can train - for example "
+        "Warband > Spear Troop > Iron Blades > Rifles > Infantry. With Currency it costs gold; before that, the refit is done in one of your "
+        "cities and paid for from that city's stored production. Upgraded units keep their health.\n"
         "NUCLEAR WEAPONS  Nuclear Fission lets a city build a Nuclear Warhead (needs Uranium). Warheads wait in your silos: click the warhead "
         "count on the top bar, pick a tile within 12 of one of your cities and confirm. Everything next to the blast is destroyed, cities are "
         "wrecked, fallout spreads, your victims declare war and others who know you may join them.\n"
@@ -1534,6 +1573,11 @@ void GameUI::unitCommand(char cmd) {
             }
             return;
         case 'G': if (!g.splitBand(u)) return; break;
+        case 'U': if (!g.upgradeUnit(u)) return; break;
+        case 'K':
+            if (u.carrier >= 0) { if (!g.leaveShip(u)) { toast = "There is no room ashore here"; toastMs = 2000; return; } }
+            else if (!g.boardShip(u)) return;
+            break;
         case 'R': if (!g.raiseWarParty(u)) return; break;
         case 'F': if (g_units[u.type].military()) { u.order = ORD_FORTIFY; } break;
         case 'S': u.order = ORD_SLEEP; break;
@@ -1843,7 +1887,7 @@ void GameUI::key(int k, bool shift, bool ctrl) {
         case KEY_TAB: { int n = nextUnitNeedingOrders(selUnit); if (n >= 0) selectUnit(n, true); return; }
         case 'C': if (sel()) centerOn(sel()->x, sel()->y); return;
         case 'M': if (sel()) moveMode = !moveMode; return;
-        case 'B': case 'F': case 'S': case 'W': case 'E': case 'X': case 'G': case 'R': case KEY_SPACE: unitCommand((char)k); return;
+        case 'B': case 'F': case 'S': case 'W': case 'E': case 'X': case 'G': case 'R': case 'U': case 'K': case KEY_SPACE: unitCommand((char)k); return;
         case KEY_DELETE: if (sel()) { if (disbandArm == selUnit) unitCommand('D'); else disbandArm = selUnit; } return;
         default: return;
     }

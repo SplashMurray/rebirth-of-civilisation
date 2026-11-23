@@ -244,6 +244,7 @@ void Game::aiTurn(int c) {
         aiPlanWar(c);
         aiNukes(c);
     }
+    aiUpgrades(c);
     aiDiplomacy(c);
     for (size_t i = 0; i < cities.size(); i++)
         if (cities[i].alive && cities[i].owner == c) aiCity(cities[i]);
@@ -333,6 +334,10 @@ void Game::aiCity(City& city) {
     else if (mil < milWant) { kind = BK_UNIT; id = bestMilitary(mil % 3 == 2); }
     else if (workers < workWant && city.pop >= 2) { kind = BK_UNIT; id = uniqueFor(c, ID.uGatherer); }
     else if (myCities + settlers < targetCities && settlers < settlerSlots && city.pop >= 2 && turn < dur(260) && canBuild(city, BK_UNIT, ID.uElder)) { kind = BK_UNIT; id = ID.uElder; }
+    else if (isCoastal(city.x, city.y) && aiNeedsTransport(city) >= 0) {
+        kind = BK_UNIT;
+        id = aiNeedsTransport(city);
+    }
     else if (isCoastal(city.x, city.y) && ships < aiShipWant(c, atWarAny) && aiBestShip(c, ships % 2 == 1) >= 0 && rng.chance(sk >= 2 ? 0.8 : 0.5)) {
         kind = BK_UNIT;
         id = aiBestShip(c, ships % 2 == 1);
@@ -392,6 +397,39 @@ void Game::aiUnit(Unit& uref) {
         aiNaval(U());
         return;
     }
+    // crossing the water: keep going while the goal still makes sense
+    if (U().ferryX >= 0 || U().carrier >= 0) {
+        int fx = U().ferryX, fy = U().ferryY;
+        bool valid = fx >= 0 && (d.cls == UnitClass::Settler ? aiSiteScore(c, fx, fy) > 0 : isEnemyTarget(c, fx, fy));
+        if (!valid) {
+            U().ferryX = U().ferryY = -1;
+            if (U().carrier >= 0) {
+                if (!isWater(U().x, U().y)) { leaveShip(U()); }
+                else {  // go home: land next to our nearest city
+                    const City* home = nullptr;
+                    for (auto& ci : cities)
+                        if (ci.alive && ci.owner == c && (!home || dist(ci.x, ci.y, U().x, U().y) < dist(home->x, home->y, U().x, U().y))) home = &ci;
+                    if (home) { aiFerry(U(), home->x, home->y); return; }
+                }
+            }
+        } else {
+            if (U().carrier < 0) {
+                // already on the same landmass as the goal? then just walk
+                Unit probe = U();
+                if (!findPath(probe, fx, fy, true).empty() && dist(U().x, U().y, fx, fy) <= 4) U().ferryX = U().ferryY = -1;
+            }
+            if (U().ferryX >= 0 && aiFerry(U(), fx, fy)) {
+                if (U().alive && U().carrier < 0 && U().ferryX < 0 && d.cls == UnitClass::Settler && canFoundAt(c, U().x, U().y) &&
+                    dist(U().x, U().y, fx, fy) <= 1 && U().moves > 0) {
+                    foundCity(c, U().x, U().y);
+                    killUnit(U());
+                }
+                return;
+            }
+            U().ferryX = U().ferryY = -1;
+        }
+        if (!U().alive || U().moves <= 0) return;
+    }
     // ---------------- settlers
     if (d.cls == UnitClass::Settler) {
         if (numCities(c) == 0 && (turn >= 2 || aiSiteScore(c, U().x, U().y) >= 40) && canFoundAt(c, U().x, U().y)) {
@@ -419,6 +457,25 @@ void Game::aiUnit(Unit& uref) {
             if (s > best) {
                 if (findPath(U(), p.x, p.y).empty() && !(p.x == U().x && p.y == U().y)) continue;
                 best = s; bx = p.x; by = p.y;
+            }
+        }
+        if (bx < 0 || best < 60) {
+            // nothing good on this landmass: look across the water
+            bool canSail = false;
+            for (int t : availableUnits(c)) if (g_units[t].cargo > 0) canSail = true;
+            for (auto& o : units) if (o.alive && o.owner == c && g_units[o.type].cargo > 0) canSail = true;
+            if (canSail && skillOf(c) >= 1) {
+                int sb = -1, sx = -1, sy = -1;
+                for (auto& p : ring(U().x, U().y, 14)) {
+                    int s = aiSiteScore(c, p.x, p.y);
+                    if (s < 35) continue;
+                    s = s * 3 - dist(U().x, U().y, p.x, p.y) * 3;
+                    if (s > sb && s > best + 30) { sb = s; sx = p.x; sy = p.y; }
+                }
+                if (sx >= 0) {
+                    Unit probe = U();
+                    if (findPath(probe, sx, sy, true).empty() && aiFerry(U(), sx, sy)) return;
+                }
             }
         }
         if (bx < 0) {
@@ -800,6 +857,10 @@ bool Game::aiArmyUnit(Unit& uref) {
     const City& T = cities[P.target];
     if (!T.alive || !atWar(c, T.owner)) return false;
     int dT = dist(U().x, U().y, T.x, T.y);
+    if (dT > 1 && isCoastal(T.x, T.y)) {  // across the sea: go by ship
+        Unit probe = U();
+        if (findPath(probe, T.x, T.y, true).empty()) return aiFerry(U(), T.x, T.y);
+    }
     if (!P.assault) {
         if (dist(U().x, U().y, P.rx, P.ry) > 1) {
             U().order = ORD_GOTO; U().gx = P.rx; U().gy = P.ry;

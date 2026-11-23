@@ -44,6 +44,10 @@ void Game::aiNaval(Unit& uref) {
     int sk = skillOf(c);
     if (U().moves <= 0) return;
     if (U().order == ORD_FORTIFY || U().order == ORD_SLEEP) U().order = ORD_NONE;
+    if (aiFerryJob(U())) {
+        aiTransportShip(U());
+        return;
+    }
     auto sail = [&](int tx, int ty) {
         U().order = ORD_GOTO; U().gx = tx; U().gy = ty;
         continueGoto(U());

@@ -69,6 +69,8 @@ struct UnitDef {
     int replacesId = -1;
     std::vector<int> needs;  // strategic resources required to train it
     bool ocean = false;      // ships: can leave the coast for the open ocean
+    int cargo = 0;           // ships: land units it can carry
+    int upgradeId = -1;      // the next unit in this unit's line (base units only)
     bool civilian() const { return cls == UnitClass::Settler || cls == UnitClass::Worker || cls == UnitClass::Band; }
     bool military() const { return !civilian() && cls != UnitClass::Nuke; }
     bool ranged() const { return rstr > 0; }

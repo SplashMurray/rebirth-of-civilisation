@@ -19,6 +19,10 @@ static void invariants(Game& g) {
         if (g_units[u.type].naval()) {
             CHECK(g.isWater(u.x, u.y) || (g.cityAt(u.x, u.y) && g.cityAt(u.x, u.y)->owner == u.owner), "ship on land type=%s", g_units[u.type].name.c_str());
             CHECK(g_units[u.type].ocean || g.at(u.x, u.y).terrain != T_OCEAN, "coastal ship on ocean type=%s", g_units[u.type].name.c_str());
+        } else if (u.carrier >= 0) {
+            CHECK(u.carrier < (int)g.units.size() && g.units[u.carrier].alive && g_units[g.units[u.carrier].type].naval() &&
+                      g.units[u.carrier].x == u.x && g.units[u.carrier].y == u.y && g.units[u.carrier].owner == u.owner,
+                  "cargo not with its ship type=%s", g_units[u.type].name.c_str());
         } else if (g.isWater(u.x, u.y)) CHECK(g.canEmbark(u.owner, u.x, u.y) || u.owner < FIRST_PRIMATE_CIV, "unit in water without tech type=%s", g_units[u.type].name.c_str());
     }
     // stacking
@@ -28,11 +32,14 @@ static void invariants(Game& g) {
         for (size_t j = i + 1; j < g.units.size(); j++) {
             auto& b = g.units[j];
             if (!b.alive || a.x != b.x || a.y != b.y) continue;
+            if (a.owner == b.owner && (a.carrier >= 0 || b.carrier >= 0)) continue;  // aboard a ship
             CHECK(a.owner == b.owner, "enemy units stacked %d %d at %d,%d", a.owner, b.owner, a.x, a.y);
             auto layer = [](const UnitDef& d) { return d.civilian() ? 0 : d.naval() ? 2 : 1; };
             CHECK(layer(g_units[a.type]) != layer(g_units[b.type]), "illegal stack %s + %s", g_units[a.type].name.c_str(), g_units[b.type].name.c_str());
         }
     }
+    for (auto& u : g.units)
+        if (u.alive && g_units[u.type].naval()) CHECK(g.cargoCount(u) <= g_units[u.type].cargo, "ship overloaded %s", g_units[u.type].name.c_str());
     for (auto& c : g.cities) {
         if (!c.alive) continue;
         CHECK(c.pop >= 1, "pop < 1");

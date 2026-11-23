@@ -981,6 +981,10 @@ int Game::spawnUnit(int c, int type, int x, int y) {
 void Game::killUnit(Unit& u) {
     u.alive = false;
     u.order = ORD_NONE;
+    if (g_units[u.type].naval())  // everyone aboard goes down with the ship
+        for (auto& o : units)
+            if (o.alive && o.carrier == u.id) { o.alive = false; o.order = ORD_NONE; }
+    u.carrier = -1;
 }
 
 Unit* Game::militaryAt(int x, int y) {
@@ -1036,6 +1040,7 @@ int Game::moveCost(const Unit& u, int fx, int fy, int tx, int ty) const {
     if (t.mountain) return -1;
     if (!warHappened && t.site >= 0) return -1;  // living human settlements are off limits
     bool toWater = isWater(tx, ty), fromWater = isWater(fx, fy);
+    if (toWater && ud.cls != UnitClass::Nuke && transportAt(u.owner, tx, ty, u.id)) return 1;  // going aboard one of our ships
     if (toWater && !canEmbark(u.owner, tx, ty)) return -1;
     if (toWater != fromWater) return 99;  // embark/disembark uses all movement
     if (toWater) return 1;
@@ -1052,11 +1057,13 @@ bool Game::canEnter(const Unit& u, int x, int y) const {
     if (const City* c = cityAt(x, y)) {
         if (c->owner != u.owner) return false;
     }
-    // one civilian, one land military unit and one ship may share a tile
+    // one civilian, one land military unit and one ship may share a tile; units aboard a ship don't count
     auto layer = [](const UnitDef& d) { return d.civilian() ? 0 : d.naval() ? 2 : 1; };
     int mine = layer(g_units[u.type]);
+    bool boarding = !g_units[u.type].naval() && isWater(x, y) && transportAt(u.owner, x, y, u.id);
     for (auto& o : units) {
         if (!o.alive || o.x != x || o.y != y || o.id == u.id) continue;
+        if (o.owner == u.owner && (o.carrier >= 0 || boarding)) continue;
         if (o.owner != u.owner) return false;
         if (layer(g_units[o.type]) == mine) return false;
     }
@@ -1144,7 +1151,25 @@ bool Game::stepUnit(Unit& u, int nx, int ny) {
     }
     if (!canEnter(u, nx, ny)) return false;
     bool wasWater = isWater(u.x, u.y);
+    if (!g_units[u.type].naval()) {  // board, change ships or step ashore
+        const Unit* ship = isWater(nx, ny) ? transportAt(u.owner, nx, ny, u.id) : nullptr;
+        int before = u.carrier;
+        u.carrier = ship ? ship->id : -1;
+        if (ship && before < 0) {
+            civs[u.owner].unitsFerried += u.owner >= FIRST_PRIMATE_CIV ? 1 : 0;
+            u.x = nx; u.y = ny;
+            u.moves = 0;
+            u.order = ORD_SLEEP;
+            u.acted = true;
+            u.fortTurns = 0;
+            if (u.owner >= FIRST_PRIMATE_CIV) revealAround(*this, u.owner, nx, ny, sightRange(u));
+            return true;
+        }
+    }
     u.x = nx; u.y = ny;
+    if (g_units[u.type].naval())  // the cargo sails with the ship
+        for (auto& o : units)
+            if (o.alive && o.carrier == u.id) { o.x = nx; o.y = ny; }
     if (mc >= 99) u.moves = 0;
     else u.moves = std::max(0, u.moves - mc);
     if (wasWater != isWater(nx, ny) && !g_units[u.type].naval()) u.moves = 0;  // embarking/landing
@@ -1177,7 +1202,7 @@ bool Game::isEnemyTarget(int c, int tx, int ty) const {
 
 bool Game::canAttack(const Unit& u, int tx, int ty) const {
     const UnitDef& d = g_units[u.type];
-    if (!d.military() || u.attacked || u.moves <= 0) return false;
+    if (!d.military() || u.attacked || u.moves <= 0 || u.carrier >= 0) return false;
     if (!isEnemyTarget(u.owner, tx, ty)) return false;
     int dd = dist(u.x, u.y, tx, ty);
     if (d.ranged()) return dd <= d.range && dd >= 1;

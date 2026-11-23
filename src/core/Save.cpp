@@ -5,7 +5,7 @@
 #include <sstream>
 
 namespace {
-const int SAVE_VERSION = 12;
+const int SAVE_VERSION = 13;
 
 struct Archive {
     bool writing;
@@ -127,7 +127,7 @@ void ioGame(Archive& a, Game& g) {
         a.io(c.traits); a.io(c.evoGoal); a.io(c.evoPool); a.io(c.evoRate); a.io(c.battles);
         a.io(c.tempPressures); a.io(c.lastDisaster); a.io(c.aiSkill);
         a.io(c.warheads); a.io(c.nukesLaunched); a.io(c.timesNuked); a.io(c.citiesCaptured); a.io(c.citiesLost); a.io(c.bandSplits);
-        a.io(c.disastersSuffered); a.io(c.warsDeclared); a.io(c.falloutCleaned); a.io(c.maxBand); a.io(c.shipsSunk);
+        a.io(c.disastersSuffered); a.io(c.warsDeclared); a.io(c.falloutCleaned); a.io(c.maxBand); a.io(c.shipsSunk); a.io(c.unitsUpgraded); a.io(c.unitsFerried);
     }
     long long nu = (long long)g.units.size();
     a.num(nu);
@@ -135,7 +135,7 @@ void ioGame(Archive& a, Game& g) {
     for (auto& u : g.units) {
         a.io(u.id); a.io(u.type); a.io(u.owner); a.io(u.x); a.io(u.y); a.io(u.hp); a.io(u.moves);
         a.io(u.order); a.io(u.gx); a.io(u.gy); a.io(u.work); a.io(u.buildImp); a.io(u.fortTurns);
-        a.io(u.acted); a.io(u.attacked); a.io(u.alive); a.io(u.band); a.io(u.bandFood);
+        a.io(u.acted); a.io(u.attacked); a.io(u.alive); a.io(u.band); a.io(u.bandFood); a.io(u.carrier); a.io(u.ferryX); a.io(u.ferryY);
     }
     long long ncity = (long long)g.cities.size();
     a.num(ncity);

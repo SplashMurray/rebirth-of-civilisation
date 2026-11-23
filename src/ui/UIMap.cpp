@@ -827,13 +827,17 @@ void GameUI::renderMap() {
     for (auto& u : g.units) {
         if (!u.alive || !me.visible[g.idx(u.x, u.y)]) continue;
         if (u.x < x0 || u.x > x1 || u.y < y0 || u.y > y1) continue;
+        if (u.carrier >= 0 && u.id != selUnit) continue;  // aboard a ship: shown as the ship's cargo badge
         int sx, sy;
         tileCenter(u.x, u.y, sx, sy);
         bool civil = g_units[u.type].civilian();
+        bool naval = g_units[u.type].naval();
         bool shared = false;
-        for (auto& o : g.units) if (o.alive && o.id != u.id && o.x == u.x && o.y == u.y) shared = true;
+        for (auto& o : g.units) if (o.alive && o.id != u.id && o.x == u.x && o.y == u.y && o.carrier < 0) shared = true;
         int rr = r;
-        if (shared && civil) { sx -= hs / 3; sy += hs / 3; rr = r * 3 / 4; }
+        if (u.carrier >= 0) { sx -= hs / 3; sy -= hs / 3; rr = r * 2 / 3; }
+        else if (shared && civil) { sx -= hs / 3; sy += hs / 3; rr = r * 3 / 4; }
+        else if (shared && naval) { sx += hs / 3; sy += hs / 4; rr = r * 4 / 5; }
         else if (shared) { sx += hs / 8; sy -= hs / 8; }
         else if (civil) rr = r * 7 / 8;
         if (u.id == selUnit) {
@@ -842,6 +846,15 @@ void GameUI::renderMap() {
             cv->circle(sx, sy, rr + 5, blend(rgb(255, 255, 255), rgb(255, 210, 60), (float)pulse), 2);
         }
         drawUnitToken(u, sx, sy, rr);
+        if (naval && rr >= 9) {
+            int n = g.cargoCount(u);
+            if (n > 0) {  // cargo badge
+                int bs = std::max(8, rr * 5 / 10);
+                cv->fillCircle(sx - rr, sy + rr - 2, bs, rgb(40, 90, 160));
+                cv->circle(sx - rr, sy + rr - 2, bs, rgb(220, 230, 255), 1);
+                cv->text(sx - rr, sy + rr - 2 - bs * 7 / 10, std::to_string(n), bs * 13 / 10, rgb(255, 255, 255), AL_CENTER, true);
+            }
+        }
     }
     // city banners above units
     for (auto& c : g.cities) {

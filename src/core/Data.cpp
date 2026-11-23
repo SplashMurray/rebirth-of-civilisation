@@ -356,6 +356,8 @@ void initData() {
         {"Archer Galley", "AG", 70, 8, 11, 2, 3, "Archery", UC::Naval, "", -1, "Archers on a galley: attacks ships and the shore 2 tiles away. Coastal waters only."},
         {"Caravel", "Cv", 95, 16, 0, 0, 5, "Navigation", UC::Naval, "", -1, "A fast sailing ship that can cross the open ocean."},
         {"Frigate", "Fr", 160, 22, 28, 2, 4, "Gunpowder", UC::Naval, "", -1, "Broadsides of salvaged cannon. Bombards ships and coasts 2 tiles away."},
+        {"Salvaged Freighter", "SF", 140, 10, 0, 0, 5, "Steam Power", UC::Naval, "", -1,
+         "A rusting human cargo ship, patched and steaming again. Carries 4 land units across the ocean."},
         {"Ironclad", "Ic", 220, 40, 0, 0, 4, "Steam Power", UC::Naval, "", -1, "A steam-driven, iron-plated ram. Needs Coal."},
         {"Salvaged Destroyer", "Ds", 330, 58, 0, 0, 6, "Combustion", UC::Naval, "", -1, "A human destroyer raised from the harbour mud and made to sail again. Needs Oil."},
         {"Salvaged Battleship", "BB", 420, 50, 68, 3, 5, "Motorised Warfare", UC::Naval, "", -1,
@@ -421,7 +423,36 @@ void initData() {
     needU("Ironclad", {R_COAL});
     needU("Salvaged Destroyer", {R_OIL});
     needU("Salvaged Battleship", {R_OIL});
-    for (const char* n : {"Caravel", "Frigate", "Ironclad", "Salvaged Destroyer", "Salvaged Battleship"}) g_units[unitIndex(n)].ocean = true;
+    for (const char* n : {"Caravel", "Frigate", "Salvaged Freighter", "Ironclad", "Salvaged Destroyer", "Salvaged Battleship"}) g_units[unitIndex(n)].ocean = true;
+    // transport capacity
+    auto cargo = [](const char* u, int n) { g_units[unitIndex(u)].cargo = n; };
+    cargo("Dugout Canoe", 1);
+    cargo("War Galley", 1);
+    cargo("Caravel", 2);
+    cargo("Frigate", 1);
+    cargo("Salvaged Freighter", 4);
+    // upgrade lines (unique units follow the line of the unit they replace)
+    auto upg = [](const char* a, const char* b) { g_units[unitIndex(a)].upgradeId = unitIndex(b); };
+    upg("Warband", "Spear Troop");
+    upg("Spear Troop", "Iron Blades");
+    upg("Bronze Phalanx", "Iron Blades");
+    upg("Iron Blades", "Salvaged Rifles");
+    upg("Salvaged Rifles", "Riflemen");
+    upg("Riflemen", "Infantry");
+    upg("Infantry", "Exo-Primates");
+    upg("Stone Thrower", "Bow Troop");
+    upg("Bow Troop", "Crossbows");
+    upg("Crossbows", "Field Guns");
+    upg("Siege Sling", "Bombard");
+    upg("Bombard", "Field Guns");
+    upg("Beast Riders", "Armoured Riders");
+    upg("Armoured Riders", "Rebuilt Tanks");
+    upg("Dugout Canoe", "War Galley");
+    upg("War Galley", "Caravel");
+    upg("Caravel", "Ironclad");
+    upg("Ironclad", "Salvaged Destroyer");
+    upg("Archer Galley", "Frigate");
+    upg("Frigate", "Salvaged Battleship");
     for (auto& u : g_units) if (u.replacesId >= 0 && u.needs.empty()) u.needs = g_units[u.replacesId].needs;
     needB("Factory", {R_COAL});
     needB("Power Station", {R_COAL});

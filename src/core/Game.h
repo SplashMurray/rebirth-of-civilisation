@@ -51,6 +51,8 @@ struct Unit {
     bool acted = false;
     bool attacked = false;
     bool alive = true;
+    int carrier = -1;   // id of the ship carrying this unit, or -1
+    int ferryX = -1, ferryY = -1;  // AI: where a ferried unit (or its ship) is heading
     int band = 0;       // Roaming Band: members
     int bandFood = 0;   // Roaming Band: food store towards the next member
 };
@@ -123,6 +125,7 @@ struct Civ {
     // lifetime counters (achievements, statistics)
     int nukesLaunched = 0, timesNuked = 0, citiesCaptured = 0, citiesLost = 0, bandSplits = 0;
     int disastersSuffered = 0, warsDeclared = 0, falloutCleaned = 0, maxBand = 0, shipsSunk = 0;
+    int unitsUpgraded = 0, unitsFerried = 0;
     int lastDisaster = -100;
 };
 
@@ -339,6 +342,23 @@ public:
     bool canEmbark(int c, int x, int y) const;
     bool isCoastal(int x, int y) const;  // next to water
     void aiNaval(Unit& u);
+    // ---- upgrades and transports (Transport.cpp)
+    bool canTrain(int c, int unitType) const;     // tech, resources and species allow it
+    int upgradeTarget(const Unit& u) const;       // the best unit this one can become now, or -1
+    int upgradeGold(const Unit& u, int to) const;
+    int upgradeProd(const Unit& u, int to) const; // before Currency: production from the city it stands in
+    bool canUpgrade(const Unit& u, std::string* why = nullptr) const;
+    bool upgradeUnit(Unit& u);
+    int cargoCount(const Unit& ship) const;
+    int cargoSpace(const Unit& ship) const;
+    const Unit* transportAt(int c, int x, int y, int exclude = -1) const;  // own ship with room
+    bool boardShip(Unit& u);     // in a harbour city: go aboard the docked ship
+    bool leaveShip(Unit& u);     // in a harbour city: step ashore
+    void aiUpgrades(int c);
+    bool aiFerry(Unit& u, int gx, int gy);  // AI: get a land unit to a goal across the water
+    void aiTransportShip(Unit& u);          // AI: a ship with cargo space acting as a ferry
+    bool aiFerryJob(const Unit& ship) const;
+    int aiNeedsTransport(const City& port) const;  // unit type to build for waiting passengers, or -1
     int aiShipWant(int c, bool atWar) const;
     int aiBestShip(int c, bool wantRanged) const;
     std::vector<Pt> findPath(const Unit& u, int tx, int ty, bool ignoreUnits = false) const;

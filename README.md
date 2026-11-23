@@ -109,13 +109,16 @@
   | Archer Galley | Archery | 8 / ranged 11 (2) | Coastal |
   | Caravel | Navigation | 16 | Ocean-going, 5 moves |
   | Frigate | Gunpowder | 22 / ranged 28 (2) | Ocean-going |
+  | Salvaged Freighter | Steam Power | 10 | Ocean-going transport, carries 4 |
   | Ironclad | Steam Power | 40 | Ocean-going; needs Coal |
   | Salvaged Destroyer | Combustion | 58 | Ocean-going, 6 moves; needs Oil |
   | Salvaged Battleship | Motorised Warfare | 50 / ranged 68 (3) | Ocean-going; needs Oil |
 
   Ships sail on water and dock in your own coastal cities, sharing the tile with a land garrison. Melee ships ram ships and embarked units and can storm a coastal city; ranged ships bombard anything in range, including the shore. Embarked land units are weak, so escort them. Coastal military-base ruins can yield a warship raised from the harbour. The AI keeps a small navy in peacetime, scouts unknown waters, and in war hunts enemy ships and bombards or storms coastal cities (Hard and Expert join the attack on their war-plan target).
+* **Transports.** Canoes and War Galleys carry 1 land unit, Caravels 2, Frigates 1 and Salvaged Freighters 4. Move a land unit onto your ship's tile to board (or press `K` in a harbour city); it sails with the ship and lands by moving onto an adjacent land tile. Units aboard can't fight, and go down with the ship. The AI ferries Elder Troops to good land across the water, and Hard/Expert AIs ship armies to enemy cities they can't reach on foot.
+* **Unit upgrades.** Inside your own territory a unit can be refitted (`U`) as the best unit of its line you can train - Warband → Spear Troop → Iron Blades → Salvaged Rifles → Riflemen → Infantry → Exo-Primates, Stone Thrower → Bow Troop → Crossbows → Field Guns, Siege Sling → Bombard → Field Guns, Beast Riders → Armoured Riders → Rebuilt Tanks, Dugout Canoe → War Galley → Caravel → Ironclad → Salvaged Destroyer, Archer Galley → Frigate → Salvaged Battleship. Unique units follow the line of the unit they replace, and upgrade into your species' unique unit where there is one. With Currency it costs gold; before that, the refit is done inside one of your cities and paid for from that city's stored production. Units keep their health. AIs upgrade too (not on Easy).
 * **Nuclear weapons, again.** *Nuclear Fission* lets a city build a **Nuclear Warhead** (needs Uranium). Warheads wait in your silos; click the warhead count on the top bar, pick any tile within 12 of one of your cities and confirm. Everything next to the blast is destroyed, cities are wrecked and lose buildings, fallout spreads, your victims declare war and others who know you may join them. Hard and Expert rivals will use them too - rarely.
-* **Achievements** - 35 of them, from *Spark of Genius* (discover Fire) to *Full Troop* (win with every primate), including the essential **Here We Go Again** for detonating a nuclear weapon. They belong to your profile rather than a saved game (`%APPDATA%\RebirthOfCivilisation\achievements.ini`), pop up as you earn them, and are listed under *Achievements* on the title screen and in the menu. Each has a stable API name (e.g. `HERE_WE_GO_AGAIN`) so a future Steam build can map them straight onto Steam achievements. Games where every civilisation is AI-controlled earn nothing.
+* **Achievements** - 37 of them, from *Spark of Genius* (discover Fire) to *Full Troop* (win with every primate), including the essential **Here We Go Again** for detonating a nuclear weapon. They belong to your profile rather than a saved game (`%APPDATA%\RebirthOfCivilisation\achievements.ini`), pop up as you earn them, and are listed under *Achievements* on the title screen and in the menu. Each has a stable API name (e.g. `HERE_WE_GO_AGAIN`) so a future Steam build can map them straight onto Steam achievements. Games where every civilisation is AI-controlled earn nothing.
 * **Difficulty means a smarter AI, not a cheating one.** Unlike *Civilization*, no level gives the computer extra yields, units or settlers - every species plays by the same rules as you. Difficulty sets how well the rivals play:
 
   | Level | How the rivals play |
@@ -180,6 +183,7 @@
 | `Space` / `Tab` | Skip the unit / go to the next unit |
 | `B` `F` `S` `E` `X` `M` | Settle / found city, fortify, sleep, excavate ruins, decontaminate, move mode |
 | `G` / `R` | Split band / raise a war party from a band |
+| `U` / `K` | Upgrade unit / board or leave a ship in a harbour |
 | `T` `V` `P` `D` `L` | Technology tree / evolution / traditions / diplomacy / event log |
 | `Ctrl+S` / `Ctrl+L` | Save / load |
 | `Ctrl +` / `Ctrl -` / `Ctrl 0` | Interface size bigger / smaller / reset (also in the menu and on the title screen) |
@@ -239,6 +243,7 @@ src/core/        Rules engine - no platform code
   Bands.cpp        the nomadic age: roaming bands, foraging, settling
   Nukes.cpp        nuclear warheads: building, launching, the world's reaction
   Naval.cpp        naval AI (ship rules live in Game.cpp: moveCost, canEnter, canAttack)
+  Transport.cpp    unit upgrades, ships carrying land units, AI ferrying
   Achievements.cpp achievement list, unlock checks and the profile file
   AI.cpp           computer opponents
   Save.cpp         save games
