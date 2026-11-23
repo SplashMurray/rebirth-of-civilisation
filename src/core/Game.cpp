@@ -558,7 +558,7 @@ void Game::processEvolution(int c) {
 // ============================================================ traditions
 int Game::policyCost(int c) const {
     int n = civs[c].policiesAdopted;
-    return sc(40 + 50 * n + 10 * n * n);
+    return sc(40 + 60 * n + 24 * n * n);
 }
 bool Game::canAdopt(int c, int p) const {
     return !civs[c].policies[p] && hasTech(c, g_policies[p].techId) && civs[c].culture >= policyCost(c);
@@ -1400,6 +1400,8 @@ void Game::excavateReward(int c, int x, int y, int tier) {
     int mult = 100 + policyPct(c, PolicyEffect::RuinBonus);
     if (const PrimateDef* pd = primate(c)) mult += pd->ruinPct;
     if (ownsWonderSpecial(c, BSpecial::RuinBonus)) mult += 100;
+    // diminishing returns: the richest finds come first, later digs mostly confirm what is already known
+    mult = mult * 12 / (12 + cv.ruinsExcavated);
     std::string site = t.site >= 0 ? sites[t.site].name : g_ruins[t.ruin].ruinName;
     if (t.site >= 0 && t.ruin == RUIN_CITY) site = "the ruins of " + site;
     else site = "a " + g_ruins[t.ruin].ruinName;
@@ -1419,25 +1421,18 @@ void Game::excavateReward(int c, int x, int y, int tier) {
             break;
         }
         case 1: {
-            int sci = std::max(30, curCost * 2 / 5) * mult / 100;
+            int sci = std::max(30, curCost * 3 / 10) * mult / 100;
             addScience(c, sci);
             body = "Among the ashes of " + site + " your scholars found human books that can finally be read.\n\n+" + std::to_string(sci) + " Science";
             break;
         }
         case 2: {
-            bool freeTech = t.ruin == RUIN_CITY;
-            if (freeTech) {
-                int tech = cv.research;
-                if (tech < 0) {
-                    for (size_t k = 0; k < g_techs.size(); k++)
-                        if (canResearch(c, (int)k) && (tech < 0 || techCost(k) < techCost(tech))) tech = (int)k;
-                }
-                if (tech >= 0) {
-                    grantTech(c, tech, true);
-                    body = "Your engineers took apart the machines of " + site + " and learned their secrets.\n\nFree technology: " + g_techs[tech].name;
-                }
-            } else {
+            if (t.ruin == RUIN_CITY) {
                 int sci = curCost / 2 * mult / 100;
+                addScience(c, sci);
+                body = "Your engineers took apart the machines of " + site + " and learned many of their secrets.\n\n+" + std::to_string(sci) + " Science";
+            } else {
+                int sci = curCost * 2 / 5 * mult / 100;
                 addScience(c, sci);
                 body = "Machines recovered from " + site + " were reverse-engineered.\n\n+" + std::to_string(sci) + " Science";
                 if (t.ruin == RUIN_MILITARY) {
@@ -1454,17 +1449,7 @@ void Game::excavateReward(int c, int x, int y, int tier) {
         }
         case 3: {
             body = "Human data archives in " + site + " were brought back online!";
-            if (t.ruin == RUIN_CITY) {
-                int tech = cv.research;
-                if (tech < 0)
-                    for (size_t k = 0; k < g_techs.size(); k++)
-                        if (canResearch(c, (int)k) && (tech < 0 || techCost(k) < techCost(tech))) tech = (int)k;
-                if (tech >= 0) {
-                    grantTech(c, tech, true);
-                    body += "\n\nFree technology: " + g_techs[tech].name;
-                }
-            }
-            int sci = curCost * 3 / 5 * mult / 100;
+            int sci = curCost * (t.ruin == RUIN_CITY ? 3 : 2) / 5 * mult / 100;
             addScience(c, sci);
             body += "\n+" + std::to_string(sci) + " Science";
             break;

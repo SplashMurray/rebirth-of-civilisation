@@ -25,7 +25,7 @@ const char* SPEED_NAMES[3] = {"Quick", "Standard", "Epic"};
 const int SPEED_PCT[3] = {100, 150, 225};
 const int SPEED_TURNS[3] = {330, 500, 750};
 // costs rise faster than the turn count: on longer games empires grow to full size relatively earlier
-const int SPEED_COST[3] = {95, 170, 250};
+const int SPEED_COST[3] = {100, 170, 250};
 const char* ERA_NAMES[] = {"Awakening", "Tribal", "Ancient", "Classical", "Kingdoms",
                            "Reclamation", "Industrial", "Modern", "Rebirth"};
 const char* RUIN_TIER_TECH[RUIN_TIERS] = {"Salvaging", "Deciphering", "Reverse Engineering", "Computing"};
@@ -184,7 +184,7 @@ void initData() {
         {"Rebirth", 15, {"Genetics", "Rocketry"}, "Civilisation reborn - wiser than the last."},
     };
     static const int ERA_BY_COL[] = {0, 0, 1, 1, 2, 2, 3, 3, 4, 5, 5, 6, 6, 7, 7, 8};
-    static const int COST_BY_COL[] = {25, 50, 90, 150, 270, 400, 600, 860, 1200, 1640, 2200, 2880, 3700, 4700, 5800, 7200};
+    static const int COST_BY_COL[] = {25, 50, 90, 150, 420, 700, 900, 1300, 1800, 2450, 3300, 4200, 5200, 6300, 7500, 9400};
     {
         int rowCount[16] = {0};
         for (auto& t : g_techs) {
@@ -389,7 +389,7 @@ void initData() {
         {"The First Library", 260, "Writing", Y(0, 0, 5, 2, 0), Y(0, 0, 0, 0, 0), 0, 0, true, BSpecial::FreeTech, "Grants a free technology"},
         {"Hall of Human Relics", 420, "Deciphering", Y(0, 0, 4, 4, 0), Y(0, 0, 0, 0, 0), 0, 0, true, BSpecial::RuinBonus, "+100% rewards from human ruins"},
         {"Restored Observatory", 650, "Education", Y(0, 0, 10, 0, 0), Y(0, 0, 25, 0, 0), 0, 0, true, BSpecial::None, "+10 Science, +25% Science here"},
-        {"Rebirth Project", 4000, "Rebirth", Y(0, 0, 0, 0, 0), Y(0, 0, 0, 0, 0), 0, 0, true, BSpecial::Victory, "Rebuild civilisation. Completing it wins the game."},
+        {"Rebirth Project", 3000, "Rebirth", Y(0, 0, 0, 0, 0), Y(0, 0, 0, 0, 0), 0, 0, true, BSpecial::Victory, "Rebuild civilisation. Completing it wins the game."},
     };
     for (auto& b : g_buildings) b.techId = needTech(b.tech);
     // strategic resource requirements (unique units inherit those of the unit they replace)

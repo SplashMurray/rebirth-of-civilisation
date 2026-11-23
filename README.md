@@ -61,10 +61,10 @@
   |---|---|---|
   | Scrap | Salvaging | Science, plus Production for your nearest city |
   | Books | Deciphering | A large burst of Science |
-  | Machines | Reverse Engineering | A free technology (cities), or Science and a restored war machine (military bases) |
-  | Data Archives | Computing | A free technology plus Science |
+  | Machines | Reverse Engineering | A big burst of Science (cities), or Science and a restored war machine (military bases) |
+  | Data Archives | Computing | The largest burst of Science |
 
-  Ruins inside your borders also yield Production and Science, and the *Archive of Humanity* and *Salvage Yard* buildings boost them further.
+  Rewards scale with what you are researching, with diminishing returns: the first finds are the richest. Ruins inside your borders also yield Production and Science, and the *Archive of Humanity* and *Salvage Yard* buildings boost them further.
 * **Resources revealed by technology.** Deposits only appear on the map once you understand them. Strategic resources inside your borders unlock units and buildings, and the right improvement boosts their yields:
 
   | Resource | Revealed by | Used for / improvement |
@@ -120,9 +120,9 @@
 
   | Speed | Turn limit | Pace |
   |---|---|---|
-  | Quick | 330 | Everything costs less; AI games are usually decided around turns 190–220 |
-  | **Standard** (default) | 500 | Like Civ VI Standard; AI games are usually decided around turns 300–380 |
-  | Epic | 750 | Everything costs much more; AI games run around 500–560 turns |
+  | Quick | 330 | Everything costs less; AI games usually run to around turns 280–330 |
+  | **Standard** (default) | 500 | Like Civ VI Standard; AI games usually run to around turns 400–500 |
+  | Epic | 750 | Everything costs much more; AI games usually run to around turns 700–750 |
 
   Speed scales the cost of science, production, growth, culture and evolution, along with timed effects (nuclear winter, fallout decay, feral escalation).
 * Save and load, autosave, an event log, tooltips everywhere, a minimap, and three difficulty levels.
