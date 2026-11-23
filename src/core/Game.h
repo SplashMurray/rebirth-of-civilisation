@@ -122,7 +122,7 @@ struct Civ {
     int warheads = 0;       // nuclear warheads in the silos
     // lifetime counters (achievements, statistics)
     int nukesLaunched = 0, timesNuked = 0, citiesCaptured = 0, citiesLost = 0, bandSplits = 0;
-    int disastersSuffered = 0, warsDeclared = 0, falloutCleaned = 0, maxBand = 0;
+    int disastersSuffered = 0, warsDeclared = 0, falloutCleaned = 0, maxBand = 0, shipsSunk = 0;
     int lastDisaster = -100;
 };
 
@@ -337,6 +337,10 @@ public:
     int moveCost(const Unit& u, int fx, int fy, int tx, int ty) const;  // -1 impassable
     bool canEnter(const Unit& u, int x, int y) const;
     bool canEmbark(int c, int x, int y) const;
+    bool isCoastal(int x, int y) const;  // next to water
+    void aiNaval(Unit& u);
+    int aiShipWant(int c, bool atWar) const;
+    int aiBestShip(int c, bool wantRanged) const;
     std::vector<Pt> findPath(const Unit& u, int tx, int ty, bool ignoreUnits = false) const;
     bool stepUnit(Unit& u, int nx, int ny);
     void continueGoto(Unit& u);

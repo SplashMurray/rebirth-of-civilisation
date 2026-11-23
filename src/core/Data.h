@@ -55,7 +55,7 @@ extern const char* RUIN_TIER_NAME[RUIN_TIERS];
 extern int g_ruinTierTech[RUIN_TIERS];
 
 // ---------------------------------------------------------------- units
-enum class UnitClass { Settler, Worker, Recon, Melee, Ranged, Mounted, Siege, Armor, Band, Nuke };
+enum class UnitClass { Settler, Worker, Recon, Melee, Ranged, Mounted, Siege, Armor, Band, Nuke, Naval };
 
 struct UnitDef {
     std::string name, abbr;
@@ -68,9 +68,12 @@ struct UnitDef {
     int techId = -1;
     int replacesId = -1;
     std::vector<int> needs;  // strategic resources required to train it
+    bool ocean = false;      // ships: can leave the coast for the open ocean
     bool civilian() const { return cls == UnitClass::Settler || cls == UnitClass::Worker || cls == UnitClass::Band; }
     bool military() const { return !civilian() && cls != UnitClass::Nuke; }
     bool ranged() const { return rstr > 0; }
+    bool naval() const { return cls == UnitClass::Naval; }
+    bool landMilitary() const { return military() && !naval(); }
 };
 
 // ---------------------------------------------------------------- buildings

@@ -350,6 +350,16 @@ void initData() {
         {"Nuclear Warhead", "NW", 600, 0, 0, 0, 0, "Nuclear Fission", UC::Nuke, "", -1,
          "The weapon that ended the old world. Kept in your silos: launch it at any tile within 12 of one of your cities. "
          "Destroys everything nearby, wrecks cities and leaves fallout - and the whole world will remember."},
+        // ships: built in coastal cities, move on water (early ones keep to the coast)
+        {"Dugout Canoe", "DC", 40, 6, 0, 0, 3, "Rafts", UC::Naval, "", -1, "A hollowed log paddled by warriors. Coastal waters only."},
+        {"War Galley", "WG", 65, 12, 0, 0, 3, "Bronze Working", UC::Naval, "", -1, "Oars and a bronze ram. Coastal waters only."},
+        {"Archer Galley", "AG", 70, 8, 11, 2, 3, "Archery", UC::Naval, "", -1, "Archers on a galley: attacks ships and the shore 2 tiles away. Coastal waters only."},
+        {"Caravel", "Cv", 95, 16, 0, 0, 5, "Navigation", UC::Naval, "", -1, "A fast sailing ship that can cross the open ocean."},
+        {"Frigate", "Fr", 160, 22, 28, 2, 4, "Gunpowder", UC::Naval, "", -1, "Broadsides of salvaged cannon. Bombards ships and coasts 2 tiles away."},
+        {"Ironclad", "Ic", 220, 40, 0, 0, 4, "Steam Power", UC::Naval, "", -1, "A steam-driven, iron-plated ram. Needs Coal."},
+        {"Salvaged Destroyer", "Ds", 330, 58, 0, 0, 6, "Combustion", UC::Naval, "", -1, "A human destroyer raised from the harbour mud and made to sail again. Needs Oil."},
+        {"Salvaged Battleship", "BB", 420, 50, 68, 3, 5, "Motorised Warfare", UC::Naval, "", -1,
+         "The humans' greatest warship, restored. Its guns reach 3 tiles inland. Needs Oil."},
         {"Exo-Primates", "EP", 520, 90, 0, 0, 3, "Genetics", UC::Melee, "", -1, "Soldiers in powered exoskeletons."},
         // hostile wildlife and leftovers of humanity (never buildable, primate == -2)
         {"Feral Dogs", "FD", 0, 7, 0, 0, 2, "", UC::Melee, "", -2, "Packs of former pets, gone wild."},
@@ -407,6 +417,11 @@ void initData() {
     needU("Rebuilt Tanks", {R_OIL});
     needU("Exo-Primates", {R_URANIUM});
     needU("Nuclear Warhead", {R_URANIUM});
+    needU("War Galley", {R_COPPER});
+    needU("Ironclad", {R_COAL});
+    needU("Salvaged Destroyer", {R_OIL});
+    needU("Salvaged Battleship", {R_OIL});
+    for (const char* n : {"Caravel", "Frigate", "Ironclad", "Salvaged Destroyer", "Salvaged Battleship"}) g_units[unitIndex(n)].ocean = true;
     for (auto& u : g_units) if (u.replacesId >= 0 && u.needs.empty()) u.needs = g_units[u.replacesId].needs;
     needB("Factory", {R_COAL});
     needB("Power Station", {R_COAL});

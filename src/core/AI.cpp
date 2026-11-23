@@ -172,7 +172,7 @@ void Game::aiDiplomacy(int c) {
         } else if (sk >= 2) {
             // only start wars that can be won: clearly stronger, an army to hand, and the enemy nearby
             int mil = 0;
-            for (auto& u : units) if (u.alive && u.owner == c && g_units[u.type].military() && g_units[u.type].cls != UnitClass::Recon) mil++;
+            for (auto& u : units) if (u.alive && u.owner == c && g_units[u.type].landMilitary() && g_units[u.type].cls != UnitClass::Recon) mil++;
             bool busy = false;  // the target is already fighting someone else
             for (int q = FIRST_PRIMATE_CIV; q < (int)civs.size(); q++) if (q != c && civs[o].war[q] && civs[q].alive) busy = true;
             double need = sk >= 3 ? 1.4 : 1.6;
@@ -267,26 +267,26 @@ void Game::aiCity(City& city) {
         if (u.alive && atWar(c, u.owner) && g_units[u.type].military() && dist(u.x, u.y, city.x, city.y) <= 4) threat++;
     bool garrison = false;
     for (auto& u : units)
-        if (u.alive && u.owner == c && u.x == city.x && u.y == city.y && g_units[u.type].military()) garrison = true;
+        if (u.alive && u.owner == c && u.x == city.x && u.y == city.y && g_units[u.type].landMilitary()) garrison = true;
 
     auto bestMilitary = [&](bool wantRanged) {
         int best = -1, bs = -1;
         for (int u : availableUnits(c)) {
             const UnitDef& d = g_units[u];
-            if (!d.military() || d.cls == UnitClass::Recon) continue;
+            if (!d.landMilitary() || d.cls == UnitClass::Recon) continue;
             if (wantRanged != d.ranged()) continue;
             int s = std::max(d.str, d.rstr) * 100 / std::max(1, d.cost) + std::max(d.str, d.rstr) * 3;
             if (s > bs) { bs = s; best = u; }
         }
         if (best < 0 && wantRanged) {
             for (int u : availableUnits(c))
-                if (g_units[u].military() && g_units[u].cls != UnitClass::Recon && (best < 0 || g_units[u].str > g_units[best].str)) best = u;
+                if (g_units[u].landMilitary() && g_units[u].cls != UnitClass::Recon && (best < 0 || g_units[u].str > g_units[best].str)) best = u;
         }
         return best;
     };
 
     bool keep = city.buildKind != BK_NONE && canBuild(city, city.buildKind, city.buildId);
-    if (keep && threat > 0 && !garrison && !(city.buildKind == BK_UNIT && g_units[city.buildId].military())) keep = false;
+    if (keep && threat > 0 && !garrison && !(city.buildKind == BK_UNIT && g_units[city.buildId].landMilitary())) keep = false;
     int sk = skillOf(c);
     if (keep) {
         if (sk > 0 && threat > 0 && hasGold(c) && buyCost(city) > 0 && cv.gold >= buyCost(city)) buy(city);
@@ -296,20 +296,22 @@ void Game::aiCity(City& city) {
         return;
     }
 
-    int myCities = numCities(c), mil = 0, workers = 0, settlers = 0;
+    int myCities = numCities(c), mil = 0, workers = 0, settlers = 0, ships = 0;
     for (auto& u : units) {
         if (!u.alive || u.owner != c) continue;
         const UnitDef& d = g_units[u.type];
         if (d.cls == UnitClass::Worker) workers++;
         else if (d.cls == UnitClass::Settler) settlers++;
-        else if (d.cls != UnitClass::Recon) mil++;
+        else if (d.naval()) ships++;
+        else if (d.landMilitary() && d.cls != UnitClass::Recon) mil++;
     }
     for (auto& oc : cities)
         if (oc.alive && oc.owner == c && oc.id != city.id && oc.buildKind == BK_UNIT) {
             const UnitDef& d = g_units[oc.buildId];
             if (d.cls == UnitClass::Settler) settlers++;
             else if (d.cls == UnitClass::Worker) workers++;
-            else mil++;
+            else if (d.naval()) ships++;
+            else if (d.landMilitary()) mil++;
         }
     bool atWarAny = false;
     for (int o = FIRST_PRIMATE_CIV; o < (int)civs.size(); o++) if (cv.war[o] && civs[o].alive) atWarAny = true;
@@ -331,6 +333,10 @@ void Game::aiCity(City& city) {
     else if (mil < milWant) { kind = BK_UNIT; id = bestMilitary(mil % 3 == 2); }
     else if (workers < workWant && city.pop >= 2) { kind = BK_UNIT; id = uniqueFor(c, ID.uGatherer); }
     else if (myCities + settlers < targetCities && settlers < settlerSlots && city.pop >= 2 && turn < dur(260) && canBuild(city, BK_UNIT, ID.uElder)) { kind = BK_UNIT; id = ID.uElder; }
+    else if (isCoastal(city.x, city.y) && ships < aiShipWant(c, atWarAny) && aiBestShip(c, ships % 2 == 1) >= 0 && rng.chance(sk >= 2 ? 0.8 : 0.5)) {
+        kind = BK_UNIT;
+        id = aiBestShip(c, ships % 2 == 1);
+    }
     else if (sk >= 2 && atWarAny && pd && pd->aggression >= 6 && cv.warheads == 0 && canBuild(city, BK_UNIT, ID.uNuke) && rng.chance(0.15)) {
         kind = BK_UNIT;
         id = ID.uNuke;
@@ -380,6 +386,10 @@ void Game::aiUnit(Unit& uref) {
 
     if (d.cls == UnitClass::Band) {
         aiBand(U());
+        return;
+    }
+    if (d.naval()) {
+        aiNaval(U());
         return;
     }
     // ---------------- settlers
@@ -552,7 +562,7 @@ void Game::aiUnit(Unit& uref) {
     if (here && here->owner == c) {
         isGarrison = true;
         for (auto& o : units)
-            if (o.alive && o.id < uid && o.owner == c && o.x == U().x && o.y == U().y && g_units[o.type].military()) isGarrison = false;
+            if (o.alive && o.id < uid && o.owner == c && o.x == U().x && o.y == U().y && g_units[o.type].landMilitary()) isGarrison = false;
     }
     // ranged: shoot first
     if (d.ranged()) {
@@ -582,7 +592,7 @@ void Game::aiUnit(Unit& uref) {
             if (dd == 0) { ward = b.id; wd = 0; break; }
             bool guarded = false;
             for (auto& o : units)
-                if (o.alive && o.id != uid && o.owner == c && o.x == b.x && o.y == b.y && g_units[o.type].military()) guarded = true;
+                if (o.alive && o.id != uid && o.owner == c && o.x == b.x && o.y == b.y && g_units[o.type].landMilitary()) guarded = true;
             if (!guarded && dd < wd) { wd = dd; ward = b.id; }
         }
         if (ward >= 0) {
@@ -651,7 +661,7 @@ void Game::aiUnit(Unit& uref) {
         if (!ci.alive || ci.owner != c) continue;
         bool has = false;
         for (auto& o : units)
-            if (o.alive && o.owner == c && g_units[o.type].military() &&
+            if (o.alive && o.owner == c && g_units[o.type].landMilitary() &&
                 ((o.x == ci.x && o.y == ci.y) || (o.order == ORD_GOTO && o.gx == ci.x && o.gy == ci.y && o.id != uid))) has = true;
         if (!has && dist(ci.x, ci.y, U().x, U().y) <= 12) {
             Unit probe = U();
@@ -724,7 +734,7 @@ void Game::aiPlanWar(int c) {
     std::vector<Pt> path = findPath(probe, T.x, T.y, true);
     if (path.size() >= 4) { P.rx = path[path.size() - 4].x; P.ry = path[path.size() - 4].y; }
     for (auto& u : units) {
-        if (!u.alive || u.owner != c || !g_units[u.type].military() || g_units[u.type].cls == UnitClass::Recon || u.hp < 50) continue;
+        if (!u.alive || u.owner != c || !g_units[u.type].landMilitary() || g_units[u.type].cls == UnitClass::Recon || u.hp < 50) continue;
         if (dist(u.x, u.y, P.rx, P.ry) <= 2 || dist(u.x, u.y, T.x, T.y) <= 3) P.army++;
     }
     P.need = 3 + T.pop / 3 + (skillOf(c) >= 3 ? 0 : 1);

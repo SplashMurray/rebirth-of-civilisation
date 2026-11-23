@@ -844,6 +844,7 @@ bool Game::canBuild(const City& city, int kind, int id) const {
         if (!unitBelongs(*this, c, id) || !hasTech(c, g_units[id].techId) || g_units[id].cls == UnitClass::Band) return false;
         if (!hasNeeds(c, g_units[id].needs)) return false;
         if (g_units[id].cls == UnitClass::Settler && city.pop < 2) return false;
+        if (g_units[id].naval() && !isCoastal(city.x, city.y)) return false;
         return true;
     }
     if (kind == BK_BUILDING) {
@@ -983,8 +984,22 @@ void Game::killUnit(Unit& u) {
 }
 
 Unit* Game::militaryAt(int x, int y) {
-    for (auto& u : units) if (u.alive && u.x == x && u.y == y && g_units[u.type].military()) return &u;
-    return nullptr;
+    // a tile can hold a land unit and a ship: at sea the ship defends, on land (a harbour city) the land unit
+    Unit* any = nullptr;
+    bool water = isWater(x, y);
+    for (auto& u : units) {
+        if (!u.alive || u.x != x || u.y != y || !g_units[u.type].military()) continue;
+        if (g_units[u.type].naval() == water) return &u;
+        if (!any) any = &u;
+    }
+    return any;
+}
+
+bool Game::isCoastal(int x, int y) const {
+    Pt nb[6];
+    int n = neighbors(x, y, nb);
+    for (int k = 0; k < n; k++) if (isWater(nb[k].x, nb[k].y)) return true;
+    return false;
 }
 Unit* Game::civilianAt(int x, int y) {
     for (auto& u : units) if (u.alive && u.x == x && u.y == y && g_units[u.type].civilian()) return &u;
@@ -997,7 +1012,7 @@ std::vector<Unit*> Game::unitsAt(int x, int y) {
 }
 
 int Game::maxMoves(const Unit& u) const {
-    if (inMap(u.x, u.y) && isWater(u.x, u.y)) return hasTech(u.owner, ID.tNavigation) ? 3 : 2;
+    if (inMap(u.x, u.y) && isWater(u.x, u.y) && !g_units[u.type].naval()) return hasTech(u.owner, ID.tNavigation) ? 3 : 2;
     int m = g_units[u.type].moves;
     const PrimateDef* pd = primate(u.owner);
     if (pd && g_units[u.type].military()) m += pd->extraMoves;
@@ -1012,6 +1027,12 @@ bool Game::canEmbark(int c, int x, int y) const {
 
 int Game::moveCost(const Unit& u, int fx, int fy, int tx, int ty) const {
     const Tile& t = at(tx, ty);
+    const UnitDef& ud = g_units[u.type];
+    if (ud.naval()) {  // ships: water, or into one of our own coastal cities
+        if (isWater(tx, ty)) return t.terrain == T_OCEAN && !ud.ocean ? -1 : 1;
+        const City* ci = cityAt(tx, ty);
+        return ci && ci->owner == u.owner ? 1 : -1;
+    }
     if (t.mountain) return -1;
     if (!warHappened && t.site >= 0) return -1;  // living human settlements are off limits
     bool toWater = isWater(tx, ty), fromWater = isWater(fx, fy);
@@ -1031,11 +1052,13 @@ bool Game::canEnter(const Unit& u, int x, int y) const {
     if (const City* c = cityAt(x, y)) {
         if (c->owner != u.owner) return false;
     }
-    bool mil = g_units[u.type].military();
+    // one civilian, one land military unit and one ship may share a tile
+    auto layer = [](const UnitDef& d) { return d.civilian() ? 0 : d.naval() ? 2 : 1; };
+    int mine = layer(g_units[u.type]);
     for (auto& o : units) {
         if (!o.alive || o.x != x || o.y != y || o.id == u.id) continue;
         if (o.owner != u.owner) return false;
-        if (g_units[o.type].military() == mil) return false;
+        if (layer(g_units[o.type]) == mine) return false;
     }
     return true;
 }
@@ -1124,7 +1147,7 @@ bool Game::stepUnit(Unit& u, int nx, int ny) {
     u.x = nx; u.y = ny;
     if (mc >= 99) u.moves = 0;
     else u.moves = std::max(0, u.moves - mc);
-    if (wasWater != isWater(nx, ny)) u.moves = 0;
+    if (wasWater != isWater(nx, ny) && !g_units[u.type].naval()) u.moves = 0;  // embarking/landing
     u.acted = true;
     if (u.order == ORD_FORTIFY || u.order == ORD_SLEEP) u.order = ORD_NONE;
     u.fortTurns = 0;
@@ -1159,6 +1182,7 @@ bool Game::canAttack(const Unit& u, int tx, int ty) const {
     int dd = dist(u.x, u.y, tx, ty);
     if (d.ranged()) return dd <= d.range && dd >= 1;
     if (dd != 1) return false;
+    if (d.naval()) return isWater(tx, ty) || cityAt(tx, ty) != nullptr;  // rams ships and boats, or storms a coastal city
     if (isWater(u.x, u.y) || isWater(tx, ty)) return false;
     return moveCost(u, u.x, u.y, tx, ty) >= 0 || cityAt(tx, ty) != nullptr;
 }
@@ -1189,7 +1213,7 @@ int Game::unitStrength(const Unit& u, bool attacking, bool rangedAtk, int x, int
     int base = rangedAtk ? d.rstr : d.str;
     if (base <= 0) base = 1;
     bool water = isWater(x, y);
-    if (water && !attacking && u.owner >= FIRST_PRIMATE_CIV) base = std::min(base, 4 + era(u.owner) * 4);
+    if (water && !attacking && u.owner >= FIRST_PRIMATE_CIV && !d.naval()) base = std::min(base, 4 + era(u.owner) * 4);  // embarked
     int pct = 0;
     if (const PrimateDef* pd = primate(u.owner)) pct += pd->combatPct;
     if (u.owner >= FIRST_PRIMATE_CIV) {
@@ -1293,6 +1317,7 @@ CombatResult Game::attack(Unit& u, int tx, int ty) {
         notify(u.owner, msg, tx, ty);
         notify(def->owner, msg, tx, ty);
         int dx = tx, dy = ty;
+        if (res.defenderDied && g_units[def->type].naval() && u.owner >= FIRST_PRIMATE_CIV) civs[u.owner].shipsSunk++;
         if (res.defenderDied) killUnit(*def);
         if (res.attackerDied) killUnit(u);
         else if (res.defenderDied && !ranged) {
@@ -1440,10 +1465,20 @@ void Game::excavateReward(int c, int x, int y, int tier) {
                 addScience(c, sci);
                 body = "Machines recovered from " + site + " were reverse-engineered.\n\n+" + std::to_string(sci) + " Science";
                 if (t.ruin == RUIN_MILITARY) {
-                    int best = -1;
-                    for (int ut : availableUnits(c))
-                        if (g_units[ut].military() && (best < 0 || g_units[ut].str > g_units[best].str)) best = ut;
-                    if (best >= 0 && !militaryAt(x, y)) {
+                    int best = -1, ship = -1;
+                    for (int ut : availableUnits(c)) {
+                        const UnitDef& ud = g_units[ut];
+                        if (ud.landMilitary() && (best < 0 || ud.str > g_units[best].str)) best = ut;
+                        if (ud.naval() && (ship < 0 || std::max(ud.str, ud.rstr) > std::max(g_units[ship].str, g_units[ship].rstr))) ship = ut;
+                    }
+                    Pt dock = {-1, -1};  // a naval base: raise a warship from the harbour instead
+                    if (ship >= 0 && isCoastal(x, y) && rng.chance(0.5))
+                        for (auto& p : ring(x, y, 1))
+                            if (isWater(p.x, p.y) && unitsAt(p.x, p.y).empty() && (at(p.x, p.y).terrain == T_COAST || g_units[ship].ocean)) { dock = p; break; }
+                    if (dock.x >= 0) {
+                        spawnUnit(c, ship, dock.x, dock.y);
+                        body += "\n\nA warship was raised from the naval base's harbour: you gain a " + g_units[ship].name + ".";
+                    } else if (best >= 0 && !militaryAt(x, y)) {
                         spawnUnit(c, best, x, y);
                         body += "\n\nAn armoury was restored: you gain a " + g_units[best].name + ".";
                     }

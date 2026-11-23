@@ -139,7 +139,7 @@ bool Game::bandSpawnSpot(const Unit& u, bool military, Pt& out) const {
         for (auto& o : units) {
             if (!o.alive || o.x != x || o.y != y) continue;
             if (o.owner != u.owner) return false;
-            if (g_units[o.type].military() == military) return false;
+            if (g_units[o.type].landMilitary() == military && !g_units[o.type].naval()) return false;
         }
         return true;
     };

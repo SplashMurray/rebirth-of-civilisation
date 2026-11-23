@@ -457,6 +457,26 @@ void GameUI::drawUnitIcon(int type, int cx, int cy, int s, Color ic, Color accen
         return;
     }
     switch (d.cls) {
+        case UnitClass::Naval:
+            if (d.str >= 40 || (d.ocean && d.ranged() && d.rstr >= 40)) {  // steel ship: long hull, superstructure, guns
+                poly({-0.9, 0.2, 0.9, 0.2, 0.62, 0.6, -0.7, 0.6}, ic);
+                poly({-0.35, 0.2, -0.35, -0.2, 0.25, -0.2, 0.25, 0.2}, ic);
+                poly({-0.12, -0.2, -0.12, -0.55, 0.05, -0.55, 0.05, -0.2}, ic);
+                L(0.25, -0.05, 0.75, -0.2, lw);
+                if (d.ranged()) L(-0.35, -0.05, -0.85, -0.2, lw);
+            } else {  // hull, mast and sail (oars for the earliest boats)
+                poly({-0.85, 0.25, 0.85, 0.25, 0.55, 0.62, -0.55, 0.62}, ic);
+                L(0, 0.25, 0, -0.8, lw);
+                if (d.moves <= 3 && !d.ocean) {
+                    L(-0.5, 0.45, -0.75, 0.85, lw); L(0.5, 0.45, 0.75, 0.85, lw);  // oars
+                    poly({0.05, -0.75, 0.55, -0.1, 0.05, -0.1}, ic);
+                } else {
+                    poly({0.05, -0.8, 0.65, 0.05, 0.05, 0.05}, ic);
+                    poly({-0.05, -0.6, -0.55, 0.05, -0.05, 0.05}, ic);
+                }
+                if (d.ranged()) circ(0.45, 0.42, 0.08, rgb(30, 30, 30));
+            }
+            break;
         case UnitClass::Nuke:  // radiation trefoil
             circ(0, 0, 0.16, ic);
             for (int k = 0; k < 3; k++) {

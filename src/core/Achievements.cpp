@@ -33,6 +33,8 @@ const std::vector<AchievementDef> g_achievements = {
     {"SPOILS_OF_WAR", "Spoils of War", "Capture or raze a city.", "War"},
     {"WARLORD", "Warlord", "Capture or raze 10 cities in one game.", "War"},
     {"PARADISE_LOST", "Paradise Lost", "Lose a city.", "War"},
+    {"SEA_LEGS", "Sea Legs", "Launch your first warship.", "War"},
+    {"RULER_OF_THE_WAVES", "Ruler of the Waves", "Sink 10 enemy ships in one game.", "War"},
     {"HERE_WE_GO_AGAIN", "Here We Go Again", "Detonate a nuclear weapon.", "War"},
     {"GLASS_HOUSES", "Glass Houses", "Have one of your cities hit by an enemy nuclear weapon.", "War"},
     {"MUTUALLY_ASSURED", "Mutually Assured Destruction", "In one game, nuke an enemy and be nuked yourself.", "War"},
@@ -142,6 +144,10 @@ std::vector<std::string> checkAchievements(const Game& g, AchievementStore& st) 
     give("SPOILS_OF_WAR", cv.citiesCaptured > 0);
     give("WARLORD", cv.citiesCaptured >= 10);
     give("PARADISE_LOST", cv.citiesLost > 0);
+    bool ship = false;
+    for (auto& u : g.units) if (u.alive && u.owner == p && g_units[u.type].naval()) ship = true;
+    give("SEA_LEGS", ship);
+    give("RULER_OF_THE_WAVES", cv.shipsSunk >= 10);
     give("HERE_WE_GO_AGAIN", cv.nukesLaunched > 0);
     give("GLASS_HOUSES", cv.timesNuked > 0);
     give("MUTUALLY_ASSURED", cv.nukesLaunched > 0 && cv.timesNuked > 0);
