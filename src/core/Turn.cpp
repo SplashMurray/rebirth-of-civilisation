@@ -41,20 +41,58 @@ void Game::meet(int a, int b) {
 
 void Game::declareWar(int a, int b) {
     if (a == b || civs[a].war[b]) return;
+    bool friends = hasAgreement(AG_FRIENDSHIP, a, b) || hasAgreement(AG_DEFENSIVE, a, b);
     civs[a].war[b] = civs[b].war[a] = 1;
     statWars++;
     civs[a].warsDeclared++;
     civs[a].warSince[b] = civs[b].warSince[a] = turn;
     meet(a, b);
+    // diplomacy: the victim remembers; betraying a friend shocks everyone
+    if (b < (int)civs[a].grievance.size() && a >= FIRST_PRIMATE_CIV && b >= FIRST_PRIMATE_CIV) {
+        civs[b].grievance[a] += 30;
+        if (friends) {
+            civs[a].backstabs++;
+            civs[b].grievance[a] += 40;
+            for (int x = FIRST_PRIMATE_CIV; x < (int)civs.size(); x++)
+                if (x != a && x != b && civs[x].met[a]) civs[x].grievance[a] += 12;
+            if (b == player) notify(player, "The " + civs[a].name + " have betrayed your friendship!");
+        }
+        endAgreements(a, b);
+    }
     if (b == player) popup(b, POP_WAR, "War!", civs[a].leader + " of the " + civs[a].name + " has declared war on you!");
     if (a == player) notify(a, "You declared war on the " + civs[b].name + ".");
     else if (b != player && civs[player].met[a]) notify(player, "The " + civs[a].name + " declared war on the " + civs[b].name + ".");
+    // defensive pacts: an attack on one is an attack on all of its partners
+    if (a >= FIRST_PRIMATE_CIV && b >= FIRST_PRIMATE_CIV) {
+        std::vector<int> allies;
+        for (auto& ag : agreements)
+            if (ag.kind == AG_DEFENSIVE && ag.until > turn && (ag.a == b || ag.b == b)) {
+                int x = ag.a == b ? ag.b : ag.a;
+                if (x != a && civs[x].alive && !civs[x].war[a]) allies.push_back(x);
+            }
+        for (int x : allies) {
+            if (civs[x].war[a]) continue;
+            civs[x].peaceUntil[a] = civs[a].peaceUntil[x] = 0;  // the pact overrides any treaty
+            if (x == player) popup(player, POP_WAR, "Your Pact Is Called Upon",
+                                   "The " + civs[a].name + " attacked your partners, the " + civs[b].name + ". Honouring your defensive pact, you are now at war with the " + civs[a].name + ".");
+            else if (civs[player].met[x]) notify(player, "Honouring their defensive pact, the " + civs[x].name + " join the war against the " + civs[a].name + ".");
+            declareWar(x, a);
+            civs[x].warsDeclared--;  // defending a partner is not warmongering
+            civs[a].grievance[x] -= 30;
+            civs[a].grievance[x] = std::max(0, civs[a].grievance[x]);
+        }
+    }
 }
 
 void Game::makePeace(int a, int b) {
     if (!civs[a].war[b]) return;
     civs[a].war[b] = civs[b].war[a] = 0;
     civs[a].warSince[b] = civs[b].warSince[a] = turn;
+    if (a >= FIRST_PRIMATE_CIV && b >= FIRST_PRIMATE_CIV) {
+        civs[a].peaceUntil[b] = civs[b].peaceUntil[a] = turn + dur(10);
+        expelUnits(a, b);
+        expelUnits(b, a);
+    }
     if (a == player || b == player) notify(player, "Peace has been made between the " + civs[a].name + " and the " + civs[b].name + ".");
 }
 
@@ -64,6 +102,7 @@ bool Game::proposePeace(int from, int to) {
     int pf = militaryPower(from) + 5, pt = militaryPower(to) + 5;
     bool accept = len >= dur(8) && pt < pf * 1.5 && rng.chance(0.75);
     if (civs[to].primate >= 0 && g_primates[civs[to].primate].aggression <= 2 && len >= dur(4)) accept = true;
+    if (to != player && skillOf(to) >= 1) accept = peaceValue(to, from) > 0 || (accept && peaceValue(to, from) > -60);
     if (accept) makePeace(from, to);
     return accept;
 }
@@ -130,6 +169,7 @@ void Game::endTurn() {
     if (turn == PROLOGUE_TURNS) yearAF = 1;
     else if (turn > PROLOGUE_TURNS) yearAF += yearsPerTurn();
     turn++;
+    diplomacyTurn();
     for (int c = FIRST_PRIMATE_CIV - 1; c < (int)civs.size(); c++)
         if (civs[c].alive) beginTurn(c);
     updateAllVisibility();

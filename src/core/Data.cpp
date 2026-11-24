@@ -491,6 +491,24 @@ void initData() {
     ID.tCooking = techIndex("Cooking");
     ID.uElder = unitIndex("Elder Troop");
     ID.uBand = unitIndex("Roaming Band");
+    // diplomatic personalities
+    auto persona = [](const char* name, const char* title, const char* desc, int friendly, int loyal, int greed, int terr, int pacts, bool ape) {
+        for (auto& p : g_primates)
+            if (p.name == name) {
+                p.persona = title; p.personaDesc = desc;
+                p.friendliness = friendly; p.loyalty = loyal; p.greed = greed; p.territorial = terr; p.pactLove = pacts; p.ape = ape;
+            }
+    };
+    persona("Chimpanzee", "Territorial Politician", "Builds coalitions with whoever is useful, but guards its range jealously and never forgets a slight.",
+            -2, 5, 6, 9, 6, true);
+    persona("Bonobo", "Peacemaker", "Warm towards almost everyone. Loves agreements, hates war, and forgives quickly.", 10, 7, 3, 2, 8, true);
+    persona("Orangutan", "Solitary Sage", "Polite but aloof. Trades knowledge happily, but rarely binds itself with pacts.", 1, 6, 4, 4, 2, true);
+    persona("Gorilla", "Protector", "Slow to anger and fiercely loyal to friends. Despises warmongers and those who attack the weak.", 2, 9, 3, 6, 8, true);
+    persona("Baboon", "Opportunist", "Respects only strength. Drives hard bargains, demands tribute, and may turn on a friend who looks weak.",
+            -5, 2, 8, 8, 4, false);
+    persona("Capuchin", "Trader", "Will deal with anyone. Values fair trades highly and grows fond of good trading partners.", 4, 5, 8, 3, 5, false);
+    persona("Gibbon", "Faithful Partner", "Chooses one close partner and stays loyal for life. Distant with everyone else.", 0, 10, 4, 5, 9, true);
+    persona("Japanese Macaque", "Hierarchist", "Ranks everyone by strength and status. Respects the powerful; looks down on the weak.", 0, 6, 5, 5, 5, false);
     ID.uNuke = unitIndex("Nuclear Warhead");
     ID.tFission = techIndex("Nuclear Fission");
     ID.uGatherer = unitIndex("Gatherer");

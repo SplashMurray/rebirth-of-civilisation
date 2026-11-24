@@ -195,6 +195,14 @@ struct PrimateDef {
     std::vector<std::string> cityNames;
     int evoPct = 0;          // evolution speed bonus
     int evoLean = 0;         // evolutionary strand this species naturally favours (AI and description)
+    // diplomatic personality (0..10 unless noted)
+    std::string persona, personaDesc;
+    int friendliness = 0;    // -10..10: starting goodwill towards everyone
+    int loyalty = 5;         // keeps its word; low loyalty may betray friends
+    int greed = 5;           // drives a hard bargain
+    int territorial = 5;     // resents neighbours pressing on its lands
+    int pactLove = 5;        // keen on pacts and alliances
+    bool ape = true;         // great/lesser ape (true) or monkey (false): kin feeling
 };
 
 // ---------------------------------------------------------------- tables

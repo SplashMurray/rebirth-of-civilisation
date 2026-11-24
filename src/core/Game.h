@@ -127,6 +127,33 @@ struct Civ {
     int disastersSuffered = 0, warsDeclared = 0, falloutCleaned = 0, maxBand = 0, shipsSunk = 0;
     int unitsUpgraded = 0, unitsFerried = 0;
     int lastDisaster = -100;
+    // diplomacy: memories of how others treated us, and treaties
+    std::vector<int> grievance;       // wrongs done to us by each civ (decays)
+    std::vector<int> goodwill;        // gifts and fair dealing (decays)
+    std::vector<int> peaceUntil;      // no war with them before this turn
+    std::vector<int> denouncedUntil;  // we have denounced them until this turn
+    std::vector<int> lastOffer;       // AI: last turn we proposed something to them
+    int dealsMade = 0, backstabs = 0;
+};
+
+// ---- diplomacy
+enum AgreementKind { AG_OPEN_BORDERS, AG_RESEARCH, AG_DEFENSIVE, AG_FRIENDSHIP, AG_RESOURCE, AG_GOLD_PER_TURN, AG_COUNT };
+struct Agreement {
+    int kind = 0;
+    int a = -1, b = -1;  // mutual kinds: the two parties; resource/gold: a gives to b
+    int until = 0;       // the turn it ends
+    int value = 0;       // resource id, or gold per turn
+};
+enum DealItemKind { DI_GOLD, DI_GPT, DI_RESOURCE, DI_OPEN_BORDERS, DI_RESEARCH, DI_DEFENSIVE, DI_FRIENDSHIP, DI_PEACE, DI_WAR_ON, DI_COUNT };
+struct DealItem {
+    int kind = 0;
+    int from = -1;   // the side giving it; -1 for mutual agreements
+    int value = 0;   // gold, gold per turn, resource id, or the civ to declare war on
+};
+struct Deal {
+    int a = -1, b = -1;  // a proposes to b
+    std::vector<DealItem> items;
+    bool demand = false; // a tribute demand: refusing it angers them
 };
 
 struct Notification {
@@ -135,11 +162,12 @@ struct Notification {
     int x = -1, y = -1;
 };
 
-enum PopupKind { POP_INFO, POP_NUKE, POP_INTRO, POP_TECH, POP_RUIN, POP_WAR, POP_VICTORY, POP_DEFEAT, POP_WONDER, POP_EVOLUTION, POP_DISASTER, POP_SETTLE };
+enum PopupKind { POP_INFO, POP_NUKE, POP_INTRO, POP_TECH, POP_RUIN, POP_WAR, POP_VICTORY, POP_DEFEAT, POP_WONDER, POP_EVOLUTION, POP_DISASTER, POP_SETTLE, POP_DEAL };
 struct Popup {
     int kind = POP_INFO;
     std::string title, body;
     int x = -1, y = -1;
+    int deal = -1;  // POP_DEAL: index into Game::offers
 };
 
 struct GameSettings {
@@ -342,6 +370,34 @@ public:
     bool canEmbark(int c, int x, int y) const;
     bool isCoastal(int x, int y) const;  // next to water
     void aiNaval(Unit& u);
+    // ---- diplomacy (Diplomacy.cpp)
+    std::vector<Agreement> agreements;
+    std::vector<Deal> offers;        // AI proposals waiting for the player's answer (not saved)
+    int opinion(int c, int o, std::vector<std::pair<std::string, int>>* why = nullptr) const;  // c's view of o
+    int attitude(int c, int o) const;  // -2 hostile, -1 unfriendly, 0 neutral, 1 friendly, 2 close
+    static const char* attitudeName(int a);
+    bool hasAgreement(int kind, int a, int b) const;
+    const Agreement* findAgreement(int kind, int a, int b, int value = -1) const;
+    int agreementTurnsLeft(int kind, int a, int b) const;
+    void endAgreements(int a, int b);  // war breaks every treaty between them
+    bool openBorders(int a, int b) const { return hasAgreement(AG_OPEN_BORDERS, a, b); }
+    bool canDeclareWar(int a, int b, std::string* why = nullptr) const;
+    int diploSciPct(int c) const;
+    bool lentResource(int c, int r) const;
+    std::vector<int> tradeableResources(int giver, int receiver) const;
+    bool dealItemValid(const Deal& d, const DealItem& it, std::string* why = nullptr) const;
+    double dealValue(int c, const Deal& d, std::string* why = nullptr) const;  // how much civ c (AI) likes the deal
+    bool aiAccepts(int c, const Deal& d, std::string* why = nullptr) const;
+    bool executeDeal(const Deal& d);
+    std::string dealItemText(const DealItem& it, int viewer) const;
+    double peaceValue(int c, int o) const;
+    void denounce(int a, int b);
+    void expelUnits(int a, int b);  // a's military leaves b's lands
+    void diplomacyTurn();
+    void aiPacts(int c);
+    void aiOffers(int c);
+    void answerOffer(int idx, bool accept);
+    int dealTurns() const { return dur(30); }
     // ---- upgrades and transports (Transport.cpp)
     bool canTrain(int c, int unitType) const;     // tech, resources and species allow it
     int upgradeTarget(const Unit& u) const;       // the best unit this one can become now, or -1

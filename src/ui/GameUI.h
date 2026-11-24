@@ -28,7 +28,7 @@ public:
 
     // ---- used by tests / screenshot tool
     enum Screen { SCR_TITLE, SCR_SETUP, SCR_GAME };
-    enum Overlay { OV_NONE, OV_CITY, OV_TECH, OV_POLICY, OV_DIPLO, OV_MENU, OV_HELP, OV_LOG, OV_EVO, OV_ACHIEVEMENTS };
+    enum Overlay { OV_NONE, OV_CITY, OV_TECH, OV_POLICY, OV_DIPLO, OV_MENU, OV_HELP, OV_LOG, OV_EVO, OV_ACHIEVEMENTS, OV_TRADE };
     Screen screen = SCR_TITLE;
     Overlay overlay = OV_NONE;
     std::unique_ptr<Game> game;
@@ -84,6 +84,16 @@ private:
     int listScroll = 0, techScroll = 0, logScroll = 0, helpScroll = 0, achScroll = 0;
     int achPollMs = 0;
     void renderAchievements();
+    // diplomacy
+    int diploSel = -1;   // civ shown on the diplomacy screen
+    int warArm = -1;     // war declaration on a friend waiting for confirmation
+    Deal draft;          // the deal being negotiated on the trade screen
+    void openTrade(int c, int preset = -1);
+    void renderTrade();
+    DealItem* draftItem(int kind, int from, int value = -1);
+    void toggleDraft(int kind, int from, int value);
+    void adjustDraftGold(int kind, int from, int delta);
+    void balanceDraft();
     void renderAchBanner();
     void drawTrophy(int x, int y, int s, bool lit);
     void renderNukeTargeting();

@@ -95,7 +95,13 @@ bool Game::launchNuke(int c, int x, int y) {
         }
     }
     // the world reacts: victims go to war, everyone else who knows you is horrified
-    for (int o : victims) declareWar(o, c);
+    for (int o : victims) {
+        civs[o].grievance[c] += 60;
+        civs[o].peaceUntil[c] = civs[c].peaceUntil[o] = 0;
+        declareWar(o, c);
+    }
+    for (int o = FIRST_PRIMATE_CIV; o < (int)civs.size(); o++)
+        if (o != c && civs[o].met[c]) civs[o].grievance[c] += 15;
     for (int o = FIRST_PRIMATE_CIV; o < (int)civs.size(); o++) {
         if (o == c || !civs[o].alive || !civs[o].met[c] || civs[o].war[c]) continue;
         if (o != player && rng.chance(0.35)) declareWar(o, c);

@@ -302,6 +302,11 @@ void Game::newGame(const GameSettings& s) {
         cv.war.assign(total, 0);
         cv.met.assign(total, 0);
         cv.warSince.assign(total, 0);
+        cv.grievance.assign(total, 0);
+        cv.goodwill.assign(total, 0);
+        cv.peaceUntil.assign(total, 0);
+        cv.denouncedUntil.assign(total, 0);
+        cv.lastOffer.assign(total, -100);
         cv.traits.assign(g_traits.size(), 0);
         cv.evoPool.assign(PC_COUNT, 0);
         cv.evoRate.assign(PC_COUNT, 0);

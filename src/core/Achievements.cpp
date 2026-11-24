@@ -40,6 +40,10 @@ const std::vector<AchievementDef> g_achievements = {
     {"HERE_WE_GO_AGAIN", "Here We Go Again", "Detonate a nuclear weapon.", "War"},
     {"GLASS_HOUSES", "Glass Houses", "Have one of your cities hit by an enemy nuclear weapon.", "War"},
     {"MUTUALLY_ASSURED", "Mutually Assured Destruction", "In one game, nuke an enemy and be nuked yourself.", "War"},
+    // diplomacy
+    {"BEST_FRIENDS", "Best Friends", "Sign a defensive pact.", "Diplomacy"},
+    {"MONKEY_BUSINESS", "Monkey Business", "Make 10 deals with other civilisations in one game.", "Diplomacy"},
+    {"ET_TU", "Et Tu?", "Declare war on a civilisation you are sworn friends with.", "Diplomacy"},
     // victory
     {"BORN_AGAIN", "Born Again", "Win a Rebirth victory.", "Victory"},
     {"APEX_PRIMATE", "Apex Primate", "Win a Domination victory.", "Victory"},
@@ -153,6 +157,11 @@ std::vector<std::string> checkAchievements(const Game& g, AchievementStore& st) 
     give("ALL_ABOARD", cv.unitsFerried > 0);
     give("OUT_WITH_THE_OLD", cv.unitsUpgraded > 0);
     give("HERE_WE_GO_AGAIN", cv.nukesLaunched > 0);
+    bool pact = false;
+    for (auto& ag : g.agreements) if (ag.kind == AG_DEFENSIVE && ag.until > g.turn && (ag.a == p || ag.b == p)) pact = true;
+    give("BEST_FRIENDS", pact);
+    give("MONKEY_BUSINESS", cv.dealsMade >= 10);
+    give("ET_TU", cv.backstabs > 0);
     give("GLASS_HOUSES", cv.timesNuked > 0);
     give("MUTUALLY_ASSURED", cv.nukesLaunched > 0 && cv.timesNuked > 0);
 

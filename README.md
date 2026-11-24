@@ -117,8 +117,22 @@
   Ships sail on water and dock in your own coastal cities, sharing the tile with a land garrison. Melee ships ram ships and embarked units and can storm a coastal city; ranged ships bombard anything in range, including the shore. Embarked land units are weak, so escort them. Coastal military-base ruins can yield a warship raised from the harbour. The AI keeps a small navy in peacetime, scouts unknown waters, and in war hunts enemy ships and bombards or storms coastal cities (Hard and Expert join the attack on their war-plan target).
 * **Transports.** Canoes and War Galleys carry 1 land unit, Caravels 2, Frigates 1 and Salvaged Freighters 4. Move a land unit onto your ship's tile to board (or press `K` in a harbour city); it sails with the ship and lands by moving onto an adjacent land tile. Units aboard can't fight, and go down with the ship. The AI ferries Elder Troops to good land across the water, and Hard/Expert AIs ship armies to enemy cities they can't reach on foot.
 * **Unit upgrades.** Inside your own territory a unit can be refitted (`U`) as the best unit of its line you can train - Warband → Spear Troop → Iron Blades → Salvaged Rifles → Riflemen → Infantry → Exo-Primates, Stone Thrower → Bow Troop → Crossbows → Field Guns, Siege Sling → Bombard → Field Guns, Beast Riders → Armoured Riders → Rebuilt Tanks, Dugout Canoe → War Galley → Caravel → Ironclad → Salvaged Destroyer, Archer Galley → Frigate → Salvaged Battleship. Unique units follow the line of the unit they replace, and upgrade into your species' unique unit where there is one. With Currency it costs gold; before that, the refit is done inside one of your cities and paid for from that city's stored production. Units keep their health. AIs upgrade too (not on Easy).
+* **Diplomacy.** Every species has a diplomatic personality:
+
+  | Primate | Personality | |
+  |---|---|---|
+  | Chimpanzee | Territorial Politician | Builds coalitions, guards its range jealously, never forgets a slight |
+  | Bonobo | Peacemaker | Warm towards almost everyone, loves agreements, forgives quickly |
+  | Orangutan | Solitary Sage | Trades knowledge happily but rarely binds itself with pacts |
+  | Gorilla | Protector | Slow to anger, fiercely loyal, despises warmongers |
+  | Baboon | Opportunist | Respects only strength, demands tribute, may betray a weak friend |
+  | Capuchin | Trader | Deals with anyone and grows fond of good trading partners |
+  | Gibbon | Faithful Partner | Chooses one close partner for life |
+  | Japanese Macaque | Hierarchist | Respects the powerful, looks down on the weak |
+
+  Each civilisation's **opinion** of you is built from visible reasons - personality, fellow apes/monkeys, shared borders, wars, remembered wrongs, gifts, treaties, common enemies, warmongering, nuclear weapons, betrayals - and shown line by line on the Diplomacy screen, from Hostile to Close friends. The **trade screen** lets you bundle gold, gold per turn, resources (a shared strategic or luxury resource counts as the receiver's own for 30 turns), **open borders**, **research pacts** (+15% science each), **declarations of friendship**, **defensive pacts** (an attack on one brings in the other) and declarations of war on third parties; it shows live whether they would accept, and *What would it take?* adds the gold they want. Without open borders, armies must stay out of other civilisations' lands in peacetime. Making peace brings a **peace treaty** forbidding war for a while; declaring war on a sworn friend is a **betrayal** everyone remembers. You can **denounce** rivals. The AI signs treaties with each other, denounces those it despises, avoids attacking friends, and sends you proposals - peace offers, pacts, resource swaps, requests to join its wars and, from strong aggressive neighbours, demands for tribute.
 * **Nuclear weapons, again.** *Nuclear Fission* lets a city build a **Nuclear Warhead** (needs Uranium). Warheads wait in your silos; click the warhead count on the top bar, pick any tile within 12 of one of your cities and confirm. Everything next to the blast is destroyed, cities are wrecked and lose buildings, fallout spreads, your victims declare war and others who know you may join them. Hard and Expert rivals will use them too - rarely.
-* **Achievements** - 37 of them, from *Spark of Genius* (discover Fire) to *Full Troop* (win with every primate), including the essential **Here We Go Again** for detonating a nuclear weapon. They belong to your profile rather than a saved game (`%APPDATA%\RebirthOfCivilisation\achievements.ini`), pop up as you earn them, and are listed under *Achievements* on the title screen and in the menu. Each has a stable API name (e.g. `HERE_WE_GO_AGAIN`) so a future Steam build can map them straight onto Steam achievements. Games where every civilisation is AI-controlled earn nothing.
+* **Achievements** - 40 of them, from *Spark of Genius* (discover Fire) to *Full Troop* (win with every primate), including the essential **Here We Go Again** for detonating a nuclear weapon. They belong to your profile rather than a saved game (`%APPDATA%\RebirthOfCivilisation\achievements.ini`), pop up as you earn them, and are listed under *Achievements* on the title screen and in the menu. Each has a stable API name (e.g. `HERE_WE_GO_AGAIN`) so a future Steam build can map them straight onto Steam achievements. Games where every civilisation is AI-controlled earn nothing.
 * **Difficulty means a smarter AI, not a cheating one.** Unlike *Civilization*, no level gives the computer extra yields, units or settlers - every species plays by the same rules as you. Difficulty sets how well the rivals play:
 
   | Level | How the rivals play |
@@ -197,7 +211,8 @@
 | ![Evolution tree](docs/screenshots/11b_evolution_mid.png) | ![Early tech tree](docs/screenshots/04c_tech_start.png) |
 | ![A roaming band foraging](docs/screenshots/05_roaming_band.png) | ![The first settlement](docs/screenshots/07b_first_settlement.png) |
 | ![Here We Go Again](docs/screenshots/18_here_we_go_again.png) | ![Achievements](docs/screenshots/17_achievements.png) |
-| ![A fleet in harbour](docs/screenshots/19_naval.png) | |
+| ![A fleet in harbour](docs/screenshots/19_naval.png) | ![Diplomacy](docs/screenshots/20_diplomacy.png) |
+| ![Negotiating a deal](docs/screenshots/21_trade.png) | |
 | ![Start](docs/screenshots/04_start_map.png) | ![The Fall](docs/screenshots/07_fall_popup.png) |
 | ![A drought](docs/screenshots/11c_disaster.png) | ![Late game](docs/screenshots/16_lategame.png) |
 | ![Excavating ruins](docs/screenshots/09_unit_panel.png) | ![Tech tree](docs/screenshots/10_tech_tree.png) |
@@ -244,6 +259,7 @@ src/core/        Rules engine - no platform code
   Nukes.cpp        nuclear warheads: building, launching, the world's reaction
   Naval.cpp        naval AI (ship rules live in Game.cpp: moveCost, canEnter, canAttack)
   Transport.cpp    unit upgrades, ships carrying land units, AI ferrying
+  Diplomacy.cpp    opinions, treaties, deals and AI diplomacy
   Achievements.cpp achievement list, unlock checks and the profile file
   AI.cpp           computer opponents
   Save.cpp         save games

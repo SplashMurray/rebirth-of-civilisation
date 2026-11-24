@@ -346,6 +346,7 @@ void GameUI::renderGame() {
         case OV_TECH: renderTech(); break;
         case OV_POLICY: renderPolicies(); break;
         case OV_DIPLO: renderDiplomacy(); break;
+        case OV_TRADE: renderTrade(); break;
         case OV_MENU: renderMenu(); break;
         case OV_HELP: renderHelp(); break;
         case OV_LOG: renderLog(); break;
@@ -1116,51 +1117,327 @@ void GameUI::renderPolicies() {
 // ============================================================ diplomacy
 void GameUI::renderDiplomacy() {
     Game& g = *game;
-    int pw = std::min(1000, W - 40), ph = std::min(600, H - TOP - 30);
-    int px = (W - pw) / 2, py = TOP + 14;
+    int p = g.player;
+    int pw = std::min(1180, W - 30), ph = H - TOP - 20;
+    int px = (W - pw) / 2, py = TOP + 8;
     panel(px, py, pw, ph);
-    cv->text(px + 20, py + 14, "Diplomacy", 26, C_TEXT, AL_LEFT, true);
-    button(px + pw - 40, py + 12, 28, 28, "X", true, [this] { overlay = OV_NONE; });
-    int y = py + 60;
-    int myPow = g.militaryPower(g.player);
-    cv->text(px + 20, y, "Your score " + std::to_string(g.score(g.player)) + "   Military strength " + std::to_string(myPow), 14, C_DIM);
-    y += 30;
-    for (int c = FIRST_PRIMATE_CIV; c < (int)g.civs.size(); c++) {
-        if (c == g.player) continue;
-        const Civ& o = g.civs[c];
-        int rh = 74;
-        cv->fillRect(px + 16, y, pw - 32, rh - 6, rgb(32, 38, 50));
-        if (!g.civs[g.player].met[c]) {
-            cv->fillCircle(px + 46, y + 32, 18, rgb(60, 60, 60));
-            cv->text(px + 46, y + 22, "?", 18, C_DIM, AL_CENTER, true);
-            cv->text(px + 78, y + 22, "An unknown civilisation", 16, C_DIM, AL_LEFT, true);
-            y += rh;
-            continue;
-        }
-        cv->fillCircle(px + 46, y + 32, 18, o.color);
-        cv->circle(px + 46, y + 32, 18, rgb(0, 0, 0), 2);
-        cv->text(px + 78, y + 8, o.leader + " of the " + o.name, 16, o.alive ? C_TEXT : C_DIM, AL_LEFT, true);
-        if (!o.alive) {
-            cv->text(px + 78, y + 32, "Destroyed", 14, C_RED, AL_LEFT, true);
-            y += rh;
-            continue;
-        }
-        const PrimateDef& pd = g_primates[o.primate];
-        cv->text(px + 78, y + 30, pd.ability + ": " + pd.abilityDesc, 12, C_DIM);
-        bool war = g.civs[g.player].war[c];
-        cv->text(px + 78, y + 48, std::string(war ? "AT WAR" : "At peace") + "   Score " + std::to_string(g.score(c)) + "   Cities " +
-                 std::to_string(g.numCities(c)) + "   Military " + std::to_string(g.militaryPower(c)), 13, war ? C_RED : C_FOOD, AL_LEFT, true);
-        if (war)
-            button(px + pw - 180, y + 18, 150, 32, "Propose Peace", true, [this, c] {
-                bool ok = game->proposePeace(game->player, c);
-                toast = ok ? "The " + game->civs[c].name + " accept peace." : "The " + game->civs[c].name + " refuse peace.";
-                toastMs = 2500;
-            }, "They are more likely to agree after a long war, or if you are stronger.", rgb(50, 100, 60));
-        else
-            button(px + pw - 180, y + 18, 150, 32, "Declare War", true, [this, c] { game->declareWar(game->player, c); }, "", rgb(120, 46, 40));
-        y += rh;
-        if (y > py + ph - rh) break;
+    cv->text(px + 20, py + 12, "Diplomacy", 24, C_TEXT, AL_LEFT, true);
+    cv->text(px + 170, py + 18, "Your score " + std::to_string(g.score(p)) + "   Military strength " + std::to_string(g.militaryPower(p)), 13, C_DIM);
+    button(px + pw - 40, py + 10, 28, 28, "X", true, [this] { overlay = OV_NONE; });
+    auto attColor = [](int a) { return a <= -2 ? rgb(230, 80, 70) : a == -1 ? rgb(230, 150, 90) : a == 0 ? rgb(200, 200, 200) : a == 1 ? rgb(130, 220, 120) : rgb(90, 230, 200); };
+    // ---- the list
+    int lw = std::min(420, pw / 2 - 20), y = py + 50;
+    if (diploSel < 0 || diploSel >= (int)g.civs.size() || diploSel == p || !g.civs[p].met[diploSel]) {
+        diploSel = -1;
+        for (int c = FIRST_PRIMATE_CIV; c < (int)g.civs.size(); c++) if (c != p && g.civs[p].met[c] && g.civs[c].alive) { diploSel = c; break; }
     }
+    int rh = std::min(70, (ph - 60) / std::max(1, (int)g.civs.size() - FIRST_PRIMATE_CIV - 1));
+    for (int c = FIRST_PRIMATE_CIV; c < (int)g.civs.size(); c++) {
+        if (c == p) continue;
+        const Civ& o = g.civs[c];
+        bool met = g.civs[p].met[c];
+        cv->fillRect(px + 14, y, lw, rh - 6, c == diploSel ? rgb(48, 58, 76) : rgb(32, 38, 50));
+        int cy = y + (rh - 6) / 2;
+        if (!met) {
+            cv->fillCircle(px + 40, cy, 15, rgb(60, 60, 60));
+            cv->text(px + 40, cy - 9, "?", 16, C_DIM, AL_CENTER, true);
+            cv->text(px + 66, cy - 9, "An unknown civilisation", 15, C_DIM, AL_LEFT, true);
+            y += rh;
+            continue;
+        }
+        cv->fillCircle(px + 40, cy, 15, o.color);
+        cv->circle(px + 40, cy, 15, rgb(0, 0, 0), 2);
+        cv->text(px + 66, y + 6, o.name, 15, o.alive ? C_TEXT : C_DIM, AL_LEFT, true);
+        if (!o.alive) {
+            cv->text(px + 66, y + 26, "Destroyed", 13, C_RED, AL_LEFT, true);
+        } else {
+            int a = g.attitude(c, p);
+            std::string line = g.civs[p].war[c] ? std::string("AT WAR") : Game::attitudeName(a);
+            cv->text(px + 66, y + 26, line, 13, g.civs[p].war[c] ? C_RED : attColor(a), AL_LEFT, true);
+            std::string tags;
+            if (g.hasAgreement(AG_DEFENSIVE, p, c)) tags += "Pact  ";
+            if (g.hasAgreement(AG_FRIENDSHIP, p, c)) tags += "Friends  ";
+            if (g.openBorders(p, c)) tags += "Borders  ";
+            if (g.hasAgreement(AG_RESEARCH, p, c)) tags += "Research  ";
+            if (!g.civs[p].war[c] && g.civs[p].peaceUntil[c] > g.turn) tags += "Treaty  ";
+            cv->text(px + lw + 6, y + 26, tags, 12, C_GOLD, AL_RIGHT);
+            hot(px + 14, y, lw, rh - 6, [this, c] { diploSel = c; warArm = -1; }, "");
+        }
+        y += rh;
+    }
+    // ---- details of the selected civilisation
+    if (diploSel < 0) {
+        cv->text(px + lw + 50, py + 60, "You have not met anyone yet.", 16, C_DIM);
+        return;
+    }
+    int c = diploSel;
+    const Civ& o = g.civs[c];
+    int dx = px + lw + 34, dw = pw - lw - 54;
+    y = py + 50;
+    cv->fillCircle(dx + 20, y + 20, 20, o.color);
+    cv->text(dx + 50, y, o.leader + " of the " + o.name, 19, C_TEXT, AL_LEFT, true);
+    if (o.primate >= 0) {
+        const PrimateDef& pd = g_primates[o.primate];
+        cv->text(dx + 50, y + 24, pd.persona, 14, C_GOLD, AL_LEFT, true);
+        y += 46;
+        y = textBlock(dx, y, dw, pd.personaDesc, 13, C_DIM, 3) + 6;
+    }
+    cv->text(dx, y, "Score " + std::to_string(g.score(c)) + "   Cities " + std::to_string(g.numCities(c)) + "   Military " + std::to_string(g.militaryPower(c)) +
+             "   Era: " + ERA_NAMES[g.era(c)], 13, C_TEXT);
+    y += 24;
+    if (!o.alive) return;
+    // opinion
+    std::vector<std::pair<std::string, int>> why;
+    int op = g.opinion(c, p, &why);
+    int a = g.attitude(c, p);
+    cv->text(dx, y, std::string("Their view of you: ") + Game::attitudeName(a) + " (" + (op >= 0 ? "+" : "") + std::to_string(op) + ")", 15, attColor(a), AL_LEFT, true);
+    y += 22;
+    int colW = dw / 2 - 8, yy = y, k = 0;
+    for (auto& w : why) {
+        int cx = dx + (k % 2) * (colW + 16);
+        cv->text(cx, yy, w.first, 12, C_DIM);
+        cv->text(cx + colW, yy, (w.second > 0 ? "+" : "") + std::to_string(w.second), 12, w.second > 0 ? rgb(130, 220, 120) : rgb(230, 120, 100), AL_RIGHT, true);
+        if (k % 2 == 1) yy += 17;
+        k++;
+    }
+    y = yy + (k % 2 ? 17 : 0) + 8;
+    // treaties
+    std::string tr;
+    auto addT = [&](int kind, const char* name) {
+        int left = g.agreementTurnsLeft(kind, p, c);
+        if (left > 0) tr += std::string(tr.empty() ? "" : ",  ") + name + " (" + std::to_string(left) + ")";
+    };
+    addT(AG_FRIENDSHIP, "Friendship");
+    addT(AG_DEFENSIVE, "Defensive pact");
+    addT(AG_OPEN_BORDERS, "Open borders");
+    addT(AG_RESEARCH, "Research pact");
+    for (auto& ag : g.agreements) {
+        if (ag.until <= g.turn) continue;
+        bool mine = ag.a == p && ag.b == c, theirs = ag.a == c && ag.b == p;
+        if (!mine && !theirs) continue;
+        if (ag.kind == AG_RESOURCE) tr += std::string(tr.empty() ? "" : ",  ") + g_resources[ag.value].name + (mine ? " to them" : " to you") + " (" + std::to_string(ag.until - g.turn) + ")";
+        if (ag.kind == AG_GOLD_PER_TURN) tr += std::string(tr.empty() ? "" : ",  ") + std::to_string(ag.value) + " gold/turn" + (mine ? " to them" : " to you") + " (" + std::to_string(ag.until - g.turn) + ")";
+    }
+    if (!g.civs[p].war[c] && g.civs[p].peaceUntil[c] > g.turn) tr += std::string(tr.empty() ? "" : ",  ") + "Peace treaty (" + std::to_string(g.civs[p].peaceUntil[c] - g.turn) + ")";
+    cv->text(dx, y, "Treaties with you (turns left):", 13, C_TEXT, AL_LEFT, true);
+    y += 18;
+    y = textBlock(dx, y, dw, tr.empty() ? "None" : tr, 12, C_DIM, 3) + 6;
+    // their relations
+    std::string wars, friends;
+    for (int x = FIRST_PRIMATE_CIV; x < (int)g.civs.size(); x++) {
+        if (x == c || !g.civs[x].alive || !g.civs[p].met[x]) continue;
+        std::string nm = x == p ? "you" : g.civs[x].name;
+        if (o.war[x]) wars += (wars.empty() ? "" : ", ") + nm;
+        else if (x != p && (g.hasAgreement(AG_DEFENSIVE, c, x) || g.hasAgreement(AG_FRIENDSHIP, c, x)))
+            friends += (friends.empty() ? "" : ", ") + nm + (g.hasAgreement(AG_DEFENSIVE, c, x) ? " (pact)" : "");
+    }
+    y = textBlock(dx, y, dw, "At war with: " + (wars.empty() ? std::string("nobody") : wars) + "      Friends: " + (friends.empty() ? std::string("none") : friends), 12, C_DIM, 3) + 4;
+    std::string res;
+    for (int r : g.tradeableResources(c, p)) res += (res.empty() ? "" : ", ") + g_resources[r].name;
+    y = textBlock(dx, y, dw, "Could trade you: " + (res.empty() ? std::string("nothing you lack") : res), 12, C_DIM, 3) + 10;
+    // actions
+    int by = py + ph - 56, bx = dx;
+    bool war = g.civs[p].war[c];
+    button(bx, by, 150, 38, "Negotiate", true, [this, c] { openTrade(c); }, "Propose a deal: gold, resources, treaties, pacts", rgb(50, 80, 120), 15);
+    bx += 160;
+    if (war) {
+        button(bx, by, 150, 38, "Propose Peace", true, [this, c] { openTrade(c, DI_PEACE); }, "Open the negotiation with peace on the table", rgb(50, 100, 60), 15);
+    } else {
+        std::string whyNot;
+        bool ok = g.canDeclareWar(p, c, &whyNot);
+        bool friendsNow = g.hasAgreement(AG_FRIENDSHIP, p, c) || g.hasAgreement(AG_DEFENSIVE, p, c);
+        std::string label = warArm == c ? "Betray them?" : "Declare War";
+        button(bx, by, 150, 38, label, ok, [this, c, friendsNow] {
+            if (friendsNow && warArm != c) { warArm = c; return; }
+            warArm = -1;
+            game->declareWar(game->player, c);
+        }, ok ? (friendsNow ? "You are sworn friends: declaring war is a betrayal that everyone will remember. Click again to confirm." : "") : whyNot,
+               rgb(120, 46, 40), 15);
+    }
+    bx += 160;
+    bool denounced = g.civs[p].denouncedUntil[c] > g.turn;
+    button(bx, by, 130, 38, "Denounce", !denounced && !war, [this, c] { game->denounce(game->player, c); },
+           denounced ? "Already denounced" : "Publicly condemn them: they will resent it, and your friends will think less of them. Ends your treaties.", C_PANEL2, 15);
+}
+
+// ---- trade screen
+DealItem* GameUI::draftItem(int kind, int from, int value) {
+    for (auto& it : draft.items)
+        if (it.kind == kind && it.from == from && (value < 0 || it.value == value)) return &it;
+    return nullptr;
+}
+
+void GameUI::toggleDraft(int kind, int from, int value) {
+    for (size_t i = 0; i < draft.items.size(); i++) {
+        auto& it = draft.items[i];
+        if (it.kind == kind && it.from == from && it.value == value) { draft.items.erase(draft.items.begin() + i); return; }
+    }
+    draft.items.push_back({kind, from, value});
+}
+
+void GameUI::adjustDraftGold(int kind, int from, int delta) {
+    Game& g = *game;
+    DealItem* it = draftItem(kind, from);
+    int cur = it ? it->value : 0;
+    int cap = kind == DI_GOLD ? g.civs[from].gold : g.civs[from].goldPerTurn;
+    int v = std::max(0, std::min(cap, cur + delta));
+    if (it && v == 0) { toggleDraft(kind, from, cur); return; }
+    if (it) it->value = v;
+    else if (v > 0) draft.items.push_back({kind, from, v});
+}
+
+void GameUI::openTrade(int c, int preset) {
+    draft = Deal();
+    draft.a = game->player;
+    draft.b = c;
+    if (preset >= 0) draft.items.push_back({preset, -1, 0});
+    overlay = OV_TRADE;
+}
+
+void GameUI::balanceDraft() {
+    Game& g = *game;
+    int c = draft.b, p = draft.a;
+    std::string why;
+    double v = g.dealValue(c, draft, &why);
+    if (v < -1e8) { toast = why; toastMs = 2500; return; }
+    double need = (g.skillOf(c) >= 2 ? 5 : 0) - v;
+    if (need <= 0) { toast = "They already like this deal."; toastMs = 2000; return; }
+    if (!g.hasGold(p) || !g.hasGold(c)) { toast = "Without Currency there is no gold to sweeten the deal."; toastMs = 2500; return; }
+    DealItem* gi = draftItem(DI_GOLD, p);
+    int have = g.civs[p].gold - (gi ? gi->value : 0);
+    int add = (int)std::ceil(need);
+    if (add <= have) {
+        adjustDraftGold(DI_GOLD, p, add);
+        return;
+    }
+    adjustDraftGold(DI_GOLD, p, have);
+    // the rest as gold per turn
+    DealItem* tmp = draftItem(DI_GOLD, p);
+    double left = need - have;
+    int perTurn = (int)std::ceil(left / (g.dealTurns() * 0.7));
+    int income = g.civs[p].goldPerTurn - (draftItem(DI_GPT, p) ? draftItem(DI_GPT, p)->value : 0);
+    (void)tmp;
+    if (perTurn <= income) adjustDraftGold(DI_GPT, p, perTurn);
+    else { toast = "They want more than you can afford."; toastMs = 2500; }
+}
+
+void GameUI::renderTrade() {
+    Game& g = *game;
+    int p = g.player, c = draft.b;
+    if (c < 0 || !g.civs[c].alive) { overlay = OV_DIPLO; return; }
+    int pw = std::min(1180, W - 30), ph = H - TOP - 20;
+    int px = (W - pw) / 2, py = TOP + 8;
+    hot(0, 0, W, H, nullptr);
+    panel(px, py, pw, ph);
+    cv->fillCircle(px + 30, py + 26, 14, g.civs[c].color);
+    cv->text(px + 54, py + 12, "Negotiate with " + g.civs[c].leader + " of the " + g.civs[c].name, 22, C_TEXT, AL_LEFT, true);
+    button(px + pw - 40, py + 10, 28, 28, "X", true, [this] { overlay = OV_DIPLO; });
+    int colW = (pw - 60) / 3, top = py + 56;
+    int cols[3] = {px + 20, px + 30 + colW, px + 40 + colW * 2};
+    const char* heads[3] = {"You give", "Both sides agree to", "They give"};
+    for (int k = 0; k < 3; k++) {
+        cv->fillRect(cols[k], top, colW, ph - 160, rgb(30, 36, 48));
+        cv->text(cols[k] + colW / 2, top + 8, heads[k], 16, C_GOLD, AL_CENTER, true);
+    }
+    auto chip = [&](int x, int y, int w, const std::string& label, bool on, bool enabled, std::function<void()> fn, const std::string& tip) {
+        button(x, y, w, 30, (on ? "[x] " : "[ ] ") + label, enabled || on, fn, tip, on ? rgb(60, 100, 70) : C_PANEL2, 13);
+    };
+    // one side's offers
+    auto side = [&](int col, int giver) {
+        int taker = giver == p ? c : p;
+        int x = cols[col] + 10, y = top + 40, w = colW - 20;
+        if (g.hasGold(p) && g.hasGold(c)) {
+            DealItem* gi = draftItem(DI_GOLD, giver);
+            cv->text(x, y + 7, "Gold: " + std::to_string(gi ? gi->value : 0) + " / " + std::to_string(g.civs[giver].gold), 13, C_GOLD);
+            button(x + w - 130, y, 40, 28, "-50", true, [this, giver] { adjustDraftGold(DI_GOLD, giver, -50); });
+            button(x + w - 86, y, 40, 28, "+10", true, [this, giver] { adjustDraftGold(DI_GOLD, giver, 10); });
+            button(x + w - 42, y, 42, 28, "+50", true, [this, giver] { adjustDraftGold(DI_GOLD, giver, 50); });
+            y += 34;
+            DealItem* gp = draftItem(DI_GPT, giver);
+            cv->text(x, y + 7, "Gold per turn: " + std::to_string(gp ? gp->value : 0) + " / " + std::to_string(g.civs[giver].goldPerTurn), 13, C_GOLD);
+            button(x + w - 86, y, 40, 28, "-1", true, [this, giver] { adjustDraftGold(DI_GPT, giver, -1); });
+            button(x + w - 42, y, 42, 28, "+1", true, [this, giver] { adjustDraftGold(DI_GPT, giver, 1); });
+            y += 40;
+        } else {
+            cv->text(x, y, "No gold: both sides need Currency.", 12, C_DIM);
+            y += 24;
+        }
+        auto res = g.tradeableResources(giver, taker);
+        for (auto& it : draft.items)  // keep chosen ones visible
+            if (it.kind == DI_RESOURCE && it.from == giver && std::find(res.begin(), res.end(), it.value) == res.end()) res.push_back(it.value);
+        if (!res.empty()) { cv->text(x, y, "Resources (" + std::to_string(g.dealTurns()) + " turns):", 13, C_TEXT, AL_LEFT, true); y += 20; }
+        for (int r : res) {
+            bool on = draftItem(DI_RESOURCE, giver, r) != nullptr;
+            chip(x, y, w, g_resources[r].name, on, true, [this, giver, r] { toggleDraft(DI_RESOURCE, giver, r); },
+                 std::string(g_resources[r].kind == RK_STRATEGIC ? "Strategic resource" : "Luxury") + ": counts as the receiver's own while the deal lasts");
+            y += 34;
+            if (y > top + ph - 220) break;
+        }
+        bool header = false;
+        for (int x3 = FIRST_PRIMATE_CIV; x3 < (int)g.civs.size(); x3++) {
+            if (x3 == p || x3 == c || !g.civs[x3].alive) continue;
+            DealItem probe{DI_WAR_ON, giver, x3};
+            std::string why;
+            bool valid = g.dealItemValid(draft, probe, &why);
+            bool on = draftItem(DI_WAR_ON, giver, x3) != nullptr;
+            if (!valid && !on) continue;
+            if (!header) { cv->text(x, y + 4, "Declare war on:", 13, C_TEXT, AL_LEFT, true); y += 24; header = true; }
+            chip(x, y, w, g.civs[x3].name, on, valid, [this, giver, x3] { toggleDraft(DI_WAR_ON, giver, x3); }, valid ? "" : why);
+            y += 34;
+            if (y > top + ph - 220) break;
+        }
+    };
+    side(0, p);
+    side(2, c);
+    // mutual
+    {
+        int x = cols[1] + 10, y = top + 40, w = colW - 20;
+        struct M { int kind; const char* name; const char* tip; };
+        const M ms[] = {
+            {DI_PEACE, "Peace", "End the war. A peace treaty then forbids either side from declaring war for a while."},
+            {DI_FRIENDSHIP, "Declaration of friendship", "A public promise of goodwill. Needed before a defensive pact. Breaking it by war is a betrayal."},
+            {DI_OPEN_BORDERS, "Open borders", "Each side's military may enter the other's lands. Without it, armies must stay out in peacetime."},
+            {DI_RESEARCH, "Research pact", "+15% science for both sides while it lasts."},
+            {DI_DEFENSIVE, "Defensive pact", "If anyone declares war on one of you, the other joins the war automatically."},
+        };
+        for (auto& m : ms) {
+            DealItem probe{m.kind, -1, 0};
+            std::string why;
+            bool valid = g.dealItemValid(draft, probe, &why);
+            bool on = draftItem(m.kind, -1) != nullptr;
+            if (m.kind == DI_PEACE && !g.civs[p].war[c]) continue;
+            if (m.kind != DI_PEACE && g.civs[p].war[c]) continue;
+            chip(x, y, w, m.name, on, valid, [this, m] { toggleDraft(m.kind, -1, 0); }, valid ? m.tip : why);
+            y += 38;
+        }
+    }
+    // their reaction
+    int ry = py + ph - 96;
+    std::string verdict;
+    Color vc;
+    if (draft.items.empty()) { verdict = "Add something to the deal."; vc = C_DIM; }
+    else {
+        std::string why;
+        bool ok = g.aiAccepts(c, draft, &why);
+        verdict = ok ? "The " + g.civs[c].name + " would accept this deal." : g.civs[c].leader + ": \"" + why + ".\"";
+        vc = ok ? rgb(130, 220, 120) : rgb(240, 140, 110);
+    }
+    cv->text(px + 24, ry, verdict, 16, vc, AL_LEFT, true);
+    int by = py + ph - 56;
+    button(px + 24, by, 150, 38, "Propose", !draft.items.empty(), [this] {
+        Game& gg = *game;
+        std::string why;
+        if (gg.aiAccepts(draft.b, draft, &why) && gg.executeDeal(draft)) {
+            toast = "Deal agreed with the " + gg.civs[draft.b].name + ".";
+            draft.items.clear();
+            overlay = OV_DIPLO;
+        } else toast = "Refused: " + why;
+        toastMs = 2800;
+    }, "", rgb(50, 100, 60), 15);
+    button(px + 184, by, 210, 38, "What would it take?", !draft.items.empty(), [this] { balanceDraft(); },
+           "Add the gold they would want from you to make this deal acceptable", C_PANEL2, 14);
+    button(px + 404, by, 110, 38, "Clear", true, [this] { draft.items.clear(); }, "", C_PANEL2, 14);
+    button(px + pw - 134, by, 110, 38, "Back", true, [this] { overlay = OV_DIPLO; }, "", C_PANEL2, 14);
 }
 
 // ============================================================ evolution
@@ -1339,6 +1616,12 @@ void GameUI::renderHelp() {
         "over and recovers slowly, so keep the band moving to fresh forest, jungle and grassland. A well-fed band grows to at most 8 members. Split "
         "a big band in two (G), or turn members into a War Party (R) or a Scout to guard and explore. Bands that go hungry lose members. Only once "
         "your species has evolved Speech and discovered Cultivation can a band settle (B) and found a city - the end of the wandering age.\n"
+        "DIPLOMACY  Every civilisation has a personality and an opinion of you, built from visible reasons (borders, wars, gifts, treaties, "
+        "the company you keep) - see them on the Diplomacy screen (D). Negotiate deals of gold, gold per turn, resources (shared for 30 turns), "
+        "open borders, research pacts (+15% science each), declarations of friendship, defensive pacts (an attack on one brings in the other) "
+        "and joining wars; the trade screen shows live whether they would accept, and 'What would it take?' adds the gold they want. "
+        "Without open borders, armies must stay out of other civilisations' lands in peacetime. Making peace brings a treaty that forbids "
+        "war for a while. Breaking a friendship by war is a betrayal everyone remembers. Rivals send you proposals - and demands - of their own.\n"
         "NAVAL WARFARE  Coastal cities build ships: Dugout Canoes (Rafts), War Galleys (Bronze Working, needs Copper) and Archer Galleys "
         "(Archery) keep to coastal waters; Caravels (Navigation), Frigates (Gunpowder), Ironclads (Steam Power, Coal), Salvaged Destroyers "
         "(Combustion, Oil) and Salvaged Battleships (Motorised Warfare, Oil) cross the ocean. Ships move on water and dock in your own "
@@ -1417,6 +1700,7 @@ void GameUI::renderLog() {
 
 // ============================================================ popups & the Fall
 void GameUI::closePopup() {
+    if (game && !game->popups.empty() && game->popups.front().kind == POP_DEAL) game->answerOffer(game->popups.front().deal, false);  // no answer = no
     if (game && !game->popups.empty()) game->popups.erase(game->popups.begin());
     if (game && !game->popups.empty()) {
         const Popup& p = game->popups.front();
@@ -1437,7 +1721,7 @@ void GameUI::renderPopup() {
     if (p.kind == POP_NUKE) ph = std::max(ph, 330);
     int px = (W - pw) / 2, py = std::max(TOP + 10, (H - ph) / 2);
     Color head = p.kind == POP_NUKE ? rgb(150, 50, 30) : p.kind == POP_WAR ? rgb(140, 40, 40) : p.kind == POP_VICTORY ? rgb(150, 120, 40) :
-                 p.kind == POP_DEFEAT ? rgb(80, 40, 40) : p.kind == POP_RUIN ? rgb(130, 84, 40) : p.kind == POP_TECH ? rgb(40, 80, 130) : p.kind == POP_EVOLUTION ? rgb(40, 110, 70) : p.kind == POP_DISASTER ? rgb(150, 70, 20) : p.kind == POP_SETTLE ? rgb(150, 112, 40) : rgb(56, 70, 92);
+                 p.kind == POP_DEFEAT ? rgb(80, 40, 40) : p.kind == POP_RUIN ? rgb(130, 84, 40) : p.kind == POP_TECH ? rgb(40, 80, 130) : p.kind == POP_EVOLUTION ? rgb(40, 110, 70) : p.kind == POP_DISASTER ? rgb(150, 70, 20) : p.kind == POP_SETTLE ? rgb(150, 112, 40) : p.kind == POP_DEAL ? rgb(60, 90, 120) : rgb(56, 70, 92);
     cv->fillRect(px - 2, py - 2, pw + 4, ph + 4, rgb(0, 0, 0));
     cv->fillRect(px, py, pw, ph, rgb(26, 30, 38));
     cv->fillRect(px, py, pw, 46, head);
@@ -1470,6 +1754,12 @@ void GameUI::renderPopup() {
         }
         button(px + pw - 380, py + ph - 52, 170, 38, "Continue Playing", true, [this] { closePopup(); }, "", rgb(50, 90, 60), 15);
         button(px + pw - 200, py + ph - 52, 180, 38, "Main Menu", true, [this] { closePopup(); screen = SCR_TITLE; }, "", C_PANEL2, 15);
+        return;
+    }
+    if (p.kind == POP_DEAL) {
+        int di = p.deal;
+        button(px + pw - 300, py + ph - 52, 130, 38, "Accept", true, [this, di] { game->answerOffer(di, true); closePopup(); }, "", rgb(50, 100, 60), 16);
+        button(px + pw - 160, py + ph - 52, 140, 38, "Decline", true, [this] { closePopup(); }, "(Esc)", rgb(110, 50, 44), 16);
         return;
     }
     if (p.x >= 0) {

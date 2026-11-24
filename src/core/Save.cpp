@@ -5,7 +5,7 @@
 #include <sstream>
 
 namespace {
-const int SAVE_VERSION = 13;
+const int SAVE_VERSION = 14;
 
 struct Archive {
     bool writing;
@@ -56,6 +56,7 @@ struct Archive {
     }
     void io(Color& c) { io(c.r); io(c.g); io(c.b); }
     void io(TempPressure& t) { io(t.name); io(t.cat); io(t.value); io(t.turns); }
+    void io(Agreement& ag) { io(ag.kind); io(ag.a); io(ag.b); io(ag.until); io(ag.value); }
     template <class T> void io(std::vector<T>& v) {
         long long n = (long long)v.size();
         num(n);
@@ -126,6 +127,7 @@ void ioGame(Archive& a, Game& g) {
         a.io(c.capital); a.io(c.ruinsExcavated); a.io(c.nameIdx); a.io(c.yieldBonusPct);
         a.io(c.traits); a.io(c.evoGoal); a.io(c.evoPool); a.io(c.evoRate); a.io(c.battles);
         a.io(c.tempPressures); a.io(c.lastDisaster); a.io(c.aiSkill);
+        a.io(c.grievance); a.io(c.goodwill); a.io(c.peaceUntil); a.io(c.denouncedUntil); a.io(c.lastOffer); a.io(c.dealsMade); a.io(c.backstabs);
         a.io(c.warheads); a.io(c.nukesLaunched); a.io(c.timesNuked); a.io(c.citiesCaptured); a.io(c.citiesLost); a.io(c.bandSplits);
         a.io(c.disastersSuffered); a.io(c.warsDeclared); a.io(c.falloutCleaned); a.io(c.maxBand); a.io(c.shipsSunk); a.io(c.unitsUpgraded); a.io(c.unitsFerried);
     }
@@ -150,6 +152,8 @@ void ioGame(Archive& a, Game& g) {
     a.num(nl);
     if (!a.writing) g.log.assign((size_t)std::max(0LL, nl), Notification());
     for (auto& n : g.log) { a.io(n.turn); a.io(n.text); a.io(n.x); a.io(n.y); }
+    a.io(g.agreements);
+    if (!a.writing) g.offers.clear();
 }
 }  // namespace
 

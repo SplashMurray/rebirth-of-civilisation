@@ -180,6 +180,7 @@ int Game::resourceCount(int c, int r) const {
 
 bool Game::hasResource(int c, int r) const {
     if (resourceCount(c, r) > 0) return true;
+    if (c >= FIRST_PRIMATE_CIV && lentResource(c, r)) return true;
     return r == R_IRON && resourceCount(c, R_SCRAP) > 0;
 }
 
@@ -701,7 +702,7 @@ void Game::computeCity(City& city) {
     }
     pct.food += policyPct(c, PolicyEffect::Food);
     pct.prod += policyPct(c, PolicyEffect::Prod);
-    pct.sci += policyPct(c, PolicyEffect::Sci);
+    pct.sci += policyPct(c, PolicyEffect::Sci) + diploSciPct(c);
     pct.cult += policyPct(c, PolicyEffect::Culture);
     pct.gold += policyPct(c, PolicyEffect::Gold);
     if (ownsWonderSpecial(c, BSpecial::GrowthBonus)) pct.food += 10;
@@ -931,6 +932,7 @@ void Game::captureCity(City& city, int newOwner) {
         statCaptures++;
         civs[newOwner].citiesCaptured++;
         if (old >= 0) civs[old].citiesLost++;
+        if (old >= FIRST_PRIMATE_CIV && newOwner >= FIRST_PRIMATE_CIV) civs[old].grievance[newOwner] += 20;
         city.owner = newOwner;
         city.pop = std::max(1, city.pop - (city.pop + 2) / 3);
         city.food = 0;
@@ -1039,6 +1041,10 @@ int Game::moveCost(const Unit& u, int fx, int fy, int tx, int ty) const {
     }
     if (t.mountain) return -1;
     if (!warHappened && t.site >= 0) return -1;  // living human settlements are off limits
+    // closed borders: at peace, military units stay out of other civilisations' lands
+    if (t.owner >= FIRST_PRIMATE_CIV && t.owner != u.owner && u.owner >= FIRST_PRIMATE_CIV && ud.military() && ud.cls != UnitClass::Recon &&
+        !civs[u.owner].war[t.owner] && !openBorders(u.owner, t.owner) && at(fx, fy).owner != t.owner)
+        return -1;
     bool toWater = isWater(tx, ty), fromWater = isWater(fx, fy);
     if (toWater && ud.cls != UnitClass::Nuke && transportAt(u.owner, tx, ty, u.id)) return 1;  // going aboard one of our ships
     if (toWater && !canEmbark(u.owner, tx, ty)) return -1;

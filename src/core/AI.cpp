@@ -159,6 +159,7 @@ void Game::aiDiplomacy(int c) {
         }
         if (turn < dur(25) || wars > 0) continue;
         if (turn - cv.warSince[o] < dur(20)) continue;  // recent peace
+        if (!canDeclareWar(c, o)) continue;              // peace treaty
         // proximity
         int closest = 99;
         for (auto& a : cities) {
@@ -181,6 +182,18 @@ void Game::aiDiplomacy(int c) {
             else chance = aggr * (sk >= 3 ? 0.010 : 0.007) * (busy ? 2 : 1);
         } else if (myPow > theirPow * 1.5) chance *= 2.5;
         else if (myPow < theirPow) chance *= 0.2;
+        // opinion: friends are (almost) never attacked, the hated much more readily
+        int op = opinion(c, o);
+        bool sworn = hasAgreement(AG_FRIENDSHIP, c, o) || hasAgreement(AG_DEFENSIVE, c, o);
+        if (sworn) chance *= (pd && pd->loyalty <= 2) ? 0.05 : 0.0;
+        else chance *= op <= -30 ? 2.0 : op < -8 ? 1.3 : op < 12 ? 1.0 : op < 30 ? 0.3 : 0.08;
+        // never pick a fight that would bring a defensive pact down on us from a stronger partner
+        if (sk >= 1)
+            for (auto& ag : agreements)
+                if (ag.kind == AG_DEFENSIVE && ag.until > turn && (ag.a == o || ag.b == o)) {
+                    int x = ag.a == o ? ag.b : ag.a;
+                    if (x != c && militaryPower(x) + theirPow > myPow * (sk >= 2 ? 1 : 2)) chance *= 0.2;
+                }
         if (rng.chance(chance)) {
             declareWar(c, o);
             return;
@@ -246,6 +259,8 @@ void Game::aiTurn(int c) {
     }
     aiUpgrades(c);
     aiDiplomacy(c);
+    aiPacts(c);
+    aiOffers(c);
     for (size_t i = 0; i < cities.size(); i++)
         if (cities[i].alive && cities[i].owner == c) aiCity(cities[i]);
     // units: iterate by index since vectors may grow

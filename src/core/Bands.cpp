@@ -65,7 +65,7 @@ int Game::bandScience(const Unit& u) const {
     int c = u.owner;
     if (!hasTrait(c, TR_NEOCORTEX)) return 0;
     int s = 1 + u.band * 2 / 3 + civs[c].fx.flatSci;
-    int pct = civs[c].fx.sci + civs[c].yieldBonusPct + policyPct(c, PolicyEffect::Sci);
+    int pct = civs[c].fx.sci + civs[c].yieldBonusPct + policyPct(c, PolicyEffect::Sci) + diploSciPct(c);
     if (const PrimateDef* pd = primate(c)) pct += pd->sciPct;
     return applyPct(s, pct);
 }
