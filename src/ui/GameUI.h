@@ -43,6 +43,7 @@ public:
     int hoverX = -1, hoverY = -1;  // hovered tile
     int mouseX = 0, mouseY = 0;
     int nukeT = -1;                // nuclear war animation timer (ms), -1 = off
+    static constexpr int NUKE_LEN = 6000, NUKE_FADE = 1500;  // plays by itself, fading out over the last NUKE_FADE ms
     void renderUnitGallery(Canvas& c);  // test helper: every unit flag at large size
 
     // ---- achievements (kept in the player's profile, not in saved games)
@@ -100,6 +101,7 @@ private:
     void drawTrophy(int x, int y, int s, bool lit);
     void renderNukeTargeting();
     void renderBlast();
+    void skipNuke();
     // ---- unit motion and combat effects (interface only, never saved)
     struct Glide { int fx, fy, tx, ty, start, dur; };
     struct Fx { CombatFx c; int start; };
@@ -161,8 +163,8 @@ private:
     void drawTileGround(int x, int y, int sx, int sy);
     void drawPortrait(int primate, int cx, int cy, int r, Color ring);
     void drawTitleScene();
-    void drawFireball(int sx, int sy, int r, double k);
-    void drawMushroom(int sx, int sy, int big, int rise, int ms);
+    void drawFireball(int sx, int sy, int r, double k, int alpha = 255);
+    void drawMushroom(int sx, int sy, int big, int rise, int ms, int alpha = 255);
     Color groundColor(int x, int y) const;
     void edgeFade(int sx, int sy, const int* xy, int d, float depth, Color c, int a);
     void drawTerrainRegion(int x0, int x1, int y0, int y1);

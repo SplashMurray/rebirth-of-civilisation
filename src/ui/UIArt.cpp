@@ -246,29 +246,30 @@ void GameUI::drawTitleScene() {
 }
 
 // A nuclear fireball (k: 0 white-hot, 1 burnt out).
-void GameUI::drawFireball(int sx, int sy, int r, double k) {
+void GameUI::drawFireball(int sx, int sy, int r, double k, int alpha) {
     if (r <= 0) return;
-    cv->glowEllipse(sx, sy, r * 2, r * 3 / 2, rgb(255, 200, 120), (int)(220 * (1 - k * 0.7)));
-    cv->fillCircleGrad(sx, sy, r, blend(rgb(255, 255, 240), rgb(255, 170, 80), (float)k), 255, blend(rgb(255, 150, 60), rgb(110, 56, 40), (float)k), 255);
+    cv->glowEllipse(sx, sy, r * 2, r * 3 / 2, rgb(255, 200, 120), (int)(220 * (1 - k * 0.7)) * alpha / 255);
+    cv->fillCircleGrad(sx, sy, r, blend(rgb(255, 255, 240), rgb(255, 170, 80), (float)k), alpha, blend(rgb(255, 150, 60), rgb(110, 56, 40), (float)k), alpha);
 }
 
 // A mushroom cloud whose cap is 'rise' pixels above the ground; 'ms' makes it boil.
-void GameUI::drawMushroom(int sx, int sy, int big, int rise, int ms) {
+void GameUI::drawMushroom(int sx, int sy, int big, int rise, int ms, int alpha) {
+    auto A = [&](int a) { return a * alpha / 255; };
     if (big <= 0 || rise <= 0) return;
     double t = ms / 1000.0;
     int capY = sy - rise;
     int stem[8] = {sx - big / 4, sy, sx + big / 4, sy, sx + big / 7, capY + big / 5, sx - big / 7, capY + big / 5};
-    cv->fillPolyGrad(stem, 4, rgb(226, 146, 100), 255, rgb(120, 78, 70), 255, sx, capY, sx, sy);
-    if (rise > big / 2) cv->fillEllipseA(sx, sy - rise * 45 / 100, big / 2, std::max(2, big / 9), rgb(196, 126, 100), 210);
-    cv->glowEllipse(sx, capY, big, big * 2 / 3, rgb(255, 160, 90), 120);
+    cv->fillPolyGrad(stem, 4, rgb(226, 146, 100), alpha, rgb(120, 78, 70), alpha, sx, capY, sx, sy);
+    if (rise > big / 2) cv->fillEllipseA(sx, sy - rise * 45 / 100, big / 2, std::max(2, big / 9), rgb(196, 126, 100), A(210));
+    cv->glowEllipse(sx, capY, big, big * 2 / 3, rgb(255, 160, 90), A(120));
     for (int ring = 0; ring < 2; ring++) {
         int n = ring ? 5 : 9;
         for (int k = 0; k < n; k++) {
             double a = 6.2831853 * k / n + ring * 0.5;
             int pr = big * (ring ? 30 : 34) / 100 + (int)(std::sin(t * 1.3 + k + ring) * big / 30);
             int px = sx + (int)(std::cos(a) * big * (ring ? 0.3 : 0.62)), py = capY - ring * big / 6 + (int)(std::sin(a) * big * (ring ? 0.12 : 0.24));
-            cv->fillCircleGrad(px, py, pr, rgb(252, 196, 136), 255, rgb(140, 84, 72), 255, px - pr / 3, py - pr / 2);
+            cv->fillCircleGrad(px, py, pr, rgb(252, 196, 136), alpha, rgb(140, 84, 72), alpha, px - pr / 3, py - pr / 2);
         }
     }
-    cv->glowEllipse(sx, capY + big / 10, big * 2 / 3, big / 3, rgb(255, 230, 160), 160);
+    cv->glowEllipse(sx, capY + big / 10, big * 2 / 3, big / 3, rgb(255, 230, 160), A(160));
 }

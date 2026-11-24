@@ -149,13 +149,19 @@ void GameUI::render(Canvas& c) {
     tooltip();
 }
 
+// A click or key press skips the nuclear war animation (after a moment, so the click that ended the
+// turn does not skip it before it is seen).
+void GameUI::skipNuke() {
+    if (nukeT > 300) nukeT = -1;
+}
+
 bool GameUI::tick(int ms) {
     animMs += ms;
     bool redraw = false;
     if (toastMs > 0) { toastMs -= ms; redraw = true; }
     if (nukeT >= 0) {
         nukeT += ms;
-        if (nukeT > 5200) nukeT = -1;
+        if (nukeT > NUKE_LEN) nukeT = -1;
         redraw = true;
     }
     if (achBannerMs > 0) {
@@ -1813,6 +1819,7 @@ void GameUI::renderPopup() {
 void GameUI::renderNuke() {
     Game& g = *game;
     int t = nukeT;
+    int fade = t <= NUKE_LEN - NUKE_FADE ? 255 : std::max(0, 255 * (NUKE_LEN - t) / NUKE_FADE);  // fades out to the world beneath
     // screen flashes, then fireballs on every human site that is on screen
     for (auto& s : g.sites) {
         int sx, sy;
@@ -1824,14 +1831,15 @@ void GameUI::renderNuke() {
         double k = std::min(1.0, lt / 1600.0);
         int big = s.type == RUIN_CITY ? hs * 3 : hs * 2;
         int r = (int)(big * (0.3 + k));
-        drawFireball(sx, sy, r, k);
-        if (lt > 600) drawMushroom(sx, sy, big, std::min(lt - 600, 2400) * big / 1600, lt);  // rising mushroom
+        drawFireball(sx, sy, r, k, fade);
+        if (lt > 600) drawMushroom(sx, sy, big, std::min(lt - 600, 2400) * big / 1600, lt, fade);  // rising mushroom
     }
     if (t < 350) cv->fillRect(0, 0, W, H, blend(rgb(255, 255, 255), rgb(255, 230, 200), t / 350.0f));
     int ts = std::min(64, W / 16);
-    cv->text(W / 2 + 3, H / 3 + 3, "AUGUST 2034", ts, rgb(0, 0, 0), AL_CENTER, true);
-    cv->text(W / 2, H / 3, "AUGUST 2034", ts, rgb(255, 220, 180), AL_CENTER, true);
-    hot(0, 0, W, H, [this] { if (nukeT > 1200) nukeT = -1; }, "");
+    cv->textA(W / 2 + 3, H / 3 + 3, "AUGUST 2034", ts, rgb(0, 0, 0), AL_CENTER, true, fade);
+    cv->textA(W / 2, H / 3, "AUGUST 2034", ts, rgb(255, 220, 180), AL_CENTER, true, fade);
+    if (t > 800) cv->textA(W / 2, H - 40, "Click to skip", 14, rgb(255, 236, 214), AL_CENTER, false, fade * 2 / 3);
+    hot(0, 0, W, H, [this] { skipNuke(); }, "");
 }
 
 // ============================================================ actions
@@ -2070,7 +2078,7 @@ void GameUI::mouseUp(int x, int y, int button) {
     dragging = false;
     if (button == MOUSE_LEFT && wasDrag) return;
     if (screen == SCR_GAME && game && nukeT >= 0) {
-        if (nukeT > 1200) nukeT = -1;
+        skipNuke();
         return;
     }
     // UI hotspots, top-most first
@@ -2159,7 +2167,7 @@ void GameUI::key(int k, bool shift, bool ctrl) {
     if (!game) return;
     Game& g = *game;
     if (nukeT >= 0) {
-        if (nukeT > 1200) nukeT = -1;
+        skipNuke();
         return;
     }
     if (!g.popups.empty()) {

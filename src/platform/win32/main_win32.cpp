@@ -484,10 +484,17 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             EndPaint(hwnd, &ps);
             return 0;
         }
-        case WM_TIMER:
-            if (g_ui->tick(33)) InvalidateRect(hwnd, nullptr, FALSE);
+        case WM_TIMER: {
+            // advance animations by the real time that has passed: when frames are slow, Windows
+            // delivers fewer timer messages, and counting 33 ms each would slow animations down
+            static ULONGLONG last = GetTickCount64();
+            ULONGLONG now = GetTickCount64();
+            int ms = (int)std::min<ULONGLONG>(now - last, 250);
+            last = now;
+            if (ms > 0 && g_ui->tick(ms)) InvalidateRect(hwnd, nullptr, FALSE);
             if (g_ui->wantsQuit()) DestroyWindow(hwnd);
             return 0;
+        }
         case WM_MOUSEMOVE:
             g_ui->mouseMove(lx(hwnd, GET_X_LPARAM(lp)), lx(hwnd, GET_Y_LPARAM(lp)));
             InvalidateRect(hwnd, nullptr, FALSE);
