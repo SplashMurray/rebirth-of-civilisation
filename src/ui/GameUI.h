@@ -24,6 +24,7 @@ public:
     // Interface size as a percentage on top of the system display scaling. The platform layer
     // reads this after each input event and rescales the canvas when it changes.
     int uiScalePct = 100;
+    bool animOn = true;  // animated water, unit movement and combat effects (saved in settings.ini)
     static constexpr int UI_SCALE_MIN = 60, UI_SCALE_MAX = 200, UI_SCALE_STEP = 10;
     void adjustUiScale(int dir);  // dir: +1 bigger, -1 smaller, 0 reset
 
@@ -82,7 +83,6 @@ private:
     double dragCamX = 0, dragCamY = 0;
     bool moveMode = false;
     int animMs = 0;
-    bool animOn = true;   // animated water, unit movement and combat effects
     int listScroll = 0, techScroll = 0, logScroll = 0, helpScroll = 0, achScroll = 0;
     int achPollMs = 0;
     void renderAchievements();

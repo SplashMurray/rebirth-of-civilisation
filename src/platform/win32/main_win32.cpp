@@ -243,7 +243,7 @@ public:
         if (it == chunks.end() || !it->second.valid || it->second.key != key) return false;
         it->second.used = ++chunkClock;
         g->Flush(Gdiplus::FlushIntentionSync);
-        BitBlt(dc, px, py, CHUNK, CHUNK, it->second.dc, 0, 0, SRCCOPY);
+        BitBlt(dc, px, py, CHUNK, CHUNK, it->second.L.dc, 0, 0, SRCCOPY);
         return true;
     }
     void chunkBegin(uint64_t id, int ox, int oy, int px, int py) override {
