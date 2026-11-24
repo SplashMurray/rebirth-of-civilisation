@@ -15,7 +15,7 @@
 #include <algorithm>
 #include <cmath>
 
-static bool mutualKind(int k) { return k == AG_OPEN_BORDERS || k == AG_RESEARCH || k == AG_DEFENSIVE || k == AG_FRIENDSHIP; }
+static bool mutualKind(int k) { return k == AG_RESEARCH || k == AG_DEFENSIVE || k == AG_FRIENDSHIP; }
 
 const char* Game::attitudeName(int a) {
     switch (a) {
@@ -64,6 +64,40 @@ int Game::diploSciPct(int c) const {
     return std::min(2, n) * 15;
 }
 
+bool Game::embargoed(int a, int b) const {
+    if (a < FIRST_PRIMATE_CIV || b < FIRST_PRIMATE_CIV || a == b) return false;
+    return (civs[a].embargo.size() > (size_t)b && civs[a].embargo[b]) || (civs[b].embargo.size() > (size_t)a && civs[b].embargo[a]);
+}
+
+bool Game::canEmbargo(int a, int b, std::string* why) const {
+    auto fail = [&](const std::string& m) { if (why) *why = m; return false; };
+    if (a == b || b < FIRST_PRIMATE_CIV || !civs[b].alive) return fail("Not possible");
+    if (!civs[a].met[b]) return fail("You have not met them");
+    if (!hasTech(a, ID.tLaw)) return fail("Requires Tribal Law");
+    if (civs[a].embargo[b]) return fail("Already under your embargo");
+    return true;
+}
+
+void Game::setEmbargo(int a, int b, bool on) {
+    if (on == (bool)civs[a].embargo[b]) return;
+    if (on && !canEmbargo(a, b)) return;
+    civs[a].embargo[b] = on ? 1 : 0;
+    if (on) {
+        civs[b].grievance[a] += 10;
+        for (auto& ag : agreements)  // every trade between them stops
+            if (((ag.a == a && ag.b == b) || (ag.a == b && ag.b == a)) &&
+                (ag.kind == AG_RESOURCE || ag.kind == AG_GOLD_PER_TURN || ag.kind == AG_RESEARCH))
+                ag.until = turn;
+        markResourcesDirty();
+    } else {
+        civs[b].goodwill[a] += 5;
+    }
+    std::string what = on ? " imposed an embargo on " : " lifted their embargo on ";
+    if (a == player) notify(player, std::string(on ? "You imposed an embargo on the " : "You lifted your embargo on the ") + civs[b].name + ".");
+    else if (b == player) notify(player, "The " + civs[a].name + what + "you." + (on ? " No trade is possible between you." : ""));
+    else if (civs[player].met[a] && civs[player].met[b]) notify(player, "The " + civs[a].name + what + "the " + civs[b].name + ".");
+}
+
 bool Game::canDeclareWar(int a, int b, std::string* why) const {
     auto fail = [&](const std::string& m) { if (why) *why = m; return false; };
     if (a == b || b < FIRST_PRIMATE_CIV || !civs[b].alive) return fail("Not possible");
@@ -101,7 +135,8 @@ int Game::opinion(int c, int o, std::vector<std::pair<std::string, int>>* why) c
     if (cv.goodwill.size() > (size_t)o && cv.goodwill[o] > 0) add("Gifts and fair dealing", std::min(30, cv.goodwill[o]));
     if (hasAgreement(AG_FRIENDSHIP, c, o)) add("Declaration of friendship", 15);
     if (hasAgreement(AG_DEFENSIVE, c, o)) add("Defensive pact", 15);
-    if (hasAgreement(AG_OPEN_BORDERS, c, o)) add("Open borders", 4);
+    if (hasAgreement(AG_OPEN_BORDERS, c, o) || hasAgreement(AG_OPEN_BORDERS, o, c)) add("Open borders", 4);
+    if (ov.embargo.size() > (size_t)c && ov.embargo[c]) add("They embargo us", -15);
     if (hasAgreement(AG_RESEARCH, c, o)) add("Research pact", 6);
     int trades = 0;
     for (auto& ag : agreements)
@@ -166,6 +201,8 @@ bool Game::dealItemValid(const Deal& d, const DealItem& it, std::string* why) co
     int a = d.a, b = d.b;
     int giver = it.from, taker = it.from == a ? b : a;
     bool atWarNow = civs[a].war[b];
+    if ((it.kind == DI_GOLD || it.kind == DI_GPT || it.kind == DI_RESOURCE || it.kind == DI_RESEARCH) && embargoed(a, b))
+        return fail("Trade is under embargo");
     switch (it.kind) {
         case DI_GOLD:
             if (!hasGold(giver) || !hasGold(taker)) return fail("Both sides need Currency to exchange gold");
@@ -183,7 +220,10 @@ bool Game::dealItemValid(const Deal& d, const DealItem& it, std::string* why) co
         }
         case DI_OPEN_BORDERS:
             if (atWarNow) return fail("Not while at war");
-            if (hasAgreement(AG_OPEN_BORDERS, a, b)) return fail("Borders are already open");
+            if (giver < 0) return fail("Open borders are granted by one side");
+            if (!bordersClosed(giver)) return fail(giver == player ? "Your borders are open to all until you discover Tribal Law"
+                                                                   : "Their borders are open to all until they discover Tribal Law");
+            if (hasAgreement(AG_OPEN_BORDERS, giver, taker)) return fail("Those borders are already open");
             return true;
         case DI_RESEARCH:
             if (atWarNow) return fail("Not while at war");
@@ -270,8 +310,9 @@ double Game::dealValue(int c, const Deal& d, std::string* why) const {
                 break;
             }
             case DI_OPEN_BORDERS:
+                if (gets) { v += 20; break; }
                 if (att <= -1) return refuse("We do not trust you enough to open our borders");
-                v += 15 + (pd ? pd->friendliness : 0);
+                v += 5 + (pd ? pd->friendliness : 0) - territorial;
                 if (bordersTouch && territorial >= 7 && theirPow > myPow * 13 / 10) v -= 90;
                 break;
             case DI_RESEARCH:
@@ -348,7 +389,7 @@ bool Game::executeDeal(const Deal& d) {
                 break;
             case DI_GPT: agreements.push_back({AG_GOLD_PER_TURN, giver, taker, until, it.value}); break;
             case DI_RESOURCE: agreements.push_back({AG_RESOURCE, giver, taker, until, it.value}); break;
-            case DI_OPEN_BORDERS: agreements.push_back({AG_OPEN_BORDERS, a, b, until, 0}); break;
+            case DI_OPEN_BORDERS: agreements.push_back({AG_OPEN_BORDERS, giver, taker, until, 0}); break;
             case DI_RESEARCH: agreements.push_back({AG_RESEARCH, a, b, until, 0}); break;
             case DI_DEFENSIVE: agreements.push_back({AG_DEFENSIVE, a, b, turn + dur(50), 0}); break;
             case DI_FRIENDSHIP: agreements.push_back({AG_FRIENDSHIP, a, b, turn + dur(50), 0}); break;
@@ -373,7 +414,8 @@ std::string Game::dealItemText(const DealItem& it, int viewer) const {
         case DI_GOLD: return who + std::to_string(it.value) + " gold";
         case DI_GPT: return who + std::to_string(it.value) + " gold per turn (" + std::to_string(t) + " turns)";
         case DI_RESOURCE: return who + "access to " + g_resources[it.value].name + " (" + std::to_string(t) + " turns)";
-        case DI_OPEN_BORDERS: return "Open borders (" + std::to_string(t) + " turns)";
+        case DI_OPEN_BORDERS:
+            return (it.from == viewer ? std::string("You open your borders to them") : std::string("They open their borders to you")) + " (" + std::to_string(t) + " turns)";
         case DI_RESEARCH: return "Research pact: +15% science each (" + std::to_string(t) + " turns)";
         case DI_DEFENSIVE: return "Defensive pact (" + std::to_string(dur(50)) + " turns)";
         case DI_FRIENDSHIP: return "Declaration of friendship (" + std::to_string(dur(50)) + " turns)";
@@ -454,10 +496,10 @@ void Game::diplomacyTurn() {
             }
         }
         if (ag.until == turn) {
-            if (ag.kind == AG_OPEN_BORDERS) { expelUnits(ag.a, ag.b); expelUnits(ag.b, ag.a); }
+            if (ag.kind == AG_OPEN_BORDERS && !civs[ag.b].war[ag.a]) expelUnits(ag.b, ag.a);
             if (ag.a == player || ag.b == player) {
                 int other = ag.a == player ? ag.b : ag.a;
-                static const char* NAMES[AG_COUNT] = {"Open borders", "The research pact", "The defensive pact", "The declaration of friendship",
+                static const char* NAMES[AG_COUNT] = {"An open-borders agreement", "The research pact", "The defensive pact", "The declaration of friendship",
                                                       "Resource sharing", "A gold-per-turn deal"};
                 if (civs[other].alive && !civs[player].war[other]) notify(player, std::string(NAMES[ag.kind]) + " with the " + civs[other].name + " has ended.");
             }
@@ -485,9 +527,13 @@ void Game::aiPacts(int c) {
         if (!rng.chance(0.15)) continue;
         civs[c].lastOffer[o] = turn;
         std::vector<Deal> cands;
-        auto mk = [&](std::initializer_list<DealItem> items) { Deal d; d.a = c; d.b = o; d.items = items; cands.push_back(d); };
+        auto mk = [&](std::initializer_list<DealItem> items) {
+            Deal d; d.a = c; d.b = o;
+            for (auto& it : items) if (dealItemValid(d, it)) d.items.push_back(it);
+            if (!d.items.empty()) cands.push_back(d);
+        };
         mk({{DI_FRIENDSHIP, -1, 0}});
-        mk({{DI_OPEN_BORDERS, -1, 0}});
+        mk({{DI_OPEN_BORDERS, c, 0}, {DI_OPEN_BORDERS, o, 0}});
         mk({{DI_RESEARCH, -1, 0}});
         mk({{DI_DEFENSIVE, -1, 0}});
         auto mine = tradeableResources(c, o), theirs = tradeableResources(o, c);
@@ -508,6 +554,14 @@ void Game::aiPacts(int c) {
             }
         }
     }
+    // embargo those we cannot stand; lift it once tempers cool
+    if (hasTech(c, ID.tLaw))
+        for (int o = FIRST_PRIMATE_CIV; o < (int)civs.size(); o++) {
+            if (o == c || !civs[o].alive || !civs[c].met[o]) continue;
+            int op = opinion(c, o);
+            if (!civs[c].embargo[o] && op <= -35 && !civs[c].war[o] && rng.chance(0.03)) setEmbargo(c, o, true);
+            else if (civs[c].embargo[o] && op > -10 && rng.chance(0.1)) setEmbargo(c, o, false);
+        }
     // denounce those we despise
     for (int o = FIRST_PRIMATE_CIV; o < (int)civs.size(); o++) {
         if (o == c || !civs[o].alive || !civs[c].met[o] || civs[c].denouncedUntil[o] > turn) continue;
@@ -525,9 +579,9 @@ void Game::aiOffers(int c) {
     int aggr = pd ? pd->aggression : 5;
     std::vector<Deal> cands;
     auto mk = [&](std::vector<DealItem> items, bool demand = false) {
-        Deal d; d.a = c; d.b = p; d.items = items; d.demand = demand;
-        for (auto& it : d.items) if (!dealItemValid(d, it)) return;
-        cands.push_back(d);
+        Deal d; d.a = c; d.b = p; d.demand = demand;
+        for (auto& it : items) if (dealItemValid(d, it)) d.items.push_back(it);
+        if (d.items.size() == items.size() || (!d.items.empty() && d.items[0].kind == DI_OPEN_BORDERS)) cands.push_back(d);
     };
     if (civs[c].war[p]) {
         if (peaceValue(c, p) > 0 && turn - civs[c].warSince[p] >= dur(6)) {
@@ -544,7 +598,7 @@ void Game::aiOffers(int c) {
         if (att >= 1) mk({{DI_FRIENDSHIP, -1, 0}});
         if (att >= 2 && (pd ? pd->pactLove : 5) >= 5) mk({{DI_DEFENSIVE, -1, 0}});
         if (att >= 1) mk({{DI_RESEARCH, -1, 0}});
-        if (att >= 0) mk({{DI_OPEN_BORDERS, -1, 0}});
+        if (att >= 0) mk({{DI_OPEN_BORDERS, c, 0}, {DI_OPEN_BORDERS, p, 0}});
         auto mine = tradeableResources(c, p), theirs = tradeableResources(p, c);
         if (!mine.empty() && !theirs.empty() && att >= 0) mk({{DI_RESOURCE, c, mine[rng.range((int)mine.size())]}, {DI_RESOURCE, p, theirs[rng.range((int)theirs.size())]}});
         // help against an enemy

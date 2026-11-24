@@ -133,6 +133,7 @@ struct Civ {
     std::vector<int> peaceUntil;      // no war with them before this turn
     std::vector<int> denouncedUntil;  // we have denounced them until this turn
     std::vector<int> lastOffer;       // AI: last turn we proposed something to them
+    std::vector<int> embargo;         // 1: we refuse all trade with them
     int dealsMade = 0, backstabs = 0;
 };
 
@@ -140,7 +141,7 @@ struct Civ {
 enum AgreementKind { AG_OPEN_BORDERS, AG_RESEARCH, AG_DEFENSIVE, AG_FRIENDSHIP, AG_RESOURCE, AG_GOLD_PER_TURN, AG_COUNT };
 struct Agreement {
     int kind = 0;
-    int a = -1, b = -1;  // mutual kinds: the two parties; resource/gold: a gives to b
+    int a = -1, b = -1;  // mutual kinds: the two parties; open borders, resource, gold: a gives to b
     int until = 0;       // the turn it ends
     int value = 0;       // resource id, or gold per turn
 };
@@ -380,7 +381,13 @@ public:
     const Agreement* findAgreement(int kind, int a, int b, int value = -1) const;
     int agreementTurnsLeft(int kind, int a, int b) const;
     void endAgreements(int a, int b);  // war breaks every treaty between them
-    bool openBorders(int a, int b) const { return hasAgreement(AG_OPEN_BORDERS, a, b); }
+    // borders: open to everyone until the owner discovers Tribal Law, then closed except by treaty
+    bool bordersClosed(int owner) const { return owner >= FIRST_PRIMATE_CIV && hasTech(owner, ID.tLaw); }
+    bool bordersOpenTo(int owner, int mover) const { return !bordersClosed(owner) || hasAgreement(AG_OPEN_BORDERS, owner, mover); }
+    // embargoes: no trade of any kind between the two
+    bool embargoed(int a, int b) const;
+    bool canEmbargo(int a, int b, std::string* why = nullptr) const;
+    void setEmbargo(int a, int b, bool on);
     bool canDeclareWar(int a, int b, std::string* why = nullptr) const;
     int diploSciPct(int c) const;
     bool lentResource(int c, int r) const;

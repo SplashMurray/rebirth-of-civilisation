@@ -151,6 +151,8 @@ void initData() {
         {"Animal Taming", 3, {"Cultivation", "Spearcraft"}, "Feral horses and great dogs learn to carry riders."},
         {"Masonry", 3, {"Digging"}, "Stacked stone outlasts any nest."},
         {"Bronze Working", 3, {"Digging"}, "Copper and tin, melted together, make something harder than either."},
+        {"Tribal Law", 4, {"Symbols", "Cultivation"},
+         "Marks on the trees say where our land ends. Strangers with spears must ask first. Your borders close to foreign armies, and you can impose embargoes."},
         {"Writing", 4, {"Symbols"}, "Knowledge outlives the one who knew it."},
         {"Smelting", 4, {"Salvaging", "Bronze Working"}, "Melted scrap pours into new shapes."},
         {"Bartering", 4, {"Cultivation", "Symbols"}, "Two bananas for a sharp stone."},
@@ -528,6 +530,7 @@ void initData() {
     ID.tRebirth = techIndex("Rebirth");
     ID.tCultivation = techIndex("Cultivation");
     ID.tForaging = techIndex("Foraging");
+    ID.tLaw = techIndex("Tribal Law");
     ID.tDigging = techIndex("Digging");
     ID.tWoodcraft = techIndex("Woodcraft");
     ID.tIndustrial = techIndex("Industrialisation");

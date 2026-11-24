@@ -232,7 +232,7 @@ struct DataIds {
     int bPalace, bRebirth;
     int tCurrency, tRafts, tNavigation, tRadiology, tSalvaging, tDeciphering, tReverse, tComputing, tRebirth;
     int tCooking;
-    int tForaging, tFission;
+    int tForaging, tFission, tLaw;
     int tCultivation, tDigging, tWoodcraft, tIndustrial, tChemistry;
 };
 extern DataIds ID;

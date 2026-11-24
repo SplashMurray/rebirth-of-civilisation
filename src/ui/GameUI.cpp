@@ -1157,7 +1157,8 @@ void GameUI::renderDiplomacy() {
             std::string tags;
             if (g.hasAgreement(AG_DEFENSIVE, p, c)) tags += "Pact  ";
             if (g.hasAgreement(AG_FRIENDSHIP, p, c)) tags += "Friends  ";
-            if (g.openBorders(p, c)) tags += "Borders  ";
+            if (g.hasAgreement(AG_OPEN_BORDERS, c, p) || g.hasAgreement(AG_OPEN_BORDERS, p, c)) tags += "Borders  ";
+            if (g.embargoed(p, c)) tags += "EMBARGO  ";
             if (g.hasAgreement(AG_RESEARCH, p, c)) tags += "Research  ";
             if (!g.civs[p].war[c] && g.civs[p].peaceUntil[c] > g.turn) tags += "Treaty  ";
             cv->text(px + lw + 6, y + 26, tags, 12, C_GOLD, AL_RIGHT);
@@ -1209,7 +1210,12 @@ void GameUI::renderDiplomacy() {
     };
     addT(AG_FRIENDSHIP, "Friendship");
     addT(AG_DEFENSIVE, "Defensive pact");
-    addT(AG_OPEN_BORDERS, "Open borders");
+    {
+        int left = g.agreementTurnsLeft(AG_OPEN_BORDERS, c, p);
+        if (left > 0) tr += std::string(tr.empty() ? "" : ",  ") + "Their borders open to you (" + std::to_string(left) + ")";
+        left = g.agreementTurnsLeft(AG_OPEN_BORDERS, p, c);
+        if (left > 0) tr += std::string(tr.empty() ? "" : ",  ") + "Your borders open to them (" + std::to_string(left) + ")";
+    }
     addT(AG_RESEARCH, "Research pact");
     for (auto& ag : g.agreements) {
         if (ag.until <= g.turn) continue;
@@ -1219,6 +1225,11 @@ void GameUI::renderDiplomacy() {
         if (ag.kind == AG_GOLD_PER_TURN) tr += std::string(tr.empty() ? "" : ",  ") + std::to_string(ag.value) + " gold/turn" + (mine ? " to them" : " to you") + " (" + std::to_string(ag.until - g.turn) + ")";
     }
     if (!g.civs[p].war[c] && g.civs[p].peaceUntil[c] > g.turn) tr += std::string(tr.empty() ? "" : ",  ") + "Peace treaty (" + std::to_string(g.civs[p].peaceUntil[c] - g.turn) + ")";
+    std::string borders = std::string("Their borders: ") + (!g.bordersClosed(c) ? "open to all (no Tribal Law yet)" : g.bordersOpenTo(c, p) ? "open to you" : "closed to your armies") +
+                          "     Yours: " + (!g.bordersClosed(p) ? "open to all (no Tribal Law yet)" : g.bordersOpenTo(p, c) ? "open to them" : "closed to their armies");
+    if (g.civs[p].embargo[c]) borders += "     You embargo them";
+    if (g.civs[c].embargo[p]) borders += "     They embargo you";
+    y = textBlock(dx, y, dw, borders, 12, g.embargoed(p, c) ? rgb(240, 150, 110) : C_DIM, 3) + 6;
     cv->text(dx, y, "Treaties with you (turns left):", 13, C_TEXT, AL_LEFT, true);
     y += 18;
     y = textBlock(dx, y, dw, tr.empty() ? "None" : tr, 12, C_DIM, 3) + 6;
@@ -1255,6 +1266,18 @@ void GameUI::renderDiplomacy() {
                rgb(120, 46, 40), 15);
     }
     bx += 160;
+    bx += 140;
+    if (g.civs[p].embargo[c]) {
+        button(bx, by, 150, 38, "Lift Embargo", true, [this, c] { game->setEmbargo(game->player, c, false); },
+               "Allow trade with them again", C_PANEL2, 15);
+    } else {
+        std::string whyNot;
+        bool ok = g.canEmbargo(p, c, &whyNot);
+        button(bx, by, 150, 38, "Embargo", ok, [this, c] { game->setEmbargo(game->player, c, true); },
+               ok ? "Refuse all trade with them: no gold, gold per turn, resources or research pacts. Ends such deals now. They will resent it." : whyNot,
+               rgb(110, 70, 40), 15);
+    }
+    bx -= 140;
     bool denounced = g.civs[p].denouncedUntil[c] > g.turn;
     button(bx, by, 130, 38, "Denounce", !denounced && !war, [this, c] { game->denounce(game->player, c); },
            denounced ? "Already denounced" : "Publicly condemn them: they will resent it, and your friends will think less of them. Ends your treaties.", C_PANEL2, 15);
@@ -1346,7 +1369,7 @@ void GameUI::renderTrade() {
     auto side = [&](int col, int giver) {
         int taker = giver == p ? c : p;
         int x = cols[col] + 10, y = top + 40, w = colW - 20;
-        if (g.hasGold(p) && g.hasGold(c)) {
+        if (g.hasGold(p) && g.hasGold(c) && !g.embargoed(p, c)) {
             DealItem* gi = draftItem(DI_GOLD, giver);
             cv->text(x, y + 7, "Gold: " + std::to_string(gi ? gi->value : 0) + " / " + std::to_string(g.civs[giver].gold), 13, C_GOLD);
             button(x + w - 130, y, 40, 28, "-50", true, [this, giver] { adjustDraftGold(DI_GOLD, giver, -50); });
@@ -1358,11 +1381,30 @@ void GameUI::renderTrade() {
             button(x + w - 86, y, 40, 28, "-1", true, [this, giver] { adjustDraftGold(DI_GPT, giver, -1); });
             button(x + w - 42, y, 42, 28, "+1", true, [this, giver] { adjustDraftGold(DI_GPT, giver, 1); });
             y += 40;
-        } else {
+        } else if (!g.embargoed(p, c)) {
             cv->text(x, y, "No gold: both sides need Currency.", 12, C_DIM);
             y += 24;
         }
-        auto res = g.tradeableResources(giver, taker);
+        {  // borders
+            DealItem probe{DI_OPEN_BORDERS, giver, 0};
+            std::string why;
+            bool valid = g.dealItemValid(draft, probe, &why);
+            bool on = draftItem(DI_OPEN_BORDERS, giver) != nullptr;
+            if (valid || on) {
+                chip(x, y, w, giver == p ? "Open your borders to them" : "Open their borders to you", on, valid,
+                     [this, giver] { toggleDraft(DI_OPEN_BORDERS, giver, 0); },
+                     "Lets the other side's armies enter these lands in peacetime (" + std::to_string(g.dealTurns()) + " turns)");
+                y += 38;
+            } else {
+                cv->text(x, y, why, 11, C_DIM);
+                y += 20;
+            }
+        }
+        if (g.embargoed(p, c)) {
+            cv->text(x, y + 4, "Trade is under embargo.", 13, rgb(240, 150, 110), AL_LEFT, true);
+            y += 26;
+        }
+        auto res = g.embargoed(p, c) ? std::vector<int>() : g.tradeableResources(giver, taker);
         for (auto& it : draft.items)  // keep chosen ones visible
             if (it.kind == DI_RESOURCE && it.from == giver && std::find(res.begin(), res.end(), it.value) == res.end()) res.push_back(it.value);
         if (!res.empty()) { cv->text(x, y, "Resources (" + std::to_string(g.dealTurns()) + " turns):", 13, C_TEXT, AL_LEFT, true); y += 20; }
@@ -1396,7 +1438,6 @@ void GameUI::renderTrade() {
         const M ms[] = {
             {DI_PEACE, "Peace", "End the war. A peace treaty then forbids either side from declaring war for a while."},
             {DI_FRIENDSHIP, "Declaration of friendship", "A public promise of goodwill. Needed before a defensive pact. Breaking it by war is a betrayal."},
-            {DI_OPEN_BORDERS, "Open borders", "Each side's military may enter the other's lands. Without it, armies must stay out in peacetime."},
             {DI_RESEARCH, "Research pact", "+15% science for both sides while it lasts."},
             {DI_DEFENSIVE, "Defensive pact", "If anyone declares war on one of you, the other joins the war automatically."},
         };
@@ -1620,7 +1661,9 @@ void GameUI::renderHelp() {
         "the company you keep) - see them on the Diplomacy screen (D). Negotiate deals of gold, gold per turn, resources (shared for 30 turns), "
         "open borders, research pacts (+15% science each), declarations of friendship, defensive pacts (an attack on one brings in the other) "
         "and joining wars; the trade screen shows live whether they would accept, and 'What would it take?' adds the gold they want. "
-        "Without open borders, armies must stay out of other civilisations' lands in peacetime. Making peace brings a treaty that forbids "
+        "Once a civilisation discovers Tribal Law its borders close: in peacetime other armies may not enter unless it opens its "
+        "borders to them in a deal (each side opens its own). With Tribal Law you can also embargo a civilisation from the Diplomacy screen: "
+        "no gold, resources or research pacts pass between you until you lift it. Making peace brings a treaty that forbids "
         "war for a while. Breaking a friendship by war is a betrayal everyone remembers. Rivals send you proposals - and demands - of their own.\n"
         "NAVAL WARFARE  Coastal cities build ships: Dugout Canoes (Rafts), War Galleys (Bronze Working, needs Copper) and Archer Galleys "
         "(Archery) keep to coastal waters; Caravels (Navigation), Frigates (Gunpowder), Ironclads (Steam Power, Coal), Salvaged Destroyers "

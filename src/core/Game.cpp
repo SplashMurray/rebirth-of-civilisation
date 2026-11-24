@@ -237,6 +237,10 @@ void Game::grantTech(int c, int t, bool announce) {
     Civ& cv = civs[c];
     if (cv.techs[t]) return;
     cv.techs[t] = 1;
+    if (t == ID.tLaw) {  // our borders close: foreign armies at peace with us must leave
+        for (int x = FIRST_PRIMATE_CIV; x < (int)civs.size(); x++)
+            if (x != c && civs[x].alive && !civs[x].war[c] && !hasAgreement(AG_OPEN_BORDERS, c, x)) expelUnits(x, c);
+    }
     if (cv.research == t) {
         // completed normally: carry the overflow; granted for free: refund partial progress
         int leftover = cv.techProgress[t] >= techCost(t) ? cv.techProgress[t] - techCost(t) : cv.techProgress[t];
@@ -258,6 +262,9 @@ void Game::grantTech(int c, int t, bool announce) {
             if (im.techId == t && !im.name.empty()) unlocks += (unlocks.empty() ? "" : ", ") + im.name;
         std::string extra;
         if (t == ID.tCurrency) extra = "\n\nYour civilisation now earns GOLD. Gold can be used to purchase units and buildings in cities.";
+        if (t == ID.tLaw)
+            extra = "\n\nYOUR BORDERS ARE NOW CLOSED. In peacetime, other civilisations' armies may no longer enter your lands unless you "
+                    "open your borders to them in a deal. You can also impose embargoes from the Diplomacy screen.";
         if (t == ID.tCultivation)
             extra = "\n\nTHE END OF WANDERING. Your bands can now settle down and found cities (B). A band of N members founds a city of "
                     "size 1 + (N-1)/2. Choose the spot well - this will be the heart of your civilisation.";
@@ -1043,7 +1050,7 @@ int Game::moveCost(const Unit& u, int fx, int fy, int tx, int ty) const {
     if (!warHappened && t.site >= 0) return -1;  // living human settlements are off limits
     // closed borders: at peace, military units stay out of other civilisations' lands
     if (t.owner >= FIRST_PRIMATE_CIV && t.owner != u.owner && u.owner >= FIRST_PRIMATE_CIV && ud.military() && ud.cls != UnitClass::Recon &&
-        !civs[u.owner].war[t.owner] && !openBorders(u.owner, t.owner) && at(fx, fy).owner != t.owner)
+        !civs[u.owner].war[t.owner] && !bordersOpenTo(t.owner, u.owner) && at(fx, fy).owner != t.owner)
         return -1;
     bool toWater = isWater(tx, ty), fromWater = isWater(fx, fy);
     if (toWater && ud.cls != UnitClass::Nuke && transportAt(u.owner, tx, ty, u.id)) return 1;  // going aboard one of our ships

@@ -307,6 +307,7 @@ void Game::newGame(const GameSettings& s) {
         cv.peaceUntil.assign(total, 0);
         cv.denouncedUntil.assign(total, 0);
         cv.lastOffer.assign(total, -100);
+        cv.embargo.assign(total, 0);
         cv.traits.assign(g_traits.size(), 0);
         cv.evoPool.assign(PC_COUNT, 0);
         cv.evoRate.assign(PC_COUNT, 0);

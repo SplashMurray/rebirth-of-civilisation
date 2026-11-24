@@ -66,6 +66,7 @@ double Game::aiTechValue(int c, int t) const {
     if (t == ID.tCultivation && nc == 0) v += 200;                 // the end of wandering
     if ((t == ID.tForaging || t == ID.tCooking) && nc == 0) v += 25;  // feeds the bands
     if (t == ID.tCurrency) v += 20;
+    if (t == ID.tLaw) v += 15;
     // in the later eras, everything on the road to Rebirth matters most
     if (era(c) >= 6 && aiOnRebirthPath(t)) v *= skillOf(c) >= 3 ? 1.4 : 1.2;
     if (t == ID.tRebirth) v *= 4;
