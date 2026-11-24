@@ -6,6 +6,7 @@
 #include "../core/Achievements.h"
 #include <functional>
 #include <memory>
+#include <unordered_map>
 
 class GameUI {
 public:
@@ -81,6 +82,7 @@ private:
     double dragCamX = 0, dragCamY = 0;
     bool moveMode = false;
     int animMs = 0;
+    bool animOn = true;   // animated water, unit movement and combat effects
     int listScroll = 0, techScroll = 0, logScroll = 0, helpScroll = 0, achScroll = 0;
     int achPollMs = 0;
     void renderAchievements();
@@ -98,6 +100,17 @@ private:
     void drawTrophy(int x, int y, int s, bool lit);
     void renderNukeTargeting();
     void renderBlast();
+    // ---- unit motion and combat effects (interface only, never saved)
+    struct Glide { int fx, fy, tx, ty, start, dur; };
+    struct Fx { CombatFx c; int start; };
+    std::vector<int> lastX, lastY;
+    std::unordered_map<int, Glide> glides;
+    std::vector<Fx> fxs;
+    uint64_t fxSeen = 0;
+    void resetMotion();
+    void updateMotion();
+    void unitScreenPos(const Unit& u, int& sx, int& sy) const;
+    void renderFx();
     void startBlast(int x, int y);
     int disbandArm = -1;
     std::string toast;
@@ -145,6 +158,15 @@ private:
     // ---- map (UIMap.cpp)
     void renderMap();
     void drawTile(int x, int y, int sx, int sy, bool visible);
+    void drawTileGround(int x, int y, int sx, int sy);
+    void drawPortrait(int primate, int cx, int cy, int r, Color ring);
+    void drawTitleScene();
+    void drawFireball(int sx, int sy, int r, double k);
+    void drawMushroom(int sx, int sy, int big, int rise, int ms);
+    Color groundColor(int x, int y) const;
+    void edgeFade(int sx, int sy, const int* xy, int d, float depth, Color c, int a);
+    void drawTerrainRegion(int x0, int x1, int y0, int y1);
+    void drawLiveWater(int x0, int x1, int y0, int y1);
     void drawHumanSite(int x, int y, int sx, int sy, bool visible);
     void drawCityOnMap(const City& c, int sx, int sy);
     void drawCityBanner(const City& c, int sx, int sy);

@@ -188,6 +188,15 @@ struct CombatResult {
 
 struct Pt { int x, y; };
 
+// A record of one attack, kept briefly so the interface can animate it. Not saved.
+struct CombatFx {
+    uint64_t seq = 0;
+    int attacker = -1, atkType = 0, atkOwner = -1;
+    int ax = 0, ay = 0, tx = 0, ty = 0;
+    int dmgDef = 0, dmgAtt = 0;
+    bool ranged = false, defDied = false, attDied = false, city = false;
+};
+
 struct Pressure {
     std::string name;
     int value;
@@ -431,6 +440,9 @@ public:
     bool canAttack(const Unit& u, int tx, int ty) const;
     bool isEnemyTarget(int c, int tx, int ty) const;
     CombatResult attack(Unit& u, int tx, int ty);
+    CombatResult attackImpl(Unit& u, int tx, int ty);
+    std::vector<CombatFx> combatFx;  // recent attacks, newest last (capped)
+    uint64_t combatSeq = 0;
     int unitStrength(const Unit& u, bool attacking, bool rangedAtk, int x, int y) const;
     int combatDamage(double a, double d);
     int sightRange(const Unit& u) const;

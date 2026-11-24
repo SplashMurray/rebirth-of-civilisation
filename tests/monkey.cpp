@@ -2,6 +2,7 @@
 // Best run under -fsanitize=address,undefined. Usage: rebirth_monkey [events] [seed]
 // SPDX-License-Identifier: MIT
 #include "SvgCanvas.h"
+#include <map>
 #include "../src/ui/GameUI.h"
 #include <cstdio>
 #include <cstdlib>
@@ -20,6 +21,14 @@ public:
     int textWidth(const std::string& s, int size, bool) override { return (int)s.size() * size / 2; }
     void clip(int, int, int, int) override {}
     void unclip() override {}
+    // a pretend chunk cache, so the chunked terrain path is exercised too
+    float pixelScale() const override { return 1.5f; }
+    int chunkSize() const override { return inChunk ? 0 : 256; }
+    bool chunkDraw(uint64_t id, uint64_t key, int, int) override { auto it = keys.find(id); return it != keys.end() && it->second == key; }
+    void chunkBegin(uint64_t, int, int, int, int) override { inChunk = true; }
+    void chunkEnd(uint64_t id, uint64_t key, int, int) override { inChunk = false; keys[id] = key; if (keys.size() > 64) keys.clear(); }
+    bool inChunk = false;
+    std::map<uint64_t, uint64_t> keys;
 };
 
 int main(int argc, char** argv) {

@@ -1278,6 +1278,27 @@ int Game::combatDamage(double a, double d) {
 }
 
 CombatResult Game::attack(Unit& u, int tx, int ty) {
+    CombatFx fx;
+    fx.attacker = u.id;
+    fx.atkType = u.type;
+    fx.atkOwner = u.owner;
+    fx.ax = u.x; fx.ay = u.y; fx.tx = tx; fx.ty = ty;
+    fx.ranged = g_units[u.type].ranged();
+    fx.city = cityAt(tx, ty) != nullptr;
+    CombatResult res = attackImpl(u, tx, ty);  // may reallocate units: do not touch u afterwards
+    if (res.happened) {
+        fx.seq = ++combatSeq;
+        fx.dmgDef = res.dmgToDef;
+        fx.dmgAtt = res.dmgToAtt;
+        fx.defDied = res.defenderDied || res.cityCaptured;
+        fx.attDied = res.attackerDied;
+        if (combatFx.size() >= 64) combatFx.erase(combatFx.begin());
+        combatFx.push_back(fx);
+    }
+    return res;
+}
+
+CombatResult Game::attackImpl(Unit& u, int tx, int ty) {
     CombatResult res;
     if (!canAttack(u, tx, ty)) return res;
     const UnitDef& d = g_units[u.type];

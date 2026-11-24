@@ -31,8 +31,10 @@ void GameUI::hot(int x, int y, int w, int h, std::function<void()> fn, const std
 }
 
 void GameUI::panel(int x, int y, int w, int h, Color fill, Color border) {
-    cv->fillRect(x, y, w, h, fill);
-    cv->rect(x, y, w, h, border, 1);
+    for (int k = 3; k >= 1; k--) cv->fillRoundRectGrad(x - k + 2, y - k + 4, w + 2 * k, h + 2 * k, 7 + k, rgb(0, 0, 0), rgb(0, 0, 0), 26);  // soft shadow
+    cv->fillRoundRectGrad(x, y, w, h, 7, lighten(fill, 0.06f), darken(fill, 0.8f));
+    cv->roundRect(x, y, w, h, 7, border, 1);
+    cv->lineA(x + 7, y + 1, x + w - 8, y + 1, rgb(255, 255, 255), 1, 30);  // top highlight
     hot(x, y, w, h, nullptr);  // absorb clicks
 }
 
@@ -40,16 +42,23 @@ void GameUI::button(int x, int y, int w, int h, const std::string& label, bool e
                     const std::string& tip, Color base, int size) {
     bool hv = enabled && over(x, y, w, h);
     Color f = !enabled ? darken(base, 0.7f) : hv ? lighten(base, 0.18f) : base;
-    cv->fillRect(x, y, w, h, f);
-    cv->rect(x, y, w, h, hv ? rgb(220, 200, 140) : lighten(base, 0.25f), 1);
-    cv->text(x + w / 2, y + (h - size) / 2 - 1, label, size, enabled ? C_TEXT : C_DIM, AL_CENTER, true);
+    int r = std::min(6, h / 3);
+    cv->fillRoundRectGrad(x, y + 1, w, h, r, rgb(0, 0, 0), rgb(0, 0, 0), 90);  // drop shadow
+    cv->fillRoundRectGrad(x, y, w, h, r, lighten(f, enabled ? 0.17f : 0.06f), darken(f, 0.76f));
+    if (enabled) cv->lineA(x + r, y + 1, x + w - r - 1, y + 1, rgb(255, 255, 255), 1, hv ? 80 : 44);  // gloss
+    cv->roundRect(x, y, w, h, r, hv ? rgb(236, 204, 120) : lighten(base, 0.28f), 1, hv ? 255 : 200);
+    int ty = y + (h - size) / 2 - 1;
+    if (enabled) cv->textA(x + w / 2 + 1, ty + 1, label, size, rgb(0, 0, 0), AL_CENTER, true, 120);
+    cv->text(x + w / 2, ty, label, size, enabled ? C_TEXT : C_DIM, AL_CENTER, true);
     hot(x, y, w, h, enabled ? fn : std::function<void()>(), tip);
 }
 
 void GameUI::bar(int x, int y, int w, int h, double frac, Color fill, Color back) {
     frac = std::clamp(frac, 0.0, 1.0);
-    cv->fillRect(x, y, w, h, back);
-    cv->fillRect(x, y, (int)(w * frac), h, fill);
+    int r = std::min(4, h / 2);
+    cv->fillRoundRectGrad(x, y, w, h, r, darken(back, 0.7f), back);
+    int fw = (int)(w * frac);
+    if (fw > 0) cv->fillRoundRectGrad(x, y, std::max(fw, std::min(w, 2 * r)), h, r, lighten(fill, 0.3f), darken(fill, 0.75f));
 }
 
 std::vector<std::string> GameUI::wrap(const std::string& s, int width, int size, bool bold) {
@@ -99,8 +108,9 @@ void GameUI::tooltip() {
         int th = (int)lines.size() * 17 + 10;
         int x = std::min(mouseX + 16, W - tw - 24), y = mouseY + 20;
         if (y + th > H) y = mouseY - th - 6;
-        cv->fillRect(x, y, tw + 16, th, rgb(16, 18, 24));
-        cv->rect(x, y, tw + 16, th, rgb(200, 180, 120));
+        cv->fillRoundRectGrad(x + 2, y + 3, tw + 16, th, 6, rgb(0, 0, 0), rgb(0, 0, 0), 80);
+        cv->fillRoundRectGrad(x, y, tw + 16, th, 6, rgb(30, 34, 44), rgb(14, 16, 22), 245);
+        cv->roundRect(x, y, tw + 16, th, 6, rgb(200, 180, 120), 1);
         int ly = y + 5;
         for (auto& l : lines) { cv->text(x + 8, ly, l, 13, C_TEXT); ly += 17; }
         return;
@@ -172,6 +182,8 @@ bool GameUI::tick(int ms) {
     }
     if (screen == SCR_GAME && (nukeMode || nukeArmX >= 0)) redraw = true;
     if (screen == SCR_GAME && selUnit >= 0 && overlay == OV_NONE) redraw = true;  // pulsing selection
+    if (screen == SCR_GAME && (!glides.empty() || !fxs.empty())) redraw = true;  // units moving, combat effects
+    if (screen == SCR_GAME && animOn && hs >= 16 && overlay != OV_TECH && animMs / 66 != (animMs - ms) / 66) redraw = true;  // water, ~15 fps
     if (screen == SCR_TITLE) redraw = (animMs / 100) % 2 == 0 || redraw;
     return redraw;
 }
@@ -180,67 +192,32 @@ void GameUI::renderToast() {
     if (toastMs <= 0 || toast.empty()) return;
     int tw = cv->textWidth(toast, 16, true) + 40;
     int x = (W - tw) / 2, y = TOP + 50;
-    cv->fillRect(x, y, tw, 34, rgb(20, 24, 30));
-    cv->rect(x, y, tw, 34, C_GOLD, 2);
+    cv->fillRoundRectGrad(x + 2, y + 4, tw, 34, 9, rgb(0, 0, 0), rgb(0, 0, 0), 90);
+    cv->fillRoundRectGrad(x, y, tw, 34, 9, rgb(40, 46, 58), rgb(16, 19, 25));
+    cv->roundRect(x, y, tw, 34, 9, C_GOLD, 2);
     cv->text(W / 2, y + 8, toast, 16, C_TEXT, AL_CENTER, true);
 }
 
 // ============================================================ title
 void GameUI::renderTitle() {
-    // sunset sky
-    for (int i = 0; i < 40; i++) {
-        float t = i / 39.0f;
-        Color c = t < 0.6f ? blend(rgb(28, 20, 48), rgb(196, 80, 46), t / 0.6f) : blend(rgb(196, 80, 46), rgb(250, 180, 80), (t - 0.6f) / 0.4f);
-        cv->fillRect(0, H * i / 40, W, H / 40 + 2, c);
-    }
-    // distant mushroom cloud
-    int mx = W * 7 / 10, my = H * 58 / 100;
-    cv->fillRect(mx - 14, my - H / 5, 28, H / 5, rgb(150, 110, 100));
-    for (int k = 0; k < 7; k++) {
-        double a = k * 3.14159 / 6;
-        cv->fillCircle(mx + (int)(std::cos(a) * 70) - 0, my - H / 5 - (int)(std::sin(a) * 26), 46, rgb(168, 120, 104));
-    }
-    cv->fillCircle(mx, my - H / 5 - 30, 52, rgb(186, 136, 112));
-    cv->fillCircle(mx, my - H / 5 - 34, 30, rgb(230, 170, 110));
-    // ruined skyline
-    uint32_t h = 12345;
-    for (int x = 0; x < W; x += 34) {
-        h = h * 1103515245u + 12345u;
-        int bh = 60 + (int)((h >> 16) % 140);
-        cv->fillRect(x, H * 3 / 4 - bh, 30, bh + 10, rgb(40, 28, 34));
-        if ((h >> 8) % 3 == 0) {
-            int xy[6] = {x, H * 3 / 4 - bh, x + 15, H * 3 / 4 - bh - 18, x + 30, H * 3 / 4 - bh};
-            cv->fillPoly(xy, 3, rgb(40, 28, 34));
-        }
-    }
-    // jungle foreground
-    cv->fillRect(0, H * 3 / 4, W, H / 4, rgb(14, 30, 20));
-    for (int x = -20; x < W + 40; x += 46) {
-        h = h * 1103515245u + 12345u;
-        cv->fillCircle(x, H * 3 / 4 + (int)((h >> 16) % 30), 44 + (int)((h >> 20) % 20), rgb(18, 44 + (int)((h >> 12) % 20), 26));
-    }
-    // a primate silhouette on a branch
-    int px = W / 5, py = H * 3 / 4 - 10;
-    cv->line(px - 120, py + 40, px + 140, py + 10, rgb(10, 16, 12), 10);
-    cv->fillCircle(px, py - 30, 26, rgb(10, 12, 10));
-    cv->fillCircle(px + 6, py - 70, 17, rgb(10, 12, 10));
-    cv->line(px - 14, py - 34, px - 34, py + 22, rgb(10, 12, 10), 9);
-    cv->line(px + 18, py - 40, px + 46, py + 14, rgb(10, 12, 10), 9);
-    cv->line(px - 6, py - 8, px - 8, py + 30, rgb(10, 12, 10), 10);
-    cv->line(px + 10, py - 8, px + 20, py + 26, rgb(10, 12, 10), 10);
-
+    drawTitleScene();
     int ts = std::min(72, W / 14);
-    cv->text(W / 2 + 3, H / 6 + 3, "REBIRTH OF CIVILISATION", ts, rgb(20, 10, 10), AL_CENTER, true);
-    cv->text(W / 2, H / 6, "REBIRTH OF CIVILISATION", ts, rgb(255, 236, 200), AL_CENTER, true);
+    cv->glowEllipse(W / 2, H / 6 + ts / 2, W * 4 / 10, ts * 3 / 2, rgb(10, 4, 12), 150);  // darken the sky behind the title
+    for (int k = 0; k < 4; k++) cv->textA(W / 2 + (k % 2 ? 2 : -2), H / 6 + (k < 2 ? 2 : -2), "REBIRTH OF CIVILISATION", ts, rgb(255, 150, 60), AL_CENTER, true, 40);
+    cv->textA(W / 2 + 3, H / 6 + 4, "REBIRTH OF CIVILISATION", ts, rgb(20, 8, 8), AL_CENTER, true, 200);
+    cv->text(W / 2, H / 6, "REBIRTH OF CIVILISATION", ts, rgb(255, 238, 204), AL_CENTER, true);
+    cv->textA(W / 2 + 1, H / 6 + ts + 15, "2034. Humanity destroys itself. The primates inherit the Earth.", 20, rgb(0, 0, 0), AL_CENTER, false, 160);
     cv->text(W / 2, H / 6 + ts + 14, "2034. Humanity destroys itself. The primates inherit the Earth.", 20, rgb(255, 230, 210), AL_CENTER);
     int bw = 280, bx = (W - bw) / 2, by = H / 6 + ts + 70;
-    button(bx, by, bw, 46, "New Game", true, [this] { screen = SCR_SETUP; }, "", rgb(70, 60, 50), 18);
+    cv->fillRoundRectGrad(bx - 22, by - 20, bw + 44, 290 + 74, 14, rgb(20, 14, 20), rgb(8, 6, 10), 150);
+    cv->roundRect(bx - 22, by - 20, bw + 44, 290 + 74, 14, rgb(220, 170, 100), 1, 90);
+    button(bx, by, bw, 46, "New Game", true, [this] { screen = SCR_SETUP; }, "", rgb(92, 66, 46), 18);
     bool hasSave = (bool)std::ifstream(savePath);
-    button(bx, by + 58, bw, 46, "Load Game", hasSave, [this] { loadGame(); }, hasSave ? "" : "No saved game found", rgb(70, 60, 50), 18);
-    button(bx, by + 116, bw, 46, "How to Play", true, [this] { overlay = OV_HELP; helpScroll = 0; }, "", rgb(70, 60, 50), 18);
+    button(bx, by + 58, bw, 46, "Load Game", hasSave, [this] { loadGame(); }, hasSave ? "" : "No saved game found", rgb(92, 66, 46), 18);
+    button(bx, by + 116, bw, 46, "How to Play", true, [this] { overlay = OV_HELP; helpScroll = 0; }, "", rgb(92, 66, 46), 18);
     button(bx, by + 174, bw, 46, "Achievements (" + std::to_string(ach.unlocked.size()) + "/" + std::to_string(g_achievements.size()) + ")", true,
-           [this] { overlay = OV_ACHIEVEMENTS; achScroll = 0; }, "", rgb(70, 60, 50), 18);
-    button(bx, by + 232, bw, 46, "Exit", true, [this] { quit = true; }, "", rgb(70, 60, 50), 18);
+           [this] { overlay = OV_ACHIEVEMENTS; achScroll = 0; }, "", rgb(92, 66, 46), 18);
+    button(bx, by + 232, bw, 46, "Exit", true, [this] { quit = true; }, "", rgb(92, 66, 46), 18);
     uiScaleControl(bx, by + 290, bw);
     cv->text(W - 12, H - 22, "Open source - MIT licence", 12, rgb(170, 200, 170), AL_RIGHT);
     if (overlay == OV_HELP) renderHelp();
@@ -249,7 +226,9 @@ void GameUI::renderTitle() {
 
 // ============================================================ setup
 void GameUI::renderSetup() {
-    cv->fillRect(0, 0, W, H, rgb(18, 22, 28));
+    cv->fillRectGrad(0, 0, W, H, rgb(30, 36, 48), rgb(10, 12, 16));
+    cv->glowEllipse(W / 2, 0, W / 2, H / 3, rgb(240, 170, 90), 40);
+    cv->textA(W / 2 + 2, 26, "Choose Your Primate", 34, rgb(0, 0, 0), AL_CENTER, true, 140);
     cv->text(W / 2, 24, "Choose Your Primate", 34, C_TEXT, AL_CENTER, true);
     cv->text(W / 2, 66, "Each primate has its own strengths. Humans are not playable - they will not survive 2034.", 15, C_DIM, AL_CENTER);
     int cols = 4, gap = 14;
@@ -259,13 +238,16 @@ void GameUI::renderSetup() {
         const PrimateDef& p = g_primates[i];
         int x = gx + (i % cols) * (cw + gap), y = gy + (i / cols) * (ch + gap);
         bool selp = setupPrimate == i;
-        cv->fillRect(x, y, cw, ch, selp ? rgb(44, 54, 70) : rgb(30, 36, 46));
-        cv->fillRect(x, y, cw, 8, p.color);
-        cv->rect(x, y, cw, ch, selp ? rgb(255, 230, 150) : C_BORDER, selp ? 3 : 1);
-        cv->fillCircle(x + 30, y + 40, 18, p.color);
-        cv->circle(x + 30, y + 40, 18, rgb(10, 10, 10), 2);
-        cv->text(x + 58, y + 20, p.name, 19, C_TEXT, AL_LEFT, true);
-        cv->text(x + 58, y + 44, p.leader, 13, C_DIM);
+        bool hvp = over(x, y, cw, ch);
+        cv->fillRoundRectGrad(x + 2, y + 4, cw, ch, 9, rgb(0, 0, 0), rgb(0, 0, 0), 90);
+        cv->fillRoundRectGrad(x, y, cw, ch, 9, selp ? rgb(56, 66, 84) : hvp ? rgb(44, 52, 66) : rgb(36, 42, 54), selp ? rgb(32, 38, 50) : rgb(22, 26, 34));
+        int band[8] = {x + 1, y + 1, x + cw - 1, y + 1, x + cw - 1, y + 70, x + 1, y + 70};
+        cv->fillPolyGrad(band, 4, p.color, 120, p.color, 0, x, y, x, y + 70);  // the species' colour washing down the card
+        cv->roundRect(x, y, cw, ch, 9, selp ? rgb(255, 222, 140) : hvp ? lighten(C_BORDER, 0.2f) : C_BORDER, selp ? 3 : 1);
+        drawPortrait(i, x + 34, y + 38, 24, p.color);
+        cv->textA(x + 69, y + 21, p.name, 19, rgb(0, 0, 0), AL_LEFT, true, 120);
+        cv->text(x + 68, y + 20, p.name, 19, C_TEXT, AL_LEFT, true);
+        cv->text(x + 68, y + 44, p.leader, 13, rgb(214, 220, 228));
         cv->text(x + 12, y + 70, p.ability, 15, C_GOLD, AL_LEFT, true);
         int ty = textBlock(x + 12, y + 92, cw - 24, p.abilityDesc + (p.evoPct ? " Evolves +" + std::to_string(p.evoPct) + "% faster." : "") + " Leans towards the " + STRAND_NAMES[p.evoLean] + ".", 13, C_TEXT, 3);
         textBlock(x + 12, ty + 6, cw - 24, p.flavor, 12, C_DIM, 2);
@@ -313,6 +295,7 @@ void GameUI::renderSetup() {
 void GameUI::startGame(const GameSettings& s) {
     game.reset(new Game());
     game->newGame(s);
+    resetMotion();
     screen = SCR_GAME;
     overlay = OV_NONE;
     selUnit = selCity = -1;
@@ -364,8 +347,11 @@ void GameUI::renderTopBar() {
     Game& g = *game;
     const Civ& me = g.civs[g.player];
     bool compact = W < 1500;
-    cv->fillRect(0, 0, W, TOP, rgb(20, 24, 31));
-    cv->line(0, TOP - 1, W, TOP - 1, rgb(110, 96, 60), 2);
+    cv->fillRectGrad(0, 0, W, TOP, rgb(40, 46, 58), rgb(14, 17, 23));
+    int shade[8] = {0, TOP, W, TOP, W, TOP + 8, 0, TOP + 8};
+    cv->fillPolyGrad(shade, 4, rgb(0, 0, 0), 120, rgb(0, 0, 0), 0, 0, TOP, 0, TOP + 8);  // shadow cast on the map
+    cv->line(0, TOP - 1, W, TOP - 1, rgb(150, 124, 64), 2);
+    cv->lineA(0, TOP - 3, W, TOP - 3, rgb(255, 220, 140), 1, 40);
     hot(0, 0, W, TOP, nullptr);
     // right side first: buttons and date
     int bx = W - 8;
@@ -500,8 +486,10 @@ void GameUI::renderNotifications() {
         int h = (int)lines.size() * 16 + 8;
         int x = W - 318;
         Color bg = n.turn == g.turn ? rgb(34, 40, 52) : rgb(26, 30, 38);
-        cv->fillRect(x, y, 310, h, bg);
-        cv->fillRect(x, y, 4, h, n.text.find("war") != std::string::npos || n.text.find("attack") != std::string::npos ? C_RED : C_GOLD);
+        cv->fillRoundRectGrad(x + 2, y + 3, 310, h, 6, rgb(0, 0, 0), rgb(0, 0, 0), 70);
+        cv->fillRoundRectGrad(x, y, 310, h, 6, lighten(bg, 0.06f), darken(bg, 0.8f), 238);
+        cv->fillRoundRectGrad(x, y, 5, h, 2, n.text.find("war") != std::string::npos || n.text.find("attack") != std::string::npos ? C_RED : C_GOLD,
+                              darken(n.text.find("war") != std::string::npos || n.text.find("attack") != std::string::npos ? C_RED : C_GOLD, 0.6f));
         int ly = y + 4;
         for (auto& l : lines) { cv->text(x + 10, ly, l, 13, n.turn == g.turn ? C_TEXT : C_DIM); ly += 16; }
         int nx = n.x, ny = n.y;
@@ -598,8 +586,9 @@ void GameUI::renderTileInfo() {
     int x = (W - w) / 2, y = H - h - 8;
     if (x < 440) x = 440;
     if (x + w > W - 270) w = std::max(260, W - 270 - x);
-    cv->fillRect(x, y, w, h, rgb(20, 24, 31));
-    cv->rect(x, y, w, h, C_BORDER);
+    cv->fillRoundRectGrad(x + 2, y + 3, w, h, 7, rgb(0, 0, 0), rgb(0, 0, 0), 80);
+    cv->fillRoundRectGrad(x, y, w, h, 7, rgb(32, 38, 48), rgb(16, 19, 25), 240);
+    cv->roundRect(x, y, w, h, 7, C_BORDER);
     int ly = y + 6;
     for (auto& l : lines) {
         std::string s = l.first;
@@ -617,7 +606,8 @@ void GameUI::renderUnitPanel() {
     const UnitDef& d = g_units[u.type];
     int pw = 420, ph = 178, px = 0, py = H - ph;
     panel(px, py, pw, ph, rgb(22, 27, 35));
-    cv->fillRect(px, py, pw, 4, civColor(u.owner));
+    int wash[8] = {px + 1, py + 1, px + pw - 1, py + 1, px + pw - 1, py + 60, px + 1, py + 60};
+    cv->fillPolyGrad(wash, 4, civColor(u.owner), 110, civColor(u.owner), 0, px, py, px, py + 60);
     drawUnitToken(u, px + 32, py + 36, 20);
     cv->text(px + 62, py + 12, d.name, 19, C_TEXT, AL_LEFT, true);
     std::string stats;
@@ -748,8 +738,9 @@ void GameUI::renderMinimap() {
     mmX = W - mmW - 10;
     mmY = H - mmH - 10;
     mmScale = sc;
-    cv->fillRect(mmX - 4, mmY - 4, mmW + 8, mmH + 8, rgb(14, 16, 20));
-    cv->rect(mmX - 4, mmY - 4, mmW + 8, mmH + 8, C_BORDER);
+    cv->fillRoundRectGrad(mmX - 6, mmY - 3, mmW + 12, mmH + 12, 8, rgb(0, 0, 0), rgb(0, 0, 0), 90);
+    cv->fillRoundRectGrad(mmX - 6, mmY - 6, mmW + 12, mmH + 12, 8, rgb(150, 124, 76), rgb(70, 54, 32));  // bronze frame
+    cv->fillRect(mmX - 2, mmY - 2, mmW + 4, mmH + 4, rgb(10, 12, 16));
     int pw = std::max(1, (int)std::ceil(sc)), ph = std::max(1, (int)std::ceil(sc));
     for (int y = 0; y < g.H; y++)
         for (int x = 0; x < g.W; x++) {
@@ -842,7 +833,8 @@ void GameUI::renderCity() {
     g.computeCity(c);
     int pw = 440, px = 0, py = TOP, ph = H - TOP;
     panel(px, py, pw, ph, rgb(22, 27, 35));
-    cv->fillRect(px, py, pw, 6, civColor(c.owner));
+    int wash[8] = {px + 1, py + 1, px + pw - 1, py + 1, px + pw - 1, py + 90, px + 1, py + 90};
+    cv->fillPolyGrad(wash, 4, civColor(c.owner), 120, civColor(c.owner), 0, px, py, px, py + 90);
     cv->text(px + 16, py + 14, (c.capital ? "* " : "") + c.name, 26, C_TEXT, AL_LEFT, true);
     cv->text(px + 16, py + 46, "Population " + std::to_string(c.pop) + (c.capital ? "  -  Capital" : "") + "    Defence " +
              std::to_string(g.cityStrength(c) / 10) + "    HP " + std::to_string(c.hp) + "/" + std::to_string(g.cityMaxHP(c)), 13, C_DIM);
@@ -984,7 +976,7 @@ void GameUI::renderTech() {
     Game& g = *game;
     const Civ& me = g.civs[g.player];
     int top = TOP, h = H - TOP;
-    cv->fillRect(0, top, W, h, rgb(16, 20, 27));
+    cv->fillRectGrad(0, top, W, h, rgb(22, 27, 36), rgb(10, 12, 17));
     hot(0, top, W, h, nullptr);
     Hot area{0, top, W, h, nullptr, "", true};
     hots.push_back(area);
@@ -1042,8 +1034,9 @@ void GameUI::renderTech() {
         bool known = me.techs[t], cur = me.research == t, avail = g.canResearch(g.player, t);
         Color bg = known ? rgb(36, 74, 46) : cur ? rgb(92, 76, 30) : onPath[t] ? rgb(40, 62, 96) : avail ? rgb(38, 54, 78) : rgb(34, 36, 44);
         if (over(bx, by, boxW, boxH)) bg = lighten(bg, 0.12f);
-        cv->fillRect(bx, by, boxW, boxH, bg);
-        cv->rect(bx, by, boxW, boxH, cur ? C_GOLD : known ? rgb(90, 160, 100) : avail ? rgb(100, 140, 200) : rgb(70, 74, 86), cur ? 2 : 1);
+        cv->fillRoundRectGrad(bx + 2, by + 3, boxW, boxH, 6, rgb(0, 0, 0), rgb(0, 0, 0), 70);
+        cv->fillRoundRectGrad(bx, by, boxW, boxH, 6, lighten(bg, 0.1f), darken(bg, 0.78f));
+        cv->roundRect(bx, by, boxW, boxH, 6, cur ? C_GOLD : known ? rgb(90, 160, 100) : avail ? rgb(100, 140, 200) : rgb(70, 74, 86), cur ? 2 : 1);
         bool tier = false;
         for (int k = 0; k < RUIN_TIERS; k++) if (g_ruinTierTech[k] == t) tier = true;
         cv->text(bx + 8, by + 5, td.name, 14, known ? rgb(200, 240, 200) : C_TEXT, AL_LEFT, true);
@@ -1145,8 +1138,7 @@ void GameUI::renderDiplomacy() {
             y += rh;
             continue;
         }
-        cv->fillCircle(px + 40, cy, 15, o.color);
-        cv->circle(px + 40, cy, 15, rgb(0, 0, 0), 2);
+        drawPortrait(o.primate, px + 40, cy, 16, o.color);
         cv->text(px + 66, y + 6, o.name, 15, o.alive ? C_TEXT : C_DIM, AL_LEFT, true);
         if (!o.alive) {
             cv->text(px + 66, y + 26, "Destroyed", 13, C_RED, AL_LEFT, true);
@@ -1175,7 +1167,7 @@ void GameUI::renderDiplomacy() {
     const Civ& o = g.civs[c];
     int dx = px + lw + 34, dw = pw - lw - 54;
     y = py + 50;
-    cv->fillCircle(dx + 20, y + 20, 20, o.color);
+    drawPortrait(o.primate, dx + 20, y + 20, 22, o.color);
     cv->text(dx + 50, y, o.leader + " of the " + o.name, 19, C_TEXT, AL_LEFT, true);
     if (o.primate >= 0) {
         const PrimateDef& pd = g_primates[o.primate];
@@ -1352,7 +1344,7 @@ void GameUI::renderTrade() {
     int px = (W - pw) / 2, py = TOP + 8;
     hot(0, 0, W, H, nullptr);
     panel(px, py, pw, ph);
-    cv->fillCircle(px + 30, py + 26, 14, g.civs[c].color);
+    drawPortrait(g.civs[c].primate, px + 30, py + 26, 16, g.civs[c].color);
     cv->text(px + 54, py + 12, "Negotiate with " + g.civs[c].leader + " of the " + g.civs[c].name, 22, C_TEXT, AL_LEFT, true);
     button(px + pw - 40, py + 10, 28, 28, "X", true, [this] { overlay = OV_DIPLO; });
     int colW = (pw - 60) / 3, top = py + 56;
@@ -1616,7 +1608,7 @@ void GameUI::uiScaleControl(int x, int y, int w) {
 }
 
 void GameUI::renderMenu() {
-    int pw = 320, ph = 460, px = (W - pw) / 2, py = (H - ph) / 2;
+    int pw = 320, ph = 508, px = (W - pw) / 2, py = (H - ph) / 2;
     hot(0, 0, W, H, [this] { overlay = OV_NONE; });
     panel(px, py, pw, ph);
     cv->text(px + pw / 2, py + 16, "Menu", 24, C_TEXT, AL_CENTER, true);
@@ -1629,6 +1621,9 @@ void GameUI::renderMenu() {
     b("Achievements", [this] { overlay = OV_ACHIEVEMENTS; achScroll = 0; });
     uiScaleControl(px + 30, y, pw - 60);
     y += 52;
+    button(px + 30, y, pw - 60, 40, std::string("Animations: ") + (animOn ? "On" : "Off"), true, [this] { animOn = !animOn; resetMotion(); },
+           "Moving water, units gliding between tiles and combat effects. Turn off on slow computers.", C_PANEL2, 16);
+    y += 48;
     b("Main Menu", [this] { overlay = OV_NONE; screen = SCR_TITLE; });
     b("Exit Game", [this] { quit = true; });
 }
@@ -1765,10 +1760,13 @@ void GameUI::renderPopup() {
     int px = (W - pw) / 2, py = std::max(TOP + 10, (H - ph) / 2);
     Color head = p.kind == POP_NUKE ? rgb(150, 50, 30) : p.kind == POP_WAR ? rgb(140, 40, 40) : p.kind == POP_VICTORY ? rgb(150, 120, 40) :
                  p.kind == POP_DEFEAT ? rgb(80, 40, 40) : p.kind == POP_RUIN ? rgb(130, 84, 40) : p.kind == POP_TECH ? rgb(40, 80, 130) : p.kind == POP_EVOLUTION ? rgb(40, 110, 70) : p.kind == POP_DISASTER ? rgb(150, 70, 20) : p.kind == POP_SETTLE ? rgb(150, 112, 40) : p.kind == POP_DEAL ? rgb(60, 90, 120) : rgb(56, 70, 92);
-    cv->fillRect(px - 2, py - 2, pw + 4, ph + 4, rgb(0, 0, 0));
-    cv->fillRect(px, py, pw, ph, rgb(26, 30, 38));
-    cv->fillRect(px, py, pw, 46, head);
-    cv->rect(px, py, pw, ph, lighten(head, 0.3f), 2);
+    cv->fillRectA(0, TOP, W, H - TOP, rgb(0, 0, 0), 70);  // dim the world behind
+    for (int k = 4; k >= 1; k--) cv->fillRoundRectGrad(px - k * 2 + 3, py - k * 2 + 6, pw + k * 4, ph + k * 4, 10 + k * 2, rgb(0, 0, 0), rgb(0, 0, 0), 30);
+    cv->fillRoundRectGrad(px, py, pw, ph, 10, rgb(36, 41, 52), rgb(16, 19, 25));
+    cv->fillRoundRectGrad(px, py, pw, 46, 10, lighten(head, 0.22f), darken(head, 0.7f));
+    cv->fillRectGrad(px, py + 36, pw, 10, darken(head, 0.78f), darken(head, 0.7f));  // square the header's lower corners
+    cv->lineA(px + 10, py + 1, px + pw - 11, py + 1, rgb(255, 255, 255), 1, 70);
+    cv->roundRect(px, py, pw, ph, 10, lighten(head, 0.3f), 2);
     cv->text(px + 20, py + 11, p.title, 22, rgb(255, 245, 230), AL_LEFT, true);
     int tx = px + 20;
     if (p.kind == POP_NUKE) {
@@ -1826,18 +1824,8 @@ void GameUI::renderNuke() {
         double k = std::min(1.0, lt / 1600.0);
         int big = s.type == RUIN_CITY ? hs * 3 : hs * 2;
         int r = (int)(big * (0.3 + k));
-        Color outer = blend(rgb(255, 250, 220), rgb(120, 60, 40), (float)k);
-        cv->fillCircle(sx, sy, r, outer);
-        cv->fillCircle(sx, sy, r * 2 / 3, blend(rgb(255, 255, 255), rgb(230, 120, 40), (float)k));
-        if (lt > 600) {
-            // rising mushroom
-            int rise = std::min(lt - 600, 2400) * big / 1600;
-            cv->fillRect(sx - big / 6, sy - rise, big / 3, rise, rgb(150, 100, 80));
-            cv->fillCircle(sx, sy - rise, big * 2 / 3, rgb(170, 110, 80));
-            cv->fillCircle(sx - big / 2, sy - rise + big / 6, big / 2, rgb(150, 96, 72));
-            cv->fillCircle(sx + big / 2, sy - rise + big / 6, big / 2, rgb(150, 96, 72));
-            cv->fillCircle(sx, sy - rise - big / 8, big / 3, rgb(240, 170, 90));
-        }
+        drawFireball(sx, sy, r, k);
+        if (lt > 600) drawMushroom(sx, sy, big, std::min(lt - 600, 2400) * big / 1600, lt);  // rising mushroom
     }
     if (t < 350) cv->fillRect(0, 0, W, H, blend(rgb(255, 255, 255), rgb(255, 230, 200), t / 350.0f));
     int ts = std::min(64, W / 16);
@@ -2026,6 +2014,7 @@ void GameUI::loadGame() {
         return;
     }
     game = std::move(g);
+    resetMotion();
     screen = SCR_GAME;
     overlay = OV_NONE;
     selUnit = selCity = -1;
@@ -2405,19 +2394,10 @@ void GameUI::renderBlast() {
     double k = std::min(1.0, t / 1400.0);
     int r = (int)(big * (0.3 + k));
     if (t < 2600) {
-        cv->fillCircleA(sx, sy, r * 3 / 2, rgb(255, 200, 120), (int)(90 * (1 - k)));
-        cv->fillCircle(sx, sy, r, blend(rgb(255, 250, 220), rgb(130, 70, 40), (float)k));
-        cv->fillCircle(sx, sy, r * 2 / 3, blend(rgb(255, 255, 255), rgb(230, 120, 40), (float)k));
-        if (t > 500) {
-            int rise = std::min(t - 500, 2000) * big / 1300;
-            cv->fillRect(sx - big / 6, sy - rise, big / 3, rise, rgb(150, 100, 80));
-            cv->fillCircle(sx, sy - rise, big * 2 / 3, rgb(170, 110, 80));
-            cv->fillCircle(sx - big / 2, sy - rise + big / 6, big / 2, rgb(150, 96, 72));
-            cv->fillCircle(sx + big / 2, sy - rise + big / 6, big / 2, rgb(150, 96, 72));
-            cv->fillCircle(sx, sy - rise - big / 8, big / 3, rgb(240, 170, 90));
-        }
+        drawFireball(sx, sy, r, k);
+        if (t > 500) drawMushroom(sx, sy, big, std::min(t - 500, 2000) * big / 1300, t);
     } else {
-        cv->fillCircleA(sx, sy, big, rgb(150, 100, 80), (int)(200 * (3400 - t) / 800.0));
+        cv->glowEllipse(sx, sy - big / 2, big * 3 / 2, big, rgb(150, 100, 80), (int)(230 * (3400 - t) / 800.0));  // the cloud drifts apart
     }
     if (t < 300) cv->fillRectA(0, 0, W, H, rgb(255, 255, 255), 255 - t * 255 / 300);
     hot(0, 0, W, H, [this] { if (blastT > 900) blastT = -1; }, "");

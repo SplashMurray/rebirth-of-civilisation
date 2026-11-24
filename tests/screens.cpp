@@ -4,10 +4,12 @@
 #include "SvgCanvas.h"
 #include "../src/ui/GameUI.h"
 #include <cstdio>
+#include <cstdlib>
 
 static std::string outDir = ".";
 static void shot(GameUI& ui, const char* name, int w = 1600, int h = 900) {
     SvgCanvas c(w, h);
+    if (const char* ch = std::getenv("REBIRTH_CHUNK")) c.chunk = std::atoi(ch);  // exercise the chunked terrain path
     ui.render(c);
     c.save(outDir + "/" + name + ".svg");
     std::printf("wrote %s\n", name);

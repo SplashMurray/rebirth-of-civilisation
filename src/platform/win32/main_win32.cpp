@@ -17,6 +17,7 @@ using std::min;
 }
 #include <gdiplus.h>
 #include <cstdio>
+#include <cmath>
 #include <string>
 #include <unordered_map>
 #include <memory>
@@ -49,6 +50,7 @@ public:
         for (auto& f : fonts) delete f.second;
         delete fmt;
         for (auto& L : layers) freeLayer(L);
+        for (auto& c : chunks) freeLayer(c.second.L);
     }
     static void setup(Gdiplus::Graphics& gr, float scale = 1.0f) {
         if (scale != 1.0f) gr.ScaleTransform(scale, scale);
@@ -93,19 +95,101 @@ public:
         Gdiplus::SolidBrush b(gc(c, a));
         g->FillEllipse(&b, cx - r, cy - r, 2 * r, 2 * r);
     }
+    // ---- gradients and rounded shapes
+    void fillPolyGrad(const int* xy, int n, Color c1, int a1, Color c2, int a2, int x1, int y1, int x2, int y2) override {
+        if (n < 3) return;
+        if (x1 == x2 && y1 == y2) { fillPolyA(xy, n, c1, a1); return; }
+        Gdiplus::Point pts[64];
+        if (n > 64) n = 64;
+        for (int i = 0; i < n; i++) pts[i] = Gdiplus::Point(xy[i * 2], xy[i * 2 + 1]);
+        // stretch the gradient a pixel past both ends: GDI+ wraps (tiles) colours just beyond them
+        float dx = (float)(x2 - x1), dy = (float)(y2 - y1), len = std::sqrt(dx * dx + dy * dy);
+        float ex = dx / len, ey = dy / len;
+        Gdiplus::PointF p1(x1 - ex, y1 - ey), p2(x2 + ex, y2 + ey);
+        Gdiplus::LinearGradientBrush b(p1, p2, gc(c1, a1), gc(c2, a2));
+        b.SetWrapMode(Gdiplus::WrapModeTileFlipXY);
+        g->FillPolygon(&b, pts, n);
+    }
+    void fillCircleGrad(int cx, int cy, int r, Color inner, int ai, Color outer, int ao, int fx, int fy) override {
+        if (r <= 0) return;
+        Gdiplus::GraphicsPath path;
+        path.AddEllipse(cx - r, cy - r, 2 * r, 2 * r);
+        Gdiplus::PathGradientBrush b(&path);
+        b.SetCenterPoint(Gdiplus::PointF((Gdiplus::REAL)fx, (Gdiplus::REAL)fy));
+        b.SetCenterColor(gc(inner, ai));
+        Gdiplus::Color sc = gc(outer, ao);
+        INT cnt = 1;
+        b.SetSurroundColors(&sc, &cnt);
+        g->FillPath(&b, &path);
+    }
+    void fillEllipseA(int cx, int cy, int rx, int ry, Color c, int a) override {
+        Gdiplus::SolidBrush b(gc(c, a));
+        g->FillEllipse(&b, cx - rx, cy - ry, 2 * rx, 2 * ry);
+    }
+    void glowEllipse(int cx, int cy, int rx, int ry, Color c, int a) override {
+        if (rx <= 0 || ry <= 0) return;
+        Gdiplus::GraphicsPath path;
+        path.AddEllipse(cx - rx, cy - ry, 2 * rx, 2 * ry);
+        Gdiplus::PathGradientBrush b(&path);
+        b.SetCenterColor(gc(c, a));
+        Gdiplus::Color sc = gc(c, 0);
+        INT cnt = 1;
+        b.SetSurroundColors(&sc, &cnt);
+        g->FillPath(&b, &path);
+    }
+    void polylineA(const int* xy, int n, Color c, int t, int a, bool closed) override {
+        if (n < 2) return;
+        Gdiplus::Point pts[128];
+        if (n > 128) n = 128;
+        for (int i = 0; i < n; i++) pts[i] = Gdiplus::Point(xy[i * 2], xy[i * 2 + 1]);
+        Gdiplus::Pen p(gc(c, a), (Gdiplus::REAL)std::max(1, t));
+        p.SetLineJoin(Gdiplus::LineJoinRound);
+        p.SetStartCap(Gdiplus::LineCapRound);
+        p.SetEndCap(Gdiplus::LineCapRound);
+        if (closed) g->DrawPolygon(&p, pts, n);
+        else g->DrawLines(&p, pts, n);
+    }
+    static void roundPath(Gdiplus::GraphicsPath& path, float x, float y, float w, float h, float r) {
+        r = std::min(r, std::min(w, h) / 2);
+        if (r <= 0.5f) { path.AddRectangle(Gdiplus::RectF(x, y, w, h)); return; }
+        float d = r * 2;
+        path.AddArc(x, y, d, d, 180, 90);
+        path.AddArc(x + w - d, y, d, d, 270, 90);
+        path.AddArc(x + w - d, y + h - d, d, d, 0, 90);
+        path.AddArc(x, y + h - d, d, d, 90, 90);
+        path.CloseFigure();
+    }
+    void fillRoundRectGrad(int x, int y, int ww, int hh, int r, Color top, Color bottom, int a) override {
+        if (ww <= 0 || hh <= 0) return;
+        Gdiplus::GraphicsPath path;
+        roundPath(path, (float)x, (float)y, (float)ww, (float)hh, (float)r);
+        Gdiplus::LinearGradientBrush b(Gdiplus::PointF((Gdiplus::REAL)x, (Gdiplus::REAL)y - 1), Gdiplus::PointF((Gdiplus::REAL)x, (Gdiplus::REAL)(y + hh + 1)),
+                                       gc(top, a), gc(bottom, a));
+        b.SetWrapMode(Gdiplus::WrapModeTileFlipXY);
+        g->FillPath(&b, &path);
+    }
+    void roundRect(int x, int y, int ww, int hh, int r, Color c, int t, int a) override {
+        if (ww <= 0 || hh <= 0) return;
+        Gdiplus::GraphicsPath path;
+        float h2 = t / 2.0f;
+        roundPath(path, x + h2, y + h2, ww - (float)t, hh - (float)t, (float)r);
+        Gdiplus::Pen p(gc(c, a), (Gdiplus::REAL)std::max(1, t));
+        g->DrawPath(&p, &path);
+    }
     void circle(int cx, int cy, int r, Color c, int t) override {
         Gdiplus::Pen p(gc(c, 255), (Gdiplus::REAL)std::max(1, t));
         g->DrawEllipse(&p, cx - r, cy - r, 2 * r, 2 * r);
     }
-    void text(int x, int y, const std::string& s, int size, Color c, int align, bool bold) override {
-        if (s.empty()) return;
+    void text(int x, int y, const std::string& s, int size, Color c, int align, bool bold) override { textA(x, y, s, size, c, align, bold, 255); }
+    void textA(int x, int y, const std::string& s, int size, Color c, int align, bool bold, int a) override {
+        if (s.empty() || a <= 0) return;
         std::wstring ws = widen(s);
         Gdiplus::Font* f = font(size, bold);
         if (align != AL_LEFT) {
             int tw = measure(ws, f);
             x -= align == AL_CENTER ? tw / 2 : tw;
         }
-        Gdiplus::SolidBrush b(gc(c, 255));
+        Gdiplus::SolidBrush b(gc(c, a));
         g->DrawString(ws.c_str(), (INT)ws.size(), f, Gdiplus::PointF((Gdiplus::REAL)x, (Gdiplus::REAL)y), format(), &b);
     }
     int textWidth(const std::string& s, int size, bool bold) override {
@@ -151,6 +235,55 @@ public:
         BitBlt(dc, 0, 0, pw, ph, layers[id].dc, 0, 0, SRCCOPY);
     }
 
+    // ---- world chunk cache: fixed-size physical-pixel tiles of the map, reused while panning
+    float pixelScale() const override { return scale; }
+    int chunkSize() const override { return layerG || chunkG ? 0 : CHUNK; }
+    bool chunkDraw(uint64_t id, uint64_t key, int px, int py) override {
+        auto it = chunks.find(id);
+        if (it == chunks.end() || !it->second.valid || it->second.key != key) return false;
+        it->second.used = ++chunkClock;
+        g->Flush(Gdiplus::FlushIntentionSync);
+        BitBlt(dc, px, py, CHUNK, CHUNK, it->second.dc, 0, 0, SRCCOPY);
+        return true;
+    }
+    void chunkBegin(uint64_t id, int ox, int oy, int px, int py) override {
+        (void)px; (void)py;
+        if (chunkG) return;
+        if (chunks.size() >= MAX_CHUNKS && !chunks.count(id)) {  // evict the least recently used
+            auto victim = chunks.begin();
+            for (auto it = chunks.begin(); it != chunks.end(); ++it)
+                if (it->second.used < victim->second.used) victim = it;
+            freeLayer(victim->second.L);
+            chunks.erase(victim);
+        }
+        Chunk& C = chunks[id];
+        if (!C.L.dc) {
+            C.L.dc = CreateCompatibleDC(dc);
+            C.L.bmp = CreateCompatibleBitmap(dc, CHUNK, CHUNK);
+            C.L.old = SelectObject(C.L.dc, C.L.bmp);
+            C.L.w = C.L.h = CHUNK;
+        }
+        C.valid = false;
+        chunkSaved = g;
+        chunkG = new Gdiplus::Graphics(C.L.dc);
+        chunkG->TranslateTransform((Gdiplus::REAL)-ox, (Gdiplus::REAL)-oy);
+        setup(*chunkG, scale);
+        g = chunkG;
+    }
+    void chunkEnd(uint64_t id, uint64_t key, int px, int py) override {
+        if (!chunkG) return;
+        delete chunkG;
+        chunkG = nullptr;
+        g = chunkSaved;
+        chunkSaved = nullptr;
+        Chunk& C = chunks[id];
+        C.valid = true;
+        C.key = key;
+        C.used = ++chunkClock;
+        g->Flush(Gdiplus::FlushIntentionSync);
+        BitBlt(dc, px, py, CHUNK, CHUNK, C.L.dc, 0, 0, SRCCOPY);
+    }
+
 private:
     struct Layer {
         HDC dc = nullptr;
@@ -162,6 +295,17 @@ private:
         bool valid = false;
     };
     Layer layers[2];
+    struct Chunk {
+        Layer L;
+        uint64_t key = 0, used = 0;
+        bool valid = false;
+    };
+    static const int CHUNK = 512;
+    static const size_t MAX_CHUNKS = 72;
+    std::unordered_map<uint64_t, Chunk> chunks;
+    uint64_t chunkClock = 0;
+    Gdiplus::Graphics* chunkG = nullptr;
+    Gdiplus::Graphics* chunkSaved = nullptr;
     Gdiplus::Graphics* layerG = nullptr;
     Gdiplus::Graphics* saved = nullptr;
     std::unordered_map<int, Gdiplus::Font*> fonts;
@@ -243,19 +387,25 @@ void enableDpiAwareness() {
 }
 
 std::string settingsPath();
+int g_appliedAnim = -1;     // animOn last saved
 void loadSettings() {
     FILE* f = fopen(settingsPath().c_str(), "r");
     if (!f) return;
-    int pct = 0;
-    if (fscanf(f, "uiscale=%d", &pct) == 1 && pct >= GameUI::UI_SCALE_MIN && pct <= GameUI::UI_SCALE_MAX) g_ui->uiScalePct = pct;
+    char line[128];
+    while (fgets(line, sizeof line, f)) {
+        int v = 0;
+        if (sscanf(line, "uiscale=%d", &v) == 1 && v >= GameUI::UI_SCALE_MIN && v <= GameUI::UI_SCALE_MAX) g_ui->uiScalePct = v;
+        if (sscanf(line, "animations=%d", &v) == 1) g_ui->animOn = v != 0;
+    }
     fclose(f);
 }
 void saveSettingsIfChanged() {
-    if (g_ui->uiScalePct == g_appliedPct) return;
+    if (g_ui->uiScalePct == g_appliedPct && (int)g_ui->animOn == g_appliedAnim) return;
     g_appliedPct = g_ui->uiScalePct;
+    g_appliedAnim = (int)g_ui->animOn;
     FILE* f = fopen(settingsPath().c_str(), "w");
     if (!f) return;
-    fprintf(f, "uiscale=%d\n", g_appliedPct);
+    fprintf(f, "uiscale=%d\nanimations=%d\n", g_appliedPct, g_appliedAnim);
     fclose(f);
 }
 

@@ -29,7 +29,13 @@
 
 ## Features
 
-* **Anti-aliased graphics** (GDI+): shaded and textured hex terrain, sandy coastlines, waves, lit mountains, forests and jungles, settlements that grow from huts to towers, translucent fog of war, glowing borders and Civ-style unit flags with an icon for every unit type. The terrain is cached so the map stays smooth.
+* **Anti-aliased, illustrated graphics** (GDI+):
+  * **Terrain** blends softly from tile to tile, with sandy shores, sunlit shallows, light and shade across the ground, gradient-lit mountains with snow caps, rolling hills, layered conifers, round-crowned woods and jungle with palms. The known world fades into darkness at its edges.
+  * **Live water**: glints drift across the sea and surf rolls onto the beaches.
+  * **Units** are bronze-rimmed medallions (shields for civilians) in their owner's colour, with an icon for every unit type. They **glide** from tile to tile and **lunge** at their targets. Arrows and stones arc through the air, bullets and shells streak, hits flash and spark, damage numbers float up and destroyed units vanish in smoke.
+  * **Cities** grow from huts round a fire, to brick and stone houses with tiled roofs, to smoking factories and glass towers. Walls gain towers, and capitals fly a fluttering pennant.
+  * **Screens** have rounded, shaded panels and buttons, illustrated portraits of each primate, and an animated title scene: a ruined city at sunset under a mushroom cloud.
+  * **Animations** can be turned off in the menu for slow computers. The terrain is cached in chunks, so scrolling the map stays smooth.
 * **Hex map**, randomly generated, with grassland, plains, desert, tundra, snow, coast and ocean, plus forest, jungle, hills, mountains and resources. Small, Standard and Large sizes (4, 6 or 8 primate civilisations).
 * **Eight playable primates**, each with its own bonuses, a unique unit and a preferred starting terrain (see below).
 * **A nomadic beginning.** There are no cities at the start. Each species begins as a **Roaming Band** that forages the tiles around it (one per member, plus one). Foraged land is picked over and recovers slowly, so bands must keep moving to fresh forest, jungle and grassland. Well-fed bands grow to at most 8 members; a band can **split** in two, or turn members into a **war party** or a **scout**. Hungry bands lose members, and predators, droughts, wildfires, sickness and cold strike the wanderers. Settling needs **Speech** (evolution) and **Cultivation** (technology); a band of N members founds a city of size 1 + (N-1)/2.
@@ -212,7 +218,7 @@
 | ![A roaming band foraging](docs/screenshots/05_roaming_band.png) | ![The first settlement](docs/screenshots/07b_first_settlement.png) |
 | ![Here We Go Again](docs/screenshots/18_here_we_go_again.png) | ![Achievements](docs/screenshots/17_achievements.png) |
 | ![A fleet in harbour](docs/screenshots/19_naval.png) | ![Diplomacy](docs/screenshots/20_diplomacy.png) |
-| ![Negotiating a deal](docs/screenshots/21_trade.png) | |
+| ![Negotiating a deal](docs/screenshots/21_trade.png) | ![Combat effects](docs/screenshots/22_combat.png) |
 | ![Start](docs/screenshots/04_start_map.png) | ![The Fall](docs/screenshots/07_fall_popup.png) |
 | ![A drought](docs/screenshots/11c_disaster.png) | ![Late game](docs/screenshots/16_lategame.png) |
 | ![Excavating ruins](docs/screenshots/09_unit_panel.png) | ![Tech tree](docs/screenshots/10_tech_tree.png) |
@@ -265,7 +271,8 @@ src/core/        Rules engine - no platform code
   Save.cpp         save games
 src/ui/          User interface, drawn through the small Canvas interface
   GameUI.cpp       screens, panels, popups, input
-  UIMap.cpp        hex map rendering
+  UIMap.cpp        hex map rendering, unit motion and combat effects
+  UIArt.cpp        primate portraits, the title scene, mushroom clouds
 src/platform/win32/main_win32.cpp   Windows window, input and GDI+ renderer
 tests/           AI simulation tests, screenshot renderer, random-input stress test
 res/             Icon and Windows resources
