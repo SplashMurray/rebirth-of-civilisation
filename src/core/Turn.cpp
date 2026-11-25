@@ -35,7 +35,18 @@ void Game::updateAllVisibility() {
 void Game::meet(int a, int b) {
     if (a == b || a < FIRST_PRIMATE_CIV || b < FIRST_PRIMATE_CIV) return;
     if (civs[a].met[b]) return;
+    if (isMinor(a) && isMinor(b)) { civs[a].met[b] = civs[b].met[a] = 1; return; }
     civs[a].met[b] = civs[b].met[a] = 1;
+    for (int k = 0; k < 2; k++) {
+        int m = k ? b : a, t = k ? a : b;
+        if (!isMajor(m) || !isMinor(t)) continue;
+        bool first = civs[t].firstMet < 0;
+        if (first) { civs[t].firstMet = m; addInfluence(m, t, 15); }
+        if (m == player)
+            notify(player, "You have met " + tribeTitle(t) + ", a " + TRIBE_KIND_NAMES[g_tribes[civs[t].tribe].kind] + " tribe. " + tribeBonusText(t) +
+                               (first ? ". As the first to meet them you start with 15 influence." : ". See the Tribes screen."));
+    }
+    if (isMinor(a) || isMinor(b)) return;
     if (a == player) notify(a, "You have met the " + civs[b].name + ", led by " + civs[b].leader + ".");
     if (b == player) notify(b, "You have met the " + civs[a].name + ", led by " + civs[a].leader + ".");
 }
@@ -48,6 +59,18 @@ void Game::declareWar(int a, int b) {
     civs[a].warsDeclared++;
     civs[a].warSince[b] = civs[b].warSince[a] = turn;
     meet(a, b);
+    if (isMinor(a) || isMinor(b)) {  // a war with a tribe
+        if (isMajor(a)) tribeDeclaredOn(a, b);
+        cancelRoutesBetween(a, b, "war broke out between the " + civs[a].name + " and the " + civs[b].name);
+        if (a == player) notify(a, "You declared war on " + tribeTitle(b) + ".");
+        else if (b == player) {
+            if (isMinor(a) && civs[a].ally >= 0)
+                notify(player, tribeTitle(a) + " have joined their allies, the " + civs[civs[a].ally].name + ", in the war against you.");
+            else popup(b, POP_WAR, "War!", "The " + civs[a].name + " have declared war on " + tribeTitle(b) + "!");
+        } else if (isMajor(a) && civs[player].met[a] && civs[player].met[b])
+            notify(player, "The " + civs[a].name + " declared war on " + tribeTitle(b) + ".");
+        return;
+    }
     // diplomacy: the victim remembers; betraying a friend shocks everyone
     if (b < (int)civs[a].grievance.size() && a >= FIRST_PRIMATE_CIV && b >= FIRST_PRIMATE_CIV) {
         civs[b].grievance[a] += 30;
@@ -95,11 +118,18 @@ void Game::makePeace(int a, int b) {
         expelUnits(a, b);
         expelUnits(b, a);
     }
-    if (a == player || b == player) notify(player, "Peace has been made between the " + civs[a].name + " and the " + civs[b].name + ".");
+    if (a == player || b == player)
+        notify(player, "Peace has been made between " + (isMinor(a) ? tribeTitle(a) : "the " + civs[a].name) + " and " + (isMinor(b) ? tribeTitle(b) : "the " + civs[b].name) + ".");
 }
 
 bool Game::proposePeace(int from, int to) {
     if (!civs[from].war[to]) return false;
+    if (isMinor(to) || isMinor(from)) {  // tribes make peace once tempers cool and their allies agree
+        int m = isMinor(to) ? from : to, t = isMinor(to) ? to : from;
+        if (!isMajor(m) || !tribePeaceOk(m, t)) return false;
+        makePeace(from, to);
+        return true;
+    }
     int len = turn - civs[to].warSince[from];
     int pf = militaryPower(from) + 5, pt = militaryPower(to) + 5;
     bool accept = len >= dur(8) && pt < pf * 1.5 && rng.chance(0.75);
@@ -156,9 +186,13 @@ void Game::endTurn() {
         // allow continued play after victory; nothing special
     }
     for (int c = FIRST_PRIMATE_CIV; c < (int)civs.size(); c++)
-        if (civs[c].alive && !civs[c].player) aiTurn(c);
+        if (civs[c].alive && !civs[c].player) {
+            if (civs[c].minor) aiMinorTurn(c);
+            else aiTurn(c);
+        }
     feralTurn();
     tradeTurn();
+    tribesTurn();
     volcanoTurn();
     regrowForage();
     for (int c = 0; c < (int)civs.size(); c++)
@@ -185,7 +219,7 @@ void Game::processCiv(int c) {
         processUnitsEndOfTurn(c);
         return;
     }
-    if (c >= FIRST_PRIMATE_CIV) wearinessTurn(c);
+    if (isMajor(c)) wearinessTurn(c);
     int sci = 0, cult = 0, gold = 0;
     for (auto& ci : cities) {
         if (!ci.alive || ci.owner != c) continue;
@@ -203,6 +237,10 @@ void Game::processCiv(int c) {
     cv.culture += cult;
     cv.cultureTotal += cult;
     cv.gold += cv.goldPerTurn;
+    if (cv.minor) {  // tribes neither evolve nor suffer the disasters of the great powers
+        processUnitsEndOfTurn(c);
+        return;
+    }
     disasterTurn(c);
     processEvolution(c);
     processUnitsEndOfTurn(c);
@@ -513,7 +551,7 @@ void Game::feralTurn() {
     if (!warHappened) return;
     int count = 0;
     for (auto& u : units) if (u.alive && u.owner == CIV_FERAL) count++;
-    int cap = std::min(24, (int)(civs.size() - FIRST_PRIMATE_CIV) * 2 + turn * 100 / speedPct / 40);
+    int cap = std::min(24, numMajors() * 2 + turn * 100 / speedPct / 40);
     if (turn % 3 == 0 && count < cap) {
         for (int tries = 0; tries < 40; tries++) {
             int x, y;
@@ -582,7 +620,8 @@ void Game::checkElimination() {
         cv.alive = false;
         for (auto& u : units) if (u.alive && u.owner == c) killUnit(u);
         for (int o = FIRST_PRIMATE_CIV; o < (int)civs.size(); o++)
-            if (o != c && civs[o].alive) notify(o, "The " + cv.name + " have been wiped out.");
+            if (o != c && civs[o].alive && (!cv.minor || civs[o].met[c]))
+                notify(o, cv.minor ? "The " + cv.name + " of " + g_tribes[cv.tribe].city + " are no more." : "The " + cv.name + " have been wiped out.");
         if (c == player && !gameOver) {
             gameOver = true;
             winner = -1;
@@ -595,7 +634,7 @@ void Game::checkElimination() {
 void Game::checkVictory() {
     if (gameOver) return;
     int alivePrim = 0;
-    for (int c = FIRST_PRIMATE_CIV; c < (int)civs.size(); c++) if (civs[c].alive) alivePrim++;
+    for (int c = FIRST_PRIMATE_CIV; c < (int)civs.size(); c++) if (civs[c].alive && !civs[c].minor) alivePrim++;
     auto win = [&](int c, const std::string& type, const std::string& text) {
         gameOver = true;
         winner = c;
@@ -608,7 +647,7 @@ void Game::checkVictory() {
     for (auto& ci : cities) if (ci.alive && ci.origCapital) capitals++;
     if (capitals >= 2 || alivePrim == 1) {
         for (int c = FIRST_PRIMATE_CIV; c < (int)civs.size(); c++) {
-            if (!civs[c].alive) continue;
+            if (!civs[c].alive || civs[c].minor) continue;
             bool all = true;
             for (auto& ci : cities) if (ci.alive && ci.origCapital && ci.owner != c) all = false;
             if (all && turn > PROLOGUE_TURNS + 1 && numCities(c) > 0) {
@@ -619,7 +658,7 @@ void Game::checkVictory() {
     }
     // culture
     for (int c = FIRST_PRIMATE_CIV; c < (int)civs.size(); c++)
-        if (civs[c].alive && civs[c].policiesAdopted >= CULTURE_WIN_POLICIES) {
+        if (civs[c].alive && !civs[c].minor && civs[c].policiesAdopted >= CULTURE_WIN_POLICIES) {
             win(c, "Cultural", "The " + civs[c].name + " have adopted " + std::to_string(CULTURE_WIN_POLICIES) + " traditions. Their songs, stories and art define the new world.");
             return;
         }
@@ -627,7 +666,7 @@ void Game::checkVictory() {
     if (turn >= maxTurns) {
         int best = -1;
         for (int c = FIRST_PRIMATE_CIV; c < (int)civs.size(); c++)
-            if (civs[c].alive && (best < 0 || score(c) > score(best))) best = c;
+            if (civs[c].alive && !civs[c].minor && (best < 0 || score(c) > score(best))) best = c;
         if (best >= 0) win(best, "Score", "Time has run out. The " + civs[best].name + " have the highest score.");
     }
 }

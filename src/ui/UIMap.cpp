@@ -550,7 +550,7 @@ void GameUI::drawCityBanner(const City& c, int sx, int sy) {
     int u = hs;
     Color cc = civColor(c.owner);
     int sz = std::max(10, std::min(16, hs / 3 + 3));
-    std::string name = (c.capital ? "* " : "") + c.name;
+    std::string name = (c.capital && !g.isMinor(c.owner) ? "* " : "") + c.name;
     int tw = cv->textWidth(name, sz, true);
     int bh = sz + 6, pw = sz + 8;
     int bw = tw + pw + 10;
@@ -564,6 +564,15 @@ void GameUI::drawCityBanner(const City& c, int sx, int sy) {
     cv->textA(bx + pw + 6, by + 4, name, sz, rgb(0, 0, 0), AL_LEFT, true, 150);
     cv->text(bx + pw + 5, by + 3, name, sz, rgb(250, 250, 250), AL_LEFT, true);
     int yb = by + bh + 1;
+    if (g.isMinor(c.owner)) {  // a tribe: its kind, and its ally's colour beneath
+        drawTribeBadge(bx - sz / 2 - 3, by + bh / 2, sz / 2 + 2, c.owner);
+        int a = g.civs[c.owner].ally;
+        if (a >= 0) {
+            cv->fillRect(bx, yb, bw, 4, g.civs[a].color);
+            cv->rect(bx, yb, bw, 4, rgb(0, 0, 0), 1);
+            yb += 5;
+        }
+    }
     if (c.owner == g.player && g.moodOf(c) != MOOD_CONTENT) drawMoodFace(bx + bw + sz / 2 + 6, by + bh / 2, sz / 2 + 1, g.moodOf(c));
     if (c.owner == g.player) {
         double pf = 0;

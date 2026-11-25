@@ -36,7 +36,7 @@ public:
 
     // ---- used by tests / screenshot tool
     enum Screen { SCR_TITLE, SCR_SETUP, SCR_GAME };
-    enum Overlay { OV_NONE, OV_CITY, OV_TECH, OV_POLICY, OV_DIPLO, OV_MENU, OV_HELP, OV_LOG, OV_EVO, OV_ACHIEVEMENTS, OV_TRADE, OV_ROUTES };
+    enum Overlay { OV_NONE, OV_CITY, OV_TECH, OV_POLICY, OV_DIPLO, OV_MENU, OV_HELP, OV_LOG, OV_EVO, OV_ACHIEVEMENTS, OV_TRADE, OV_ROUTES, OV_TRIBES };
     Screen screen = SCR_TITLE;
     Overlay overlay = OV_NONE;
     std::unique_ptr<Game> game;
@@ -97,6 +97,8 @@ private:
     // diplomacy
     int diploSel = -1;   // civ shown on the diplomacy screen
     int warArm = -1;     // war declaration on a friend waiting for confirmation
+    int tribeWarArm = -1;  // war on a tribe waiting for confirmation
+    int tribeScroll = 0;
     Deal draft;          // the deal being negotiated on the trade screen
     void openTrade(int c, int preset = -1);
     void renderTrade();
@@ -201,6 +203,9 @@ private:
     void edgeFade(int sx, int sy, const int* xy, int d, float depth, Color c, int a);
     void drawTerrainRegion(int x0, int x1, int y0, int y1);
     void drawLiveWater(int x0, int x1, int y0, int y1);
+    // ---- minor tribes
+    void renderTribes();
+    void drawTribeBadge(int x, int y, int r, int tribeCiv);
     // ---- happiness
     Color moodColor(int mood) const;
     void drawMoodFace(int x, int y, int r, int mood);

@@ -364,7 +364,7 @@ void Game::generateFeatures() {
 
 // ------------------------------------------------------------ discovery
 void Game::discoverNaturals(int c, int x, int y, int r) {
-    if (c < FIRST_PRIMATE_CIV || c >= (int)civs.size()) return;
+    if (!isMajor(c)) return;
     for (auto& s : naturals) {
         if ((int)s.found.size() < (int)civs.size()) s.found.resize(civs.size(), 0);
         if (s.found[c] || dist(s.x, s.y, x, y) > r) continue;

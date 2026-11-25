@@ -342,6 +342,7 @@ void GameUI::renderGame() {
         case OV_TECH: renderTech(); break;
         case OV_POLICY: renderPolicies(); break;
         case OV_DIPLO: renderDiplomacy(); break;
+        case OV_TRIBES: renderTribes(); break;
         case OV_TRADE: renderTrade(); break;
         case OV_ROUTES: renderRoutes(); break;
         case OV_MENU: renderMenu(); break;
@@ -377,6 +378,7 @@ void GameUI::renderTopBar() {
     rb("Menu", [this] { overlay = overlay == OV_MENU ? OV_NONE : OV_MENU; }, "Save, load, help (Esc)");
     rb("Log", [this] { overlay = overlay == OV_LOG ? OV_NONE : OV_LOG; logScroll = 0; }, "Event log (L)");
     rb(compact ? "Evo" : "Evolution", [this] { overlay = overlay == OV_EVO ? OV_NONE : OV_EVO; }, "Evolutionary traits and pressures (V)");
+    rb(compact ? "Tribes" : "Tribes", [this] { overlay = overlay == OV_TRIBES ? OV_NONE : OV_TRIBES; tribeWarArm = -1; }, "Minor tribes: influence, gifts, allies (I)");
     rb(compact ? "Diplo" : "Diplomacy", [this] { overlay = overlay == OV_DIPLO ? OV_NONE : OV_DIPLO; }, "Other civilisations (D)");
     rb(compact ? "Trad" : "Traditions", [this] { overlay = overlay == OV_POLICY ? OV_NONE : OV_POLICY; }, "Adopt traditions with culture (P)");
     rb("Tech", [this] { overlay = overlay == OV_TECH ? OV_NONE : OV_TECH; }, "Technology tree (T)");
@@ -618,6 +620,13 @@ void GameUI::renderTileInfo() {
         std::string o = g.civs[t.owner].name;
         if (t.city >= 0) o = g.cities[t.city].name + " (" + o + ")";
         lines.push_back({"Territory: " + o, civColor(t.owner)});
+        if (g.isMinor(t.owner) && g.civs[g.player].met[t.owner]) {
+            int t2 = t.owner, st = g.tribeStatus(g.player, t2);
+            static const char* ST[] = {"at war with you", "neutral", "your friends", "your allies"};
+            std::string al = g.civs[t2].ally >= 0 && g.civs[t2].ally != g.player ? "; ally: " + g.civs[g.civs[t2].ally].name : "";
+            lines.push_back({std::string(TRIBE_KIND_NAMES[g_tribes[g.civs[t2].tribe].kind]) + " tribe, " + ST[st + 1] + al, rgb(220, 200, 150)});
+            lines.push_back({"Your influence " + std::to_string(g.influenceFor(g.player, t2)) + " (Tribes screen: I)", rgb(220, 200, 150)});
+        }
     }
     if (t.fallout) lines.push_back({"Fallout level " + std::to_string(t.fallout) + ": damages units, reduces yields", rgb(220, 220, 60)});
     if (t.site >= 0) {
@@ -1247,13 +1256,13 @@ void GameUI::renderDiplomacy() {
     auto attColor = [](int a) { return a <= -2 ? rgb(230, 80, 70) : a == -1 ? rgb(230, 150, 90) : a == 0 ? rgb(200, 200, 200) : a == 1 ? rgb(130, 220, 120) : rgb(90, 230, 200); };
     // ---- the list
     int lw = std::min(420, pw / 2 - 20), y = py + 50;
-    if (diploSel < 0 || diploSel >= (int)g.civs.size() || diploSel == p || !g.civs[p].met[diploSel]) {
+    if (diploSel < 0 || diploSel >= (int)g.civs.size() || diploSel == p || !g.civs[p].met[diploSel] || g.civs[diploSel].minor) {
         diploSel = -1;
-        for (int c = FIRST_PRIMATE_CIV; c < (int)g.civs.size(); c++) if (c != p && g.civs[p].met[c] && g.civs[c].alive) { diploSel = c; break; }
+        for (int c = FIRST_PRIMATE_CIV; c < (int)g.civs.size(); c++) if (c != p && g.isMajor(c) && g.civs[p].met[c] && g.civs[c].alive) { diploSel = c; break; }
     }
-    int rh = std::min(70, (ph - 60) / std::max(1, (int)g.civs.size() - FIRST_PRIMATE_CIV - 1));
+    int rh = std::min(70, (ph - 60) / std::max(1, g.numMajors() - 1));
     for (int c = FIRST_PRIMATE_CIV; c < (int)g.civs.size(); c++) {
-        if (c == p) continue;
+        if (c == p || g.civs[c].minor) continue;
         const Civ& o = g.civs[c];
         bool met = g.civs[p].met[c];
         cv->fillRect(px + 14, y, lw, rh - 6, c == diploSel ? rgb(48, 58, 76) : rgb(32, 38, 50));
@@ -1356,7 +1365,7 @@ void GameUI::renderDiplomacy() {
     std::string wars, friends;
     for (int x = FIRST_PRIMATE_CIV; x < (int)g.civs.size(); x++) {
         if (x == c || !g.civs[x].alive || !g.civs[p].met[x]) continue;
-        std::string nm = x == p ? "you" : g.civs[x].name;
+        std::string nm = x == p ? "you" : g.civs[x].minor ? g.tribeTitle(x) : g.civs[x].name;
         if (o.war[x]) wars += (wars.empty() ? "" : ", ") + nm;
         else if (x != p && (g.hasAgreement(AG_DEFENSIVE, c, x) || g.hasAgreement(AG_FRIENDSHIP, c, x)))
             friends += (friends.empty() ? "" : ", ") + nm + (g.hasAgreement(AG_DEFENSIVE, c, x) ? " (pact)" : "");
@@ -1536,7 +1545,7 @@ void GameUI::renderTrade() {
         }
         bool header = false;
         for (int x3 = FIRST_PRIMATE_CIV; x3 < (int)g.civs.size(); x3++) {
-            if (x3 == p || x3 == c || !g.civs[x3].alive) continue;
+            if (x3 == p || x3 == c || !g.civs[x3].alive || g.civs[x3].minor) continue;
             DealItem probe{DI_WAR_ON, giver, x3};
             std::string why;
             bool valid = g.dealItemValid(draft, probe, &why);
@@ -1847,6 +1856,17 @@ void GameUI::renderHelp() {
         "Oil for tanks. Wheat, Rice and Maize are crops: build a Farm on them for extra food. Build Pastures on Horses and Mines on minerals.\n"
         "GOLD  Your people only learn the value of money with the Currency technology. From then on cities earn Gold, used to buy items.\n"
         "CITIES  Your first cities are founded by bands; after that, cities train Elder Troops to found more. Click a city to choose what it builds. Cities grow with surplus food and claim land with culture.\n"
+        "MINOR TRIBES  Small one-city peoples of other primate species - lemurs, mandrills, tarsiers, howlers and more - live among the "
+        "great powers (4, 6 or 8 by map size). They do not expand or seek victory; they defend their home and keep up with the technology "
+        "most species know. Each is Cultured (Culture), Learned (Science), Mercantile (Gold), Maritime (Food) or Militant (gifts of troops). "
+        "Every species has an influence with each tribe it has met: the first to meet them starts with 15; gifts of gold, trade routes to "
+        "their home (+2 a turn) and doing what they ask - sending a trade route, or destroying beasts that trouble them (+40) - raise it; "
+        "killing beasts near their home helps a little. Influence fades by 1 a turn. Friends (30+) receive the tribe's gift every turn. "
+        "The species with the most influence, at least 60, is their ally: a double gift, the use of the tribe's luxuries and strategic "
+        "resources, open passage, and the tribe's warriors join every war its ally fights. Declaring war on a tribe sets your influence "
+        "there to -60 and makes the other tribes warier; conquering one alarms them more. Tribes talk peace after 10 turns unless their "
+        "ally is at war with you. Manage them on the Tribes screen (I); a diamond beside a tribe's city name shows its kind, and a stripe "
+        "beneath shows its ally's colour.\n"
         "HAPPINESS AND LUXURIES  Each city has a mood. Its first 5 citizens are content with nothing; every citizen beyond that is "
         "unhappy, as are the people of a large empire (1 more in every city per 4 cities beyond the first) and a people weary of war "
         "(fighting and losses build weariness; peace lets it fade). Luxuries make them happy: each kind you have - Honey, Cacao, Spices, "
@@ -1920,7 +1940,7 @@ void GameUI::renderPopup() {
     int textW = pw - 40 - (p.kind == POP_NUKE ? 170 : 0);
     auto lines = wrap(p.body, textW, 15);
     int ph = 132 + (int)lines.size() * 21;
-    if (p.kind == POP_VICTORY || p.kind == POP_DEFEAT) ph += 30 + (int)(g.civs.size() - FIRST_PRIMATE_CIV) * 20;
+    if (p.kind == POP_VICTORY || p.kind == POP_DEFEAT) ph += 30 + g.numMajors() * 20;
     if (p.kind == POP_NUKE) ph = std::max(ph, 330);
     int px = (W - pw) / 2, py = std::max(TOP + 10, (H - ph) / 2);
     Color head = p.kind == POP_NUKE ? rgb(150, 50, 30) : p.kind == POP_WAR ? rgb(140, 40, 40) : p.kind == POP_VICTORY ? rgb(150, 120, 40) :
@@ -1950,7 +1970,7 @@ void GameUI::renderPopup() {
     if (p.kind == POP_VICTORY || p.kind == POP_DEFEAT) {
         y += 10;
         std::vector<int> order;
-        for (int c = FIRST_PRIMATE_CIV; c < (int)g.civs.size(); c++) order.push_back(c);
+        for (int c = FIRST_PRIMATE_CIV; c < (int)g.civs.size(); c++) if (!g.civs[c].minor) order.push_back(c);
         std::sort(order.begin(), order.end(), [&](int a, int b) { return g.score(a) > g.score(b); });
         for (int c : order) {
             cv->fillCircle(tx + 8, y + 8, 7, g.civs[c].color);
@@ -2275,6 +2295,7 @@ void GameUI::wheel(int x, int y, int delta) {
         else if (overlay == OV_LOG) logScroll -= delta * 3;
         else if (overlay == OV_HELP) helpScroll -= delta * 60;
         else if (overlay == OV_ACHIEVEMENTS) achScroll -= delta * 60;
+        else if (overlay == OV_TRIBES) tribeScroll -= delta * 60;
         else if (overlay == OV_ROUTES) routeScroll -= delta;
         else listScroll -= delta * 60;
         return;
@@ -2363,10 +2384,10 @@ void GameUI::key(int k, bool shift, bool ctrl) {
         case KEY_ENTER: endTurnNow(); return;
         default: break;
     }
-    if (overlay == OV_CITY && (k == 'T' || k == 'P' || k == 'D' || k == 'L' || k == 'V')) overlay = OV_NONE;
+    if (overlay == OV_CITY && (k == 'T' || k == 'P' || k == 'D' || k == 'L' || k == 'V' || k == 'I')) overlay = OV_NONE;
     if (overlay != OV_NONE && overlay != OV_CITY) {
         if ((k == 'T' && overlay == OV_TECH) || (k == 'P' && overlay == OV_POLICY) || (k == 'D' && overlay == OV_DIPLO) || (k == 'L' && overlay == OV_LOG) ||
-            (k == 'V' && overlay == OV_EVO))
+            (k == 'V' && overlay == OV_EVO) || (k == 'I' && overlay == OV_TRIBES))
             overlay = OV_NONE;
         return;
     }
@@ -2376,6 +2397,7 @@ void GameUI::key(int k, bool shift, bool ctrl) {
         case 'D': overlay = OV_DIPLO; return;
         case 'L': overlay = OV_LOG; logScroll = 0; return;
         case 'V': overlay = OV_EVO; return;
+        case 'I': overlay = OV_TRIBES; tribeWarArm = -1; return;
         case KEY_TAB: { int n = nextUnitNeedingOrders(selUnit); if (n >= 0) selectUnit(n, true); return; }
         case 'C': if (sel()) centerOn(sel()->x, sel()->y); return;
         case 'M': if (sel()) moveMode = !moveMode; return;
@@ -2618,4 +2640,123 @@ std::string GameUI::moodTip(const City& c) const {
     s += "\nA city grows only while it has at least 1 happiness to spare. 3 or more to spare (size 3+): celebrating, +10% Food and "
          "Gold. Below 0: unhappy, no growth. 3 or more short: unrest, no growth and -25% Production, Science, Culture and Gold.";
     return s;
+}
+
+// ============================================================ minor tribes
+void GameUI::drawTribeBadge(int x, int y, int r, int t) {
+    const Game& g = *game;
+    static const char* LETTER[TK_COUNT] = {"C", "S", "G", "F", "M"};
+    static const Color KC[TK_COUNT] = {{200, 120, 230}, {110, 170, 250}, {240, 200, 80}, {90, 200, 220}, {230, 100, 80}};
+    int k = g_tribes[g.civs[t].tribe].kind;
+    int d[8] = {x, y - r, x + r, y, x, y + r, x - r, y};
+    cv->fillPoly(d, 4, darken(KC[k], 0.55f));
+    int d2[8] = {x, y - r + 2, x + r - 2, y, x, y + r - 2, x - r + 2, y};
+    cv->fillPoly(d2, 4, KC[k]);
+    cv->text(x, y - r / 2 - 2, LETTER[k], std::max(8, r), rgb(20, 20, 30), AL_CENTER, true);
+}
+
+void GameUI::renderTribes() {
+    Game& g = *game;
+    int p = g.player;
+    int pw = std::min(1180, W - 30), ph = H - TOP - 20;
+    int px = (W - pw) / 2, py = TOP + 8;
+    panel(px, py, pw, ph);
+    cv->text(px + 20, py + 12, "Minor Tribes", 24, C_TEXT, AL_LEFT, true);
+    button(px + pw - 40, py + 10, 28, 28, "X", true, [this] { overlay = OV_NONE; });
+    textBlock(px + 20, py + 44, pw - 80,
+              "Small peoples of other primate species. Raise your influence with gifts of gold, trade routes to their home (+2 a turn) and by "
+              "helping with what they ask (+40). It fades by 1 a turn. Friends (30+) receive the tribe's gift every turn; the civ with the most "
+              "influence (60+) is their ally: a double gift, the use of their luxuries and strategic resources, and their warriors join its wars. "
+              "Attacking a tribe makes every tribe wary of you.",
+              12, C_DIM, 3);
+    std::vector<int> tribes;
+    for (int t = FIRST_PRIMATE_CIV; t < (int)g.civs.size(); t++) if (g.isMinor(t)) tribes.push_back(t);
+    int cols = 2, gap = 12, top = py + 96;
+    int cw = (pw - 40 - gap) / cols;
+    int rows = ((int)tribes.size() + cols - 1) / cols;
+    int ch = std::clamp((ph - (top - py) - 14 - gap * (rows - 1)) / std::max(1, rows), 118, 168);
+    int listH = ph - (top - py) - 10;
+    int maxScroll = std::max(0, rows * (ch + gap) - gap - listH);
+    tribeScroll = std::clamp(tribeScroll, 0, maxScroll);
+    cv->clip(px, top, pw, listH);
+    Hot area{px, top, pw, listH, nullptr, "", true};
+    hots.push_back(area);
+    for (size_t i = 0; i < tribes.size(); i++) {
+        int t = tribes[i];
+        const Civ& tv = g.civs[t];
+        int x = px + 20 + (int)(i % cols) * (cw + gap), y = top + (int)(i / cols) * (ch + gap) - tribeScroll;
+        if (y + ch < top || y > top + listH) continue;
+        bool met = g.civs[p].met[t];
+        cv->fillRoundRectGrad(x, y, cw, ch, 6, rgb(38, 44, 58), rgb(28, 32, 42));
+        cv->roundRect(x, y, cw, ch, 6, met && tv.alive ? darken(tv.color, 0.8f) : rgb(60, 62, 72), 1);
+        if (!met) {
+            cv->text(x + 16, y + 14, "An unknown tribe", 15, C_DIM, AL_LEFT, true);
+            cv->text(x + 16, y + 38, "Explore to find them.", 12, C_DIM);
+            continue;
+        }
+        const TribeDef& td = g_tribes[tv.tribe];
+        cv->fillCircle(x + 26, y + 26, 15, tv.color);
+        cv->circle(x + 26, y + 26, 15, rgb(10, 10, 10), 1);
+        drawTribeBadge(x + 38, y + 38, 8, t);
+        cv->text(x + 50, y + 8, tv.name + " of " + td.city, 15, tv.alive ? C_TEXT : C_DIM, AL_LEFT, true);
+        cv->text(x + 50, y + 28, std::string(TRIBE_KIND_NAMES[td.kind]) + " tribe - " + TRIBE_KIND_GIFTS[td.kind] + ".  Elder: " + td.elder, 12, C_DIM);
+        if (!tv.alive) {
+            cv->text(x + 16, y + 54, "Conquered: this tribe is no more.", 13, C_RED, AL_LEFT, true);
+            continue;
+        }
+        int st = g.tribeStatus(p, t), inf = g.influenceFor(p, t);
+        static const char* SN[] = {"AT WAR", "Neutral", "Friends", "Allies"};
+        static const Color SC[] = {{230, 80, 70}, {200, 200, 200}, {130, 220, 120}, {90, 230, 200}};
+        cv->text(x + cw - 14, y + 8, SN[st + 1], 14, SC[st + 1], AL_RIGHT, true);
+        std::string al = tv.ally < 0 ? "No ally" : tv.ally == p ? "Allied with you" : "Ally: the " + g.civs[tv.ally].name + " (" + std::to_string(g.influenceFor(tv.ally, t)) + ")";
+        cv->text(x + cw - 14, y + 28, al, 12, tv.ally == p ? SC[3] : C_DIM, AL_RIGHT);
+        // influence bar, -60 .. 120, with the friend and ally marks
+        int bx = x + 16, by = y + 52, bw = cw - 32;
+        auto pos = [&](int v) { return bx + (std::clamp(v, -60, 120) + 60) * bw / 180; };
+        cv->fillRect(bx, by, bw, 8, rgb(24, 26, 34));
+        int z = pos(0), v = pos(inf);
+        cv->fillRect(std::min(z, v), by, std::abs(v - z), 8, inf < 0 ? rgb(200, 80, 70) : st == TS_ALLY ? SC[3] : st == TS_FRIEND ? SC[2] : rgb(170, 170, 190));
+        for (int mk : {0, TRIBE_FRIEND, TRIBE_ALLY}) cv->fillRect(pos(mk), by - 3, 1, 14, rgb(230, 230, 230));
+        if (tv.ally >= 0 && tv.ally != p) {
+            int ax = pos(g.influenceFor(tv.ally, t));
+            int tri[6] = {ax - 5, by - 7, ax + 5, by - 7, ax, by - 1};
+            cv->fillPoly(tri, 3, g.civs[tv.ally].color);
+        }
+        cv->text(bx, by + 11, "Your influence " + std::to_string(inf) + "   (friends at " + std::to_string(TRIBE_FRIEND) + ", allies at " + std::to_string(TRIBE_ALLY) + "+ and the most)", 11, C_DIM);
+        int ly = by + 28;
+        cv->text(bx, ly, g.tribeBonusText(t) + ".", 12, rgb(220, 210, 170));
+        ly += 17;
+        if (tv.questKind != TQ_NONE && !(p < (int)tv.questDone.size() && tv.questDone[p]) && st != TS_WAR) {
+            cv->text(bx, ly, "They ask: " + g.questText(t) + ". Reward +40.", 12, rgb(255, 200, 120), AL_LEFT, true);
+            ly += 17;
+        }
+        // actions
+        int ay = y + ch - 34, ax = bx;
+        if (st != TS_WAR) {
+            for (int gold : {50, 100, 250}) {
+                bool ok = g.hasGold(p) && g.civs[p].gold >= gold;
+                std::string tip = g.hasGold(p) ? "Give " + std::to_string(gold) + " gold: +" + std::to_string(g.giftInfluence(p, t, gold)) + " influence"
+                                               : "Research Currency to give gold";
+                button(ax, ay, 74, 26, std::to_string(gold) + "g", ok, [this, t, gold] { game->giftGold(game->player, t, gold); }, tip, rgb(110, 90, 30), 12);
+                ax += 80;
+            }
+            std::string why;
+            bool can = g.canDeclareWar(p, t, &why);
+            bool armed = tribeWarArm == t;
+            button(ax, ay, 116, 26, armed ? "Confirm war!" : "Declare war", can, [this, t] {
+                if (tribeWarArm != t) { tribeWarArm = t; return; }
+                tribeWarArm = -1;
+                game->declareWar(game->player, t);
+            }, can ? "Attack this tribe. Every tribe will trust you less." : why, armed ? rgb(150, 40, 30) : C_PANEL2, 12);
+            ax += 122;
+        } else {
+            std::string why;
+            bool can = g.tribePeaceOk(p, t, &why);
+            button(ax, ay, 120, 26, "Make peace", can, [this, t] { game->proposePeace(game->player, t); }, can ? "They will accept." : why, rgb(50, 90, 60), 12);
+            ax += 126;
+        }
+        if (tv.capital >= 0 && g.cities[tv.capital].alive)
+            button(ax, ay, 70, 26, "Show", true, [this, t] { const City& ci = game->cities[game->civs[t].capital]; centerOn(ci.x, ci.y); overlay = OV_NONE; }, "Show their home on the map", C_PANEL2, 12);
+    }
+    cv->unclip();
 }

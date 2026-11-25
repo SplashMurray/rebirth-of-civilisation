@@ -339,8 +339,14 @@ void Game::newGame(const GameSettings& s) {
     wonderCity.assign(g_buildings.size(), -1);
     generateMap();
 
-    int total = FIRST_PRIMATE_CIV + nPrim;
+    static const int NTRIBES[] = {4, 6, 8};
+    int nTribes = std::min((int)g_tribes.size(), NTRIBES[s.mapSize]);
+    int total = FIRST_PRIMATE_CIV + nPrim + nTribes;
     civs.assign(total, Civ());
+    std::vector<int> tribePool;
+    for (int t = 0; t < (int)g_tribes.size(); t++) tribePool.push_back(t);
+    for (size_t i = tribePool.size(); i > 1; i--) std::swap(tribePool[i - 1], tribePool[rng.range((int)i)]);
+    allyResTurn = -1;
     std::vector<int> pool;
     for (int p = 0; p < (int)g_primates.size(); p++) if (p != s.primate) pool.push_back(p);
     for (size_t i = pool.size(); i > 1; i--) std::swap(pool[i - 1], pool[rng.range((int)i)]);
@@ -371,6 +377,16 @@ void Game::newGame(const GameSettings& s) {
         } else if (c == CIV_FERAL) {
             cv.feral = true; cv.name = "Feral Packs"; cv.adjective = "Feral"; cv.leader = "";
             cv.color = rgb(120, 20, 20);
+        } else if (c >= FIRST_PRIMATE_CIV + nPrim) {  // a minor tribe
+            const TribeDef& td = g_tribes[tribePool[c - FIRST_PRIMATE_CIV - nPrim]];
+            cv.minor = true;
+            cv.tribe = tribePool[c - FIRST_PRIMATE_CIV - nPrim];
+            cv.name = td.name; cv.adjective = td.adjective; cv.leader = td.elder; cv.color = td.color;
+            cv.evoGoal = -1;
+            cv.aiSkill = 1;
+            cv.influence.assign(total, 0);
+            cv.questDone.assign(total, 0);
+            cv.lastUnitGift.assign(total, -100);
         } else {
             cv.primate = c == FIRST_PRIMATE_CIV ? s.primate : pool[(c - FIRST_PRIMATE_CIV - 1) % pool.size()];
             const PrimateDef& pd = g_primates[cv.primate];
@@ -391,6 +407,7 @@ void Game::newGame(const GameSettings& s) {
         if (rng.chance(0.5)) ensureNear(*this, st, R_WHEAT, 4);
         else ensureNear(*this, st, R_RICE, 4);
     }
+    placeTribes(starts);
     markResourcesDirty();
     for (int i = 0; i < nPrim; i++) {
         int c = FIRST_PRIMATE_CIV + i;

@@ -5,7 +5,7 @@
 #include <sstream>
 
 namespace {
-const int SAVE_VERSION = 18;
+const int SAVE_VERSION = 19;
 
 struct Archive {
     bool writing;
@@ -136,7 +136,10 @@ void ioGame(Archive& a, Game& g) {
         a.io(c.warheads); a.io(c.nukesLaunched); a.io(c.timesNuked); a.io(c.citiesCaptured); a.io(c.citiesLost); a.io(c.bandSplits);
         a.io(c.disastersSuffered); a.io(c.warsDeclared); a.io(c.falloutCleaned); a.io(c.maxBand); a.io(c.shipsSunk); a.io(c.unitsUpgraded); a.io(c.unitsFerried);
         a.io(c.routesMade); a.io(c.routesPlundered); a.io(c.bestRoad); a.io(c.naturalsFound); a.io(c.riverSailed); a.io(c.weariness); a.io(c.mostCelebrating); a.io(c.mostLuxuries);
+        a.io(c.minor); a.io(c.tribe); a.io(c.influence); a.io(c.ally); a.io(c.questKind); a.io(c.questTarget); a.io(c.questUntil);
+        a.io(c.questDone); a.io(c.lastUnitGift); a.io(c.firstMet); a.io(c.tribeFoodCapital); a.io(c.tribeFoodAll); a.io(c.questsCompleted); a.io(c.mostAllies);
     }
+    if (!a.writing) g.allyResTurn = -1;
     long long nu = (long long)g.units.size();
     a.num(nu);
     if (!a.writing) g.units.assign((size_t)std::max(0LL, nu), Unit());

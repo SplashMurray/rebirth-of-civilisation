@@ -187,7 +187,24 @@ struct Civ {
     std::vector<int> lastOffer;       // AI: last turn we proposed something to them
     std::vector<int> embargo;         // 1: we refuse all trade with them
     int dealsMade = 0, backstabs = 0;
+    // minor tribes: the tribe's own state...
+    bool minor = false;
+    int tribe = -1;                   // index into g_tribes
+    std::vector<int> influence;       // each major civ's standing with this tribe
+    int ally = -1;                    // the major civ it is allied with
+    int questKind = 0, questTarget = -1, questUntil = 0;
+    std::vector<uint8_t> questDone;   // who has completed the current quest
+    std::vector<int> lastUnitGift;    // militant tribes: last turn each major was sent troops
+    int firstMet = -1;                // the first major to meet them
+    // ...and a major civ's dealings with tribes
+    int tribeFoodCapital = 0, tribeFoodAll = 0;  // maritime tribes' gifts (derived each turn)
+    int questsCompleted = 0, mostAllies = 0;
 };
+
+// Influence thresholds with a minor tribe.
+static const int TRIBE_FRIEND = 30, TRIBE_ALLY = 60;
+enum TribeStatus { TS_WAR = -1, TS_NEUTRAL = 0, TS_FRIEND = 1, TS_ALLY = 2 };
+enum TribeQuest { TQ_NONE, TQ_ROUTE, TQ_FERALS };
 
 // ---- diplomacy
 enum AgreementKind { AG_OPEN_BORDERS, AG_RESEARCH, AG_DEFENSIVE, AG_FRIENDSHIP, AG_RESOURCE, AG_GOLD_PER_TURN, AG_COUNT };
@@ -280,6 +297,8 @@ public:
     // strategic resources owned by each civ (cached; rebuilt when territory or techs change)
     mutable std::vector<std::vector<int>> resCache;
     mutable bool resDirty = true;
+    mutable std::vector<std::vector<uint8_t>> allyRes;  // resources reaching each civ from allied tribes (cache)
+    mutable int allyResTurn = -1;
     void markResourcesDirty() { resDirty = true; }
     int resourceCount(int c, int r) const;
     bool hasResource(int c, int r) const;   // Scrap Metal also counts as Iron
@@ -452,6 +471,26 @@ public:
     bool canEmbark(int c, int x, int y) const;
     bool isCoastal(int x, int y) const;  // next to water
     void aiNaval(Unit& u);
+    // ---- minor tribes (Tribes.cpp)
+    bool isMinor(int c) const { return c >= FIRST_PRIMATE_CIV && c < (int)civs.size() && civs[c].minor; }
+    bool isMajor(int c) const { return c >= FIRST_PRIMATE_CIV && c < (int)civs.size() && !civs[c].minor; }
+    int numMajors() const;
+    void placeTribes(const std::vector<Pt>& starts);
+    int tribeStatus(int major, int tribe) const;
+    int influenceFor(int major, int tribe) const;
+    void addInfluence(int major, int tribe, int amount, const std::string& why = "");
+    int giftInfluence(int major, int tribe, int gold) const;
+    bool giftGold(int major, int tribe, int gold);
+    bool allyResource(int c, int r) const;           // a tribe allied with c has it
+    std::string tribeTitle(int tribe) const;          // "the Tarsiers of Bohol"
+    std::string tribeBonusText(int tribe) const;
+    std::string questText(int tribe) const;
+    void tribesTurn();
+    void aiMinorTurn(int c);
+    void aiTribes(int c);
+    void tribeDeclaredOn(int major, int tribe);
+    void feralKilled(int killer, const Unit& feral);
+    bool tribePeaceOk(int major, int tribe, std::string* why = nullptr) const;
     // ---- happiness and luxuries (Happiness.cpp)
     std::vector<int> luxuriesOf(int c) const;   // distinct luxuries you own or are lent
     int luxuryCount(int c) const { return (int)luxuriesOf(c).size(); }

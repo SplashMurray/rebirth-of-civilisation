@@ -172,6 +172,7 @@ void Game::aiDiplomacy(int c) {
             }
             continue;
         }
+        if (civs[o].minor) continue;  // tribes are handled in aiTribes
         if (turn < dur(25) || wars > 0) continue;
         if (turn - cv.warSince[o] < dur(20)) continue;  // recent peace
         if (!canDeclareWar(c, o)) continue;              // peace treaty
@@ -286,6 +287,7 @@ void Game::aiTurn(int c) {
     }
     aiUpgrades(c);
     aiDiplomacy(c);
+    aiTribes(c);
     aiPacts(c);
     aiOffers(c);
     for (size_t i = 0; i < cities.size(); i++)

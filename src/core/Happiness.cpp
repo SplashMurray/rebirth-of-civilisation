@@ -22,7 +22,7 @@ std::vector<int> Game::luxuriesOf(int c) const {
 MoodParts Game::moodParts(const City& city) const {
     MoodParts m;
     int c = city.owner;
-    if (c < FIRST_PRIMATE_CIV) return m;
+    if (!isMajor(c)) return m;
     m.luxuries = luxuryCount(c);
     for (size_t b = 0; b < g_buildings.size(); b++)
         if (city.has[b]) (g_buildings[b].wonder ? m.wonders : m.buildings) += g_buildings[b].happy;

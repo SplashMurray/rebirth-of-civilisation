@@ -21,6 +21,8 @@ const std::vector<AchievementDef> g_achievements = {
     {"DIG_IT", "Dig It", "Excavate a layer of a human ruin.", "Evolution and the Old World"},
     {"ARCHAEOLOGIST", "Archaeologist", "Excavate 25 ruin layers in one game.", "Evolution and the Old World"},
     {"CLEAN_UP_CREW", "Clean-Up Crew", "Decontaminate fallout 10 times in one game.", "Evolution and the Old World"},
+    {"FRIENDS_IN_LOW_PLACES", "Friends in Low Places", "Be allied with 3 minor tribes at once.", "Evolution and the Old World"},
+    {"GOOD_NEIGHBOURS", "Good Neighbours", "Complete 5 requests from minor tribes in one game.", "Evolution and the Old World"},
     {"SWEET_TOOTH", "Sweet Tooth", "Enjoy 6 different luxuries at once.", "Evolution and the Old World"},
     {"PARTY_ANIMALS", "Party Animals", "Have 4 cities celebrating at once.", "Evolution and the Old World"},
     {"NATURE_WATCH", "Nature Watch", "Discover 3 natural wonders in one game.", "Evolution and the Old World"},
@@ -149,6 +151,8 @@ std::vector<std::string> checkAchievements(const Game& g, AchievementStore& st) 
     give("CLEAN_UP_CREW", cv.falloutCleaned >= 10);
     give("NATURE_WATCH", cv.naturalsFound >= 3);
     give("SWEET_TOOTH", cv.mostLuxuries >= 6);
+    give("FRIENDS_IN_LOW_PLACES", cv.mostAllies >= 3);
+    give("GOOD_NEIGHBOURS", cv.questsCompleted >= 5);
     give("PARTY_ANIMALS", cv.mostCelebrating >= 4);
     give("MONEY_TALKS", g.hasGold(p));
     give("GROWING_EMPIRE", cities >= 6);

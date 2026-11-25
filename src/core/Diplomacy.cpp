@@ -65,13 +65,13 @@ int Game::diploSciPct(int c) const {
 }
 
 bool Game::embargoed(int a, int b) const {
-    if (a < FIRST_PRIMATE_CIV || b < FIRST_PRIMATE_CIV || a == b) return false;
+    if (a < FIRST_PRIMATE_CIV || b < FIRST_PRIMATE_CIV || a == b || civs[a].minor || civs[b].minor) return false;
     return (civs[a].embargo.size() > (size_t)b && civs[a].embargo[b]) || (civs[b].embargo.size() > (size_t)a && civs[b].embargo[a]);
 }
 
 bool Game::canEmbargo(int a, int b, std::string* why) const {
     auto fail = [&](const std::string& m) { if (why) *why = m; return false; };
-    if (a == b || b < FIRST_PRIMATE_CIV || !civs[b].alive) return fail("Not possible");
+    if (a == b || b < FIRST_PRIMATE_CIV || !civs[b].alive || civs[b].minor) return fail("Not possible");
     if (!civs[a].met[b]) return fail("You have not met them");
     if (!hasTech(a, ID.tLaw)) return fail("Requires Tribal Law");
     if (civs[a].embargo[b]) return fail("Already under your embargo");
@@ -111,7 +111,7 @@ bool Game::canDeclareWar(int a, int b, std::string* why) const {
 
 // ------------------------------------------------------------ opinion
 int Game::opinion(int c, int o, std::vector<std::pair<std::string, int>>* why) const {
-    if (c < FIRST_PRIMATE_CIV || o < FIRST_PRIMATE_CIV || c == o) return 0;
+    if (c < FIRST_PRIMATE_CIV || o < FIRST_PRIMATE_CIV || c == o || civs[c].minor || civs[o].minor) return 0;
     const Civ& cv = civs[c];
     const Civ& ov = civs[o];
     const PrimateDef* pd = primate(c);
@@ -530,7 +530,7 @@ void Game::diplomacyTurn() {
 void Game::aiPacts(int c) {
     if (skillOf(c) == 0 && !rng.chance(0.5)) return;
     for (int o = FIRST_PRIMATE_CIV; o < (int)civs.size(); o++) {
-        if (o == c || o == player || !civs[o].alive || !civs[c].met[o] || civs[c].war[o]) continue;
+        if (o == c || o == player || !civs[o].alive || civs[o].minor || !civs[c].met[o] || civs[c].war[o]) continue;
         if (turn - civs[c].lastOffer[o] < dur(6)) continue;
         if (!rng.chance(0.15)) continue;
         civs[c].lastOffer[o] = turn;
@@ -565,14 +565,14 @@ void Game::aiPacts(int c) {
     // embargo those we cannot stand; lift it once tempers cool
     if (hasTech(c, ID.tLaw))
         for (int o = FIRST_PRIMATE_CIV; o < (int)civs.size(); o++) {
-            if (o == c || !civs[o].alive || !civs[c].met[o]) continue;
+            if (o == c || !civs[o].alive || civs[o].minor || !civs[c].met[o]) continue;
             int op = opinion(c, o);
             if (!civs[c].embargo[o] && op <= -35 && !civs[c].war[o] && rng.chance(0.03)) setEmbargo(c, o, true);
             else if (civs[c].embargo[o] && op > -10 && rng.chance(0.1)) setEmbargo(c, o, false);
         }
     // denounce those we despise
     for (int o = FIRST_PRIMATE_CIV; o < (int)civs.size(); o++) {
-        if (o == c || !civs[o].alive || !civs[c].met[o] || civs[c].denouncedUntil[o] > turn) continue;
+        if (o == c || !civs[o].alive || civs[o].minor || !civs[c].met[o] || civs[c].denouncedUntil[o] > turn) continue;
         if (opinion(c, o) <= -40 && rng.chance(0.04)) denounce(c, o);
     }
 }
@@ -611,7 +611,7 @@ void Game::aiOffers(int c) {
         if (!mine.empty() && !theirs.empty() && att >= 0) mk({{DI_RESOURCE, c, mine[rng.range((int)mine.size())]}, {DI_RESOURCE, p, theirs[rng.range((int)theirs.size())]}});
         // help against an enemy
         for (int x = FIRST_PRIMATE_CIV; x < (int)civs.size(); x++) {
-            if (x == c || x == p || !civs[x].alive || !civs[c].war[x] || !civs[p].met[x] || civs[p].war[x]) continue;
+            if (x == c || x == p || !civs[x].alive || civs[x].minor || !civs[c].war[x] || !civs[p].met[x] || civs[p].war[x]) continue;
             std::vector<DealItem> items = {{DI_WAR_ON, p, x}};
             if (hasGold(c) && hasGold(p) && civs[c].gold >= 50) items.push_back({DI_GOLD, c, civs[c].gold / 3});
             mk(items);

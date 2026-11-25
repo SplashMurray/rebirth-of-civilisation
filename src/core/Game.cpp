@@ -181,7 +181,8 @@ int Game::resourceCount(int c, int r) const {
 bool Game::hasResource(int c, int r) const {
     if (resourceCount(c, r) > 0) return true;
     if (c >= FIRST_PRIMATE_CIV && lentResource(c, r)) return true;
-    return r == R_IRON && resourceCount(c, R_SCRAP) > 0;
+    if (allyResource(c, r)) return true;  // from an allied tribe
+    return r == R_IRON && (resourceCount(c, R_SCRAP) > 0 || allyResource(c, R_SCRAP));
 }
 
 bool Game::hasNeeds(int c, const std::vector<int>& needs) const {
@@ -674,6 +675,7 @@ void Game::computeCity(City& city) {
     cy.food = std::max(cy.food, 2) + 1;
     if (hasTech(c, ID.tCooking)) cy.food += 1;
     if (freshWater(city.x, city.y)) cy.food += 1;  // a river, lake or oasis to drink from
+    if (isMajor(c)) cy.food += civs[c].tribeFoodAll + (city.capital ? civs[c].tribeFoodCapital : 0);  // gifts from maritime tribes
     cy.prod = std::max(cy.prod, 1) + 1;
     if (hasGold(c)) cy.gold += 1;
     total += cy;
@@ -739,7 +741,7 @@ void Game::computeCity(City& city) {
     MoodParts mp = moodParts(city);
     city.happy = mp.happy();
     city.unhappy = mp.unhappy();
-    int mood = c >= FIRST_PRIMATE_CIV ? moodOf(city) : MOOD_CONTENT;
+    int mood = isMajor(c) ? moodOf(city) : MOOD_CONTENT;
     if (mood == MOOD_CELEBRATING) { pct.food += 10; pct.gold += 10; }
     if (mood == MOOD_UNREST) { pct.prod -= 25; pct.sci -= 25; pct.cult -= 25; pct.gold -= 25; }
     total.food = applyPct(total.food, pct.food);
@@ -750,7 +752,7 @@ void Game::computeCity(City& city) {
     total.gold = hasGold(c) ? applyPct(total.gold, pct.gold) : 0;
     city.yields = total;
     city.foodSurplus = total.food - 2 * city.pop;
-    if (city.happy <= city.unhappy && c >= FIRST_PRIMATE_CIV && city.foodSurplus > 0) city.foodSurplus = 0;  // a new citizen needs happiness to spare
+    if (city.happy <= city.unhappy && isMajor(c) && city.foodSurplus > 0) city.foodSurplus = 0;  // a new citizen needs happiness to spare
 }
 
 int Game::cityStrength(const City& city) const {
@@ -959,6 +961,10 @@ int Game::turnsToGrow(const City& city) const {
 void Game::captureCity(City& city, int newOwner) {
     int old = city.owner;
     markResourcesDirty();
+    allyResTurn = -1;
+    if (isMinor(old) && isMajor(newOwner))  // swallowing a tribe alarms the others
+        for (int t = FIRST_PRIMATE_CIV; t < (int)civs.size(); t++)
+            if (t != old && isMinor(t) && civs[t].alive && civs[t].met[newOwner]) addInfluence(newOwner, t, -30);
     // units of the old owner in the city are lost
     for (auto& u : units)
         if (u.alive && u.x == city.x && u.y == city.y && u.owner != newOwner) killUnit(u);
@@ -1089,7 +1095,7 @@ int Game::moveCost(const Unit& u, int fx, int fy, int tx, int ty) const {
     if (t.mountain) return -1;
     if (!warHappened && t.site >= 0) return -1;  // living human settlements are off limits
     // closed borders: at peace, military units stay out of other civilisations' lands
-    if (t.owner >= FIRST_PRIMATE_CIV && t.owner != u.owner && u.owner >= FIRST_PRIMATE_CIV && ud.military() && ud.cls != UnitClass::Recon &&
+    if (t.owner >= FIRST_PRIMATE_CIV && !civs[t.owner].minor && t.owner != u.owner && u.owner >= FIRST_PRIMATE_CIV && ud.military() && ud.cls != UnitClass::Recon &&
         !civs[u.owner].war[t.owner] && !bordersOpenTo(t.owner, u.owner) && at(fx, fy).owner != t.owner)
         return -1;
     bool toWater = isWater(tx, ty), fromWater = isWater(fx, fy);
@@ -1439,6 +1445,7 @@ CombatResult Game::attackImpl(Unit& u, int tx, int ty) {
         notify(def->owner, msg, tx, ty);
         int dx = tx, dy = ty;
         if (res.defenderDied && g_units[def->type].naval() && u.owner >= FIRST_PRIMATE_CIV) civs[u.owner].shipsSunk++;
+        if (res.defenderDied && def->owner == CIV_FERAL) feralKilled(u.owner, *def);  // the tribes are grateful
         if (u.owner >= FIRST_PRIMATE_CIV && def->owner >= FIRST_PRIMATE_CIV) {  // losses wear a people down
             if (res.defenderDied) addWeariness(def->owner, 3);
             if (res.attackerDied) addWeariness(u.owner, 3);

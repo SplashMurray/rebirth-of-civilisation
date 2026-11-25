@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(RebirthOfCivilisation VERSION 0.14.0 LANGUAGES C CXX)
+project(RebirthOfCivilisation VERSION 0.15.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -29,6 +29,7 @@ add_library(rebirth_game STATIC
   src/core/Trade.cpp
   src/core/Rivers.cpp
   src/core/Happiness.cpp
+  src/core/Tribes.cpp
   src/core/Achievements.cpp
   src/core/Save.cpp
   src/ui/GameUI.cpp

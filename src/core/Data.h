@@ -254,6 +254,22 @@ extern std::vector<BuildingDef> g_buildings;
 extern std::vector<TechDef> g_techs;
 extern std::vector<PolicyDef> g_policies;
 extern std::vector<PrimateDef> g_primates;
+
+// ---------------------------------------------------------------- minor tribes
+// Small one-city peoples of other primate species. Befriend them for their gifts; their ally also gets
+// their resources and their spears.
+enum TribeKind { TK_CULTURED, TK_LEARNED, TK_MERCANTILE, TK_MARITIME, TK_MILITANT, TK_COUNT };
+struct TribeDef {
+    std::string name;       // "Lemurs"
+    std::string adjective;  // "Lemur"
+    std::string city;       // their home
+    std::string elder;      // who speaks for them
+    int kind;               // TribeKind
+    Color color;
+};
+extern std::vector<TribeDef> g_tribes;
+extern const char* TRIBE_KIND_NAMES[TK_COUNT];
+extern const char* TRIBE_KIND_GIFTS[TK_COUNT];
 extern std::vector<TraitDef> g_traits;
 extern std::vector<std::string> g_humanCityNames;
 

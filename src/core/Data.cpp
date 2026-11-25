@@ -17,6 +17,9 @@ std::vector<BuildingDef> g_buildings;
 std::vector<TechDef> g_techs;
 std::vector<PolicyDef> g_policies;
 std::vector<PrimateDef> g_primates;
+std::vector<TribeDef> g_tribes;
+const char* TRIBE_KIND_NAMES[TK_COUNT] = {"Cultured", "Learned", "Mercantile", "Maritime", "Militant"};
+const char* TRIBE_KIND_GIFTS[TK_COUNT] = {"Culture", "Science", "Gold", "Food", "Troops"};
 std::vector<TraitDef> g_traits;
 std::vector<std::string> g_humanCityNames;
 DataIds ID;
@@ -139,6 +142,24 @@ void initData() {
         {"Lumber Camp", 0, 1, 0, "Woodcraft", 5},
         {"Trading Post", 0, 0, 2, "Currency", 5},
         {"Pasture", 1, 1, 0, "Animal Taming", 4},
+    };
+
+    // minor tribes: name, adjective, home, elder, kind, colour
+    g_tribes = {
+        {"Ring-tailed Lemurs", "Lemur", "Isalo", "Matriarch Vola", TK_CULTURED, rgb(190, 190, 200)},
+        {"Mandrills", "Mandrill", "Moukalaba", "Old Bluenose", TK_MILITANT, rgb(70, 110, 200)},
+        {"Howler Monkeys", "Howler", "Barro Colorado", "Loudest Voice", TK_CULTURED, rgb(150, 70, 40)},
+        {"Spider Monkeys", "Spider Monkey", "Calakmul", "Long-Arms", TK_MERCANTILE, rgb(60, 50, 40)},
+        {"Tarsiers", "Tarsier", "Bohol", "Wide-Eyes", TK_LEARNED, rgb(200, 160, 110)},
+        {"Proboscis Monkeys", "Proboscis", "Klias", "Great Nose", TK_MARITIME, rgb(230, 150, 90)},
+        {"Geladas", "Gelada", "Guassa", "Bleeding-Heart", TK_MILITANT, rgb(170, 40, 50)},
+        {"Colobus Monkeys", "Colobus", "Kakamega", "White Mantle", TK_LEARNED, rgb(235, 235, 235)},
+        {"Marmosets", "Marmoset", "Atlantica", "Tufted Ear", TK_MERCANTILE, rgb(210, 200, 120)},
+        {"Snub-nosed Monkeys", "Snub-nosed", "Shennongjia", "Golden Coat", TK_LEARNED, rgb(240, 170, 40)},
+        {"Uakaris", "Uakari", "Jau", "Red-Face", TK_MARITIME, rgb(220, 60, 60)},
+        {"Hanuman Langurs", "Langur", "Ranthambore", "Grey Sage", TK_CULTURED, rgb(150, 150, 140)},
+        {"Drills", "Drill", "Bioko", "Black-Mask", TK_MILITANT, rgb(40, 40, 60)},
+        {"Squirrel Monkeys", "Squirrel Monkey", "Pacaya", "Quick-Tail", TK_MARITIME, rgb(240, 200, 60)},
     };
 
     // name, food, prod, gold (added to the tile), description

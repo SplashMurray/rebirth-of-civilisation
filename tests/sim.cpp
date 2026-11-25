@@ -220,13 +220,13 @@ int main(int argc, char** argv) {
         {
             int moods[4] = {}, lux = 0, nciv = 0, pop = 0, ncity = 0, wear = 0;
             for (int c = FIRST_PRIMATE_CIV; c < (int)g.civs.size(); c++) {
-                if (!g.civs[c].alive) continue;
+                if (!g.civs[c].alive || g.civs[c].minor) continue;
                 nciv++;
                 lux += g.luxuryCount(c);
                 wear += g.civs[c].weariness;
             }
             for (auto& ci : g.cities)
-                if (ci.alive && ci.owner >= FIRST_PRIMATE_CIV) {
+                if (ci.alive && g.isMajor(ci.owner)) {
                     moods[g.moodOf(ci) + 2]++;
                     pop += ci.pop;
                     ncity++;
@@ -234,6 +234,23 @@ int main(int argc, char** argv) {
                 }
             std::printf("mood: unrest %d unhappy %d content %d celebrating %d; avg luxuries %.1f, avg city size %.1f, avg weariness %.0f\n", moods[0], moods[1],
                         moods[2], moods[3], nciv ? (double)lux / nciv : 0, ncity ? (double)pop / ncity : 0, nciv ? (double)wear / nciv : 0);
+        }
+        {
+            int alive = 0, total = 0, allied = 0, friends = 0, quests = 0;
+            for (int t = FIRST_PRIMATE_CIV; t < (int)g.civs.size(); t++) {
+                if (g.isMajor(t)) { quests += g.civs[t].questsCompleted; continue; }
+                total++;
+                if (!g.civs[t].alive) continue;
+                alive++;
+                const Civ& tv = g.civs[t];
+                CHECK(g.numCities(t) <= 1, "tribe with %d cities", g.numCities(t));
+                if (tv.ally >= 0) {
+                    allied++;
+                    CHECK(g.isMajor(tv.ally) && tv.influence[tv.ally] >= TRIBE_ALLY - 1 && !tv.war[tv.ally], "bad tribe ally");
+                }
+                for (int m = FIRST_PRIMATE_CIV; m < (int)g.civs.size(); m++) if (g.isMajor(m) && g.tribeStatus(m, t) == TS_FRIEND) friends++;
+            }
+            std::printf("tribes: %d of %d alive, %d allied, %d friendships, %d quests completed\n", alive, total, allied, friends, quests);
         }
         int sailed = 0;
         for (auto& cv : g.civs) sailed += cv.riverSailed;

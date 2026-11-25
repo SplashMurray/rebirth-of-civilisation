@@ -375,6 +375,11 @@ void Game::aiTrader(Unit& uref) {
         if (d != c) {
             v += opinion(c, d) / 8;  // happier to enrich friends
             if (civs[c].grievance[d] > 20) v -= 6;
+            if (isMinor(d)) {  // caravans win a tribe's favour
+                int inf = influenceFor(c, d);
+                v += inf < TRIBE_ALLY + 10 ? 10 : 4;
+                if (civs[d].questKind == TQ_ROUTE && !(c < (int)civs[d].questDone.size() && civs[d].questDone[c])) v += 15;
+            }
         }
         return v;
     };
