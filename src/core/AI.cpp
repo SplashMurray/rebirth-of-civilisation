@@ -39,6 +39,7 @@ int Game::aiSiteScore(int c, int x, int y) const {
         if (t.terrain == T_COAST && dist(x, y, p.x, p.y) == 1) coast = true;
     }
     if (coast) s += 4;
+    if (freshWater(x, y)) s += 6;  // +1 food in the centre, and river cities are ports
     if (at(x, y).hills) s += 3;
     return s;
 }
@@ -373,6 +374,11 @@ void Game::aiCity(City& city) {
     else if (isCoastal(city.x, city.y) && ships < aiShipWant(c, atWarAny) && aiBestShip(c, ships % 2 == 1) >= 0 && rng.chance(sk >= 2 ? 0.8 : 0.5)) {
         kind = BK_UNIT;
         id = aiBestShip(c, ships % 2 == 1);
+    }
+    else if (!isCoastal(city.x, city.y) && hasRiver(city.x, city.y) && ships < aiShipWant(c, atWarAny) && aiBestShip(c, ships % 2 == 1, true) >= 0 &&
+             rng.chance(sk >= 2 ? 0.4 : 0.2)) {
+        kind = BK_UNIT;  // a river boat to patrol the river
+        id = aiBestShip(c, ships % 2 == 1, true);
     }
     else if (sk >= 2 && atWarAny && pd && pd->aggression >= 6 && cv.warheads == 0 && canBuild(city, BK_UNIT, ID.uNuke) && rng.chance(0.15)) {
         kind = BK_UNIT;

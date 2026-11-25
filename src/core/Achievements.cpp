@@ -21,6 +21,7 @@ const std::vector<AchievementDef> g_achievements = {
     {"DIG_IT", "Dig It", "Excavate a layer of a human ruin.", "Evolution and the Old World"},
     {"ARCHAEOLOGIST", "Archaeologist", "Excavate 25 ruin layers in one game.", "Evolution and the Old World"},
     {"CLEAN_UP_CREW", "Clean-Up Crew", "Decontaminate fallout 10 times in one game.", "Evolution and the Old World"},
+    {"NATURE_WATCH", "Nature Watch", "Discover 3 natural wonders in one game.", "Evolution and the Old World"},
     // building a civilisation
     {"MONEY_TALKS", "Money Talks", "Discover Currency.", "Civilisation"},
     {"GROWING_EMPIRE", "Growing Empire", "Control 6 cities at once.", "Civilisation"},
@@ -37,6 +38,7 @@ const std::vector<AchievementDef> g_achievements = {
     {"WARLORD", "Warlord", "Capture or raze 10 cities in one game.", "War"},
     {"PARADISE_LOST", "Paradise Lost", "Lose a city.", "War"},
     {"SEA_LEGS", "Sea Legs", "Launch your first warship.", "War"},
+    {"UP_THE_CREEK", "Up the Creek", "Sail boats 20 tiles along rivers in one game.", "War"},
     {"RULER_OF_THE_WAVES", "Ruler of the Waves", "Sink 10 enemy ships in one game.", "War"},
     {"ALL_ABOARD", "All Aboard", "Carry a land unit aboard a ship.", "War"},
     {"OUT_WITH_THE_OLD", "Out With the Old", "Upgrade a unit.", "War"},
@@ -143,6 +145,7 @@ std::vector<std::string> checkAchievements(const Game& g, AchievementStore& st) 
     give("DIG_IT", cv.ruinsExcavated >= 1);
     give("ARCHAEOLOGIST", cv.ruinsExcavated >= 25);
     give("CLEAN_UP_CREW", cv.falloutCleaned >= 10);
+    give("NATURE_WATCH", cv.naturalsFound >= 3);
     give("MONEY_TALKS", g.hasGold(p));
     give("GROWING_EMPIRE", cities >= 6);
     give("CONCRETE_JUNGLE", biggest >= 15);
@@ -160,6 +163,7 @@ std::vector<std::string> checkAchievements(const Game& g, AchievementStore& st) 
     for (auto& u : g.units) if (u.alive && u.owner == p && g_units[u.type].naval()) ship = true;
     give("SEA_LEGS", ship);
     give("RULER_OF_THE_WAVES", cv.shipsSunk >= 10);
+    give("UP_THE_CREEK", cv.riverSailed >= 20);
     give("ALL_ABOARD", cv.unitsFerried > 0);
     give("OUT_WITH_THE_OLD", cv.unitsUpgraded > 0);
     give("HERE_WE_GO_AGAIN", cv.nukesLaunched > 0);

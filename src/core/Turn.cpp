@@ -9,6 +9,7 @@ void revealAround(Game& g, int c, int x, int y, int r) {
         cv.visible[i] = 1;
         cv.explored[i] = 1;
     }
+    g.discoverNaturals(c, x, y, r);
     // meet anyone we can now see
     for (auto& u : g.units)
         if (u.alive && u.owner != c && u.owner >= FIRST_PRIMATE_CIV && !cv.met[u.owner] && g.dist(u.x, u.y, x, y) <= r)
@@ -158,6 +159,7 @@ void Game::endTurn() {
         if (civs[c].alive && !civs[c].player) aiTurn(c);
     feralTurn();
     tradeTurn();
+    volcanoTurn();
     regrowForage();
     for (int c = 0; c < (int)civs.size(); c++)
         if (civs[c].alive && !civs[c].humans) processCiv(c);
@@ -259,7 +261,7 @@ void Game::processCity(City& city) {
                         for (int k = 0; k < n; k++)
                         {
                             // ships launch onto the water next to the city, everything else steps onto land
-                            bool terrainOk = ud.naval() ? isWater(nb[k].x, nb[k].y) && moveCost(probe, city.x, city.y, nb[k].x, nb[k].y) >= 0
+                            bool terrainOk = ud.naval() ? moveCost(probe, city.x, city.y, nb[k].x, nb[k].y) >= 0
                                                         : !isWater(nb[k].x, nb[k].y) && !at(nb[k].x, nb[k].y).mountain;
                             if (terrainOk && canEnter(probe, nb[k].x, nb[k].y) && !isEnemyTarget(c, nb[k].x, nb[k].y)) { spot = nb[k]; break; }
                         }
@@ -371,6 +373,7 @@ void Game::processUnitsEndOfTurn(int c) {
                 } else if (u.order == ORD_BUILD) {
                     t.imp = (uint8_t)u.buildImp;
                     if (t.imp == IMP_FARM && t.veg == V_JUNGLE) t.veg = V_NONE;
+                    if (t.imp == IMP_FARM && t.feature == F_MARSH) t.feature = F_NONE;  // drained
                     notify(c, g_improvements[u.buildImp].name + " completed.", u.x, u.y);
                 } else {
                     if (t.fallout > 0) t.fallout--;

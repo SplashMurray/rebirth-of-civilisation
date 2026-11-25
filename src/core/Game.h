@@ -27,6 +27,17 @@ struct Tile {
     uint8_t fallout = 0;    // 0..3
     uint8_t foraged = 0;    // 0..3: how picked-over the land is by roaming bands
     uint8_t road = 0;       // RoadLevel
+    uint8_t river = 0;      // bitmask of the directions (0..5) a river joins this tile to its neighbours
+    int8_t riverOut = -1;   // the direction the river flows on towards the sea (-1: none)
+    uint8_t riverSize = 0;  // RiverSize
+    uint8_t feature = F_NONE;
+    int8_t natural = -1;    // natural wonder (index into g_naturals) when feature == F_WONDER
+};
+
+// A natural wonder on the map and which species have found it.
+struct NaturalSite {
+    int type = 0, x = 0, y = 0;
+    std::vector<uint8_t> found;  // per civ
 };
 
 // A caravan's trade route: from one of the owner's cities to another city, for a set number of turns.
@@ -149,6 +160,7 @@ struct Civ {
     int disastersSuffered = 0, warsDeclared = 0, falloutCleaned = 0, maxBand = 0, shipsSunk = 0;
     int unitsUpgraded = 0, unitsFerried = 0;
     int routesMade = 0, routesPlundered = 0, bestRoad = 0;
+    int naturalsFound = 0, riverSailed = 0;  // natural wonders seen, river tiles sailed
     int lastDisaster = -100;
     // diplomacy: memories of how others treated us, and treaties
     std::vector<int> grievance;       // wrongs done to us by each civ (decays)
@@ -186,7 +198,7 @@ struct Notification {
     int x = -1, y = -1;
 };
 
-enum PopupKind { POP_INFO, POP_NUKE, POP_INTRO, POP_TECH, POP_RUIN, POP_WAR, POP_VICTORY, POP_DEFEAT, POP_WONDER, POP_EVOLUTION, POP_DISASTER, POP_SETTLE, POP_DEAL };
+enum PopupKind { POP_INFO, POP_NUKE, POP_INTRO, POP_TECH, POP_RUIN, POP_WAR, POP_VICTORY, POP_DEFEAT, POP_WONDER, POP_EVOLUTION, POP_DISASTER, POP_SETTLE, POP_DEAL, POP_NATURAL };
 struct Popup {
     int kind = POP_INFO;
     std::string title, body;
@@ -423,6 +435,21 @@ public:
     bool canEmbark(int c, int x, int y) const;
     bool isCoastal(int x, int y) const;  // next to water
     void aiNaval(Unit& u);
+    // ---- rivers and terrain features (Rivers.cpp)
+    std::vector<NaturalSite> naturals;
+    int dirTo(int fx, int fy, int tx, int ty) const;           // 0..5, or -1 if not neighbours
+    bool hasRiver(int x, int y) const { return !isWater(x, y) && at(x, y).river != 0; }
+    bool riverLink(int fx, int fy, int tx, int ty) const;      // a river runs straight from one tile into the other
+    bool downstream(int fx, int fy, int tx, int ty) const;     // ... and flows that way
+    bool isFalls(int x, int y) const;                          // boats cannot pass a waterfall
+    bool waterStep(int fx, int fy, int tx, int ty, bool ocean, bool river) const;  // could a boat go this way?
+    bool isPort(int x, int y) const;                           // on the coast, a lake or a navigable river
+    bool freshWater(int x, int y) const;                       // on or beside a river, lake or oasis
+    bool shipCanStand(const Unit& u, int x, int y) const;
+    void generateRivers(const std::vector<double>& elev);
+    void generateFeatures();
+    void discoverNaturals(int c, int x, int y, int r);
+    void volcanoTurn();
     // ---- diplomacy (Diplomacy.cpp)
     std::vector<Agreement> agreements;
     // ---- trade and roads (Trade.cpp)
@@ -497,7 +524,7 @@ public:
     bool aiFerryJob(const Unit& ship) const;
     int aiNeedsTransport(const City& port) const;  // unit type to build for waiting passengers, or -1
     int aiShipWant(int c, bool atWar) const;
-    int aiBestShip(int c, bool wantRanged) const;
+    int aiBestShip(int c, bool wantRanged, bool riverOnly = false) const;
     std::vector<Pt> findPath(const Unit& u, int tx, int ty, bool ignoreUnits = false) const;
     bool stepUnit(Unit& u, int nx, int ny);
     void continueGoto(Unit& u);

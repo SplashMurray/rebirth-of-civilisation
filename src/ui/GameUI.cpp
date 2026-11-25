@@ -552,21 +552,35 @@ void GameUI::renderTileInfo() {
     if (over(0, H - 190, 420, 190) || over(W - 260, H - 260, 260, 260)) return;
     const Tile& t = g.at(hoverX, hoverY);
     std::vector<std::pair<std::string, Color>> lines;
-    std::string terr = t.mountain ? "Mountains" : g_terrain[t.terrain].name;
+    std::string terr = t.feature == F_WONDER && t.natural >= 0 ? g_naturals[t.natural].name
+                       : t.feature == F_LAKE ? std::string("Lake")
+                       : t.feature == F_VOLCANO ? std::string("Volcano")
+                       : t.mountain ? "Mountains" : g_terrain[t.terrain].name;
     if (t.hills) terr += ", Hills";
+    if (t.feature == F_FLOODPLAIN || t.feature == F_MARSH || t.feature == F_OASIS || t.feature == F_REEF) terr += ", " + g_features[t.feature].name;
     if (t.veg == V_FOREST) terr += ", Forest";
     if (t.veg == V_JUNGLE) terr += ", Jungle";
     if (g.resourceVisible(g.player, hoverX, hoverY)) terr += ", " + g_resources[t.res].name;
     if (t.imp) terr += ", " + g_improvements[t.imp].name;
     if (t.road) terr += ", " + g_roads[t.road].name;
     lines.push_back({terr, C_TEXT});
+    if (g.hasRiver(hoverX, hoverY)) {
+        static const char* RS[] = {"", "Stream", "River", "Great river"};
+        std::string rv = std::string(RS[t.riverSize]) + ": navigable by river boats, downstream is faster; +1 gold";
+        if (g.isFalls(hoverX, hoverY)) rv = "Waterfall: boats cannot pass";
+        lines.push_back({rv, rgb(130, 190, 240)});
+    }
+    if (t.feature == F_WONDER && t.natural >= 0) lines.push_back({"Natural wonder: " + g_naturals[t.natural].desc, rgb(240, 214, 140)});
+    else if (t.feature != F_NONE && !g_features[t.feature].desc.empty()) lines.push_back({g_features[t.feature].desc, rgb(170, 200, 150)});
+    if (!g.isWater(hoverX, hoverY) && !t.mountain && g.freshWater(hoverX, hoverY) && g.canFoundAt(g.player, hoverX, hoverY))
+        lines.push_back({"Fresh water: a city here gets +1 food", rgb(130, 190, 240)});
     for (auto& r : g.routes) {  // trade routes through here
         if (r.owner != g.player && (r.to < 0 || g.cities[r.to].owner != g.player)) continue;
         if (std::find(r.path.begin(), r.path.end(), g.idx(hoverX, hoverY)) == r.path.end()) continue;
         lines.push_back({"Trade route: " + g.cities[r.from].name + " - " + g.cities[r.to].name + " (" + std::to_string(std::max(0, r.until - g.turn)) + " turns left)",
                          rgb(240, 200, 110)});
     }
-    if (!t.mountain) lines.push_back({yieldsStr(g.tileYields(g.player, hoverX, hoverY)), C_DIM});
+    if (!t.mountain || t.feature == F_WONDER) lines.push_back({yieldsStr(g.tileYields(g.player, hoverX, hoverY)), C_DIM});
     if (g.resourceVisible(g.player, hoverX, hoverY)) {
         const ResourceDef& rd = g_resources[t.res];
         static const char* KIND[] = {"Bonus resource", "Strategic resource", "Luxury resource", "Crop"};
@@ -1737,8 +1751,8 @@ void GameUI::renderHelp() {
         "no gold, resources or research pacts pass between you until you lift it. Making peace brings a treaty that forbids "
         "war for a while. Breaking a friendship by war is a betrayal everyone remembers. Rivals send you proposals - and demands - of their own.\n"
         "TRADE  With Currency your cities can train Caravans. Move one into a city of yours and choose Trade Route: it sets off for a city "
-        "of yours or of another species you have met - overland up to 15 tiles, or by sea between coastal cities (Rafts along the coast, "
-        "Navigation across the ocean). A route lasts 30 turns (longer at slower speeds), then the caravan comes home to be sent out again. Foreign routes earn gold (and "
+        "of yours or of another species you have met - overland up to 15 tiles, or by boat between ports - cities on the coast, a lake or a "
+        "river - along coasts, lakes and rivers (Rafts), or across the ocean (Navigation). A route lasts 30 turns (longer at slower speeds), then the caravan comes home to be sent out again. Foreign routes earn gold (and "
         "science if they know things you don't) and give them a share; routes between your own cities bring food and production. Roads along "
         "the way make a route richer, the sea pays a bonus too, and trading partners like each other more. The number of routes is limited: one "
         "with Currency, one more each with Navigation, Banking, Industrialisation and Computing, and one for every two Markets. "
@@ -1748,6 +1762,17 @@ void GameUI::renderHelp() {
         "time: Worn Track, Dirt Road (Bartering), Cobblestone Road (Construction), Paved Road (Industrialisation) and Tarmac Road (Combustion). "
         "Moving between two road tiles costs two-thirds of the usual on a track, then a half, a third, a quarter and a sixth of a move. "
         "Cities count as roads. Roads serve everyone - including invaders.\n"
+        "RIVERS  Rivers run from the hills down to the sea and to lakes, and they are navigable. Dugout Canoes, War Galleys, Archer Galleys, "
+        "Ironclads and River Gunboats (Steam Power, Coal) can sail up and down them; downstream, riding the current, costs two-thirds of a "
+        "move. Ocean-going ships are too big for rivers. A city on a river is a port for river boats even far inland: it can build them and "
+        "trade by water, and a river boat can carry troops deep inland. Waterfalls block the way. Land units fording a river - entering a "
+        "river tile from the side - lose half a move, unless a road crosses it (a bridge). River tiles give +1 gold, and a city on or beside "
+        "a river, lake or oasis has fresh water: +1 food. Rivers sometimes flood the cities on their banks.\n"
+        "TERRAIN FEATURES  Floodplains (+2 food, +1 more when farmed) line rivers through dry land. Marshes are slow going and poor until a "
+        "farm drains them. Oases give food and gold in the desert. Reefs feed coastal cities. The ash of a volcano makes the land around it "
+        "fertile (+1 food, +1 production), but now and then it erupts, wrecking improvements and hurting anything nearby. Lakes are fresh "
+        "water that coastal boats can sail. Each map also holds a few natural wonders: the first species to find one is inspired (culture "
+        "and science), later finders less so, and a city that works one gets rich yields. Cities cannot be founded on them.\n"
         "NAVAL WARFARE  Coastal cities build ships: Dugout Canoes (Rafts), War Galleys (Bronze Working, needs Copper) and Archer Galleys "
         "(Archery) keep to coastal waters; Caravels (Navigation), Frigates (Gunpowder), Ironclads (Steam Power, Coal), Salvaged Destroyers "
         "(Combustion, Oil) and Salvaged Battleships (Motorised Warfare, Oil) cross the ocean. Ships move on water and dock in your own "
@@ -1847,7 +1872,7 @@ void GameUI::renderPopup() {
     if (p.kind == POP_NUKE) ph = std::max(ph, 330);
     int px = (W - pw) / 2, py = std::max(TOP + 10, (H - ph) / 2);
     Color head = p.kind == POP_NUKE ? rgb(150, 50, 30) : p.kind == POP_WAR ? rgb(140, 40, 40) : p.kind == POP_VICTORY ? rgb(150, 120, 40) :
-                 p.kind == POP_DEFEAT ? rgb(80, 40, 40) : p.kind == POP_RUIN ? rgb(130, 84, 40) : p.kind == POP_TECH ? rgb(40, 80, 130) : p.kind == POP_EVOLUTION ? rgb(40, 110, 70) : p.kind == POP_DISASTER ? rgb(150, 70, 20) : p.kind == POP_SETTLE ? rgb(150, 112, 40) : p.kind == POP_DEAL ? rgb(60, 90, 120) : rgb(56, 70, 92);
+                 p.kind == POP_DEFEAT ? rgb(80, 40, 40) : p.kind == POP_RUIN ? rgb(130, 84, 40) : p.kind == POP_TECH ? rgb(40, 80, 130) : p.kind == POP_EVOLUTION ? rgb(40, 110, 70) : p.kind == POP_DISASTER ? rgb(150, 70, 20) : p.kind == POP_SETTLE ? rgb(150, 112, 40) : p.kind == POP_DEAL ? rgb(60, 90, 120) : p.kind == POP_NATURAL ? rgb(40, 104, 96) : rgb(56, 70, 92);
     cv->fillRectA(0, TOP, W, H - TOP, rgb(0, 0, 0), 70);  // dim the world behind
     for (int k = 4; k >= 1; k--) cv->fillRoundRectGrad(px - k * 2 + 3, py - k * 2 + 6, pw + k * 4, ph + k * 4, 10 + k * 2, rgb(0, 0, 0), rgb(0, 0, 0), 30);
     cv->fillRoundRectGrad(px, py, pw, ph, 10, rgb(36, 41, 52), rgb(16, 19, 25));

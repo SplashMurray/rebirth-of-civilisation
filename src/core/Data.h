@@ -7,6 +7,28 @@
 enum Terrain : uint8_t { T_OCEAN, T_COAST, T_GRASS, T_PLAINS, T_DESERT, T_TUNDRA, T_SNOW, T_COUNT };
 enum Vegetation : uint8_t { V_NONE, V_FOREST, V_JUNGLE };
 
+// Terrain features: changes to a tile's land beyond its terrain, vegetation and relief.
+enum Feature : uint8_t { F_NONE, F_FLOODPLAIN, F_MARSH, F_OASIS, F_VOLCANO, F_REEF, F_LAKE, F_WONDER, F_COUNT };
+struct FeatureDef {
+    std::string name;
+    int food, prod, gold;
+    std::string desc;
+};
+extern std::vector<FeatureDef> g_features;
+
+// Natural wonders: one-of-a-kind places. Discovering one inspires a species; working it pays well.
+enum WonderSite { WS_FALLS, WS_FLAT, WS_HILLS, WS_REEF, WS_SALT, WS_COLD, WS_PEAK, WS_MESA };
+struct NaturalDef {
+    std::string name;
+    Yields y;
+    int site;           // WonderSite: where it can appear
+    std::string desc;
+};
+extern std::vector<NaturalDef> g_naturals;
+
+// River sizes, from a stream to a great river, by how much land drains into them.
+enum RiverSize : uint8_t { RIVER_NONE, RIVER_STREAM, RIVER_RIVER, RIVER_GREAT };
+
 struct TerrainDef {
     std::string name;
     int food, prod, gold;
@@ -84,6 +106,7 @@ struct UnitDef {
     std::vector<int> needs;  // strategic resources required to train it
     bool ocean = false;      // ships: can leave the coast for the open ocean
     int cargo = 0;           // ships: land units it can carry
+    bool river = false;      // ships: shallow enough to sail up rivers
     int upgradeId = -1;      // the next unit in this unit's line (base units only)
     bool civilian() const { return cls == UnitClass::Settler || cls == UnitClass::Worker || cls == UnitClass::Band || cls == UnitClass::Trader; }
     bool military() const { return !civilian() && cls != UnitClass::Nuke; }

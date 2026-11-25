@@ -105,7 +105,10 @@ Color GameUI::groundColor(int x, int y) const {
     bool water = g.isWater(x, y);
     uint32_t h = hashXY(x, y);
     Color base = g_terrain[t.terrain].color;
-    if (water) base = t.terrain == T_COAST ? rgb(42, 108, 156) : rgb(22, 50, 96);
+    if (water) base = t.feature == F_LAKE ? rgb(48, 118, 150) : t.terrain == T_COAST ? rgb(42, 108, 156) : rgb(22, 50, 96);
+    if (t.feature == F_FLOODPLAIN) base = blend(base, rgb(112, 128, 64), 0.45f);
+    if (t.feature == F_MARSH) base = blend(base, rgb(76, 104, 76), 0.5f);
+    if (t.feature == F_OASIS) base = blend(base, rgb(150, 168, 90), 0.35f);
     int v = (int)(h % 9) - 4;
     if (water) v /= 2;
     base = rgb(base.r + v, base.g + v, base.b + v);
@@ -188,7 +191,7 @@ void GameUI::drawTile(int x, int y, int sx, int sy, bool visible) {
                 int wv[8] = {wx - u / 6, wy, wx - u / 12, wy - u / 20, wx, wy, wx + u / 12, wy - u / 20};
                 cv->polylineA(wv, 4, rgb(220, 240, 255), lw, 34);
             }
-        } else if (t.veg == V_NONE && !t.hills) {
+        } else if (t.veg == V_NONE && !t.hills && t.feature == F_NONE) {
             switch (t.terrain) {
                 case T_GRASS:
                     for (int k = 0; k < 4; k++) {
@@ -224,8 +227,12 @@ void GameUI::drawTile(int x, int y, int sx, int sy, bool visible) {
         }
     }
     drawRoads(x, y, sx, sy);
+    bool special = t.feature == F_VOLCANO || t.feature == F_WONDER;
+    bool keepHills = t.feature == F_WONDER && t.natural >= 0 && g_naturals[t.natural].site == WS_FALLS;
     // relief
-    if (t.mountain) {
+    if (special && !keepHills) {
+        // volcanoes and natural wonders draw their own shapes below
+    } else if (t.mountain) {
         bool coldPeak = t.terrain == T_SNOW || t.terrain == T_TUNDRA;
         Color rock = t.terrain == T_DESERT ? rgb(168, 140, 104) : rgb(126, 118, 110);
         cv->glowEllipse(PX(0), PY(5), u * 8 / 10, u / 4, rgb(0, 0, 0), 110);  // shadow at its foot
@@ -298,6 +305,12 @@ void GameUI::drawTile(int x, int y, int sx, int sy, bool visible) {
             }
         }
     }
+    drawFeature(x, y, sx, sy);
+    if (t.river) {  // the river over the ground and plants, and any road over the river on a bridge
+        drawRiver(x, y, sx, sy);
+        if (g.roadLevelAt(x, y) > 0 && !water) drawRoads(x, y, sx, sy);
+    }
+    if (t.feature == F_WONDER) drawNatural(x, y, sx, sy);
     if (t.site >= 0) drawHumanSite(x, y, sx, sy, true);
     // improvements
     if (t.imp != IMP_NONE && hs >= 16) {
@@ -791,7 +804,7 @@ void GameUI::drawPathPreview() {
 }
 
 static const Color MAP_BG = {8, 10, 14};
-static const uint64_t TERRAIN_STYLE = 3;  // bump to invalidate cached terrain when its drawing changes
+static const uint64_t TERRAIN_STYLE = 4;  // bump to invalidate cached terrain when its drawing changes
 
 // Draws the terrain of a block of tiles in the current coordinate system: ground, then what stands on it,
 // then fog of war, the soft edge of the unexplored world, and borders.
@@ -944,6 +957,7 @@ void GameUI::renderMap() {
                             (uint64_t)t.fallout << 8 | (uint64_t)(uint8_t)t.owner << 12 | (uint64_t)t.res << 20 | (uint64_t)t.ruinDone << 28 |
                             (uint64_t)t.terrain << 36 | (uint64_t)t.hills << 40 | (uint64_t)t.mountain << 41 | (uint64_t)t.road << 42 |
                             (uint64_t)(t.city >= 0 && g.cities[t.city].x == x && g.cities[t.city].y == y) << 46);
+                        mix((uint64_t)t.feature | (uint64_t)t.river << 8 | (uint64_t)t.riverSize << 16 | (uint64_t)(uint8_t)t.natural << 24);
                     }
                 uint64_t id = ((uint64_t)(uint32_t)ci << 32) | (uint32_t)cj;
                 int px = (int)(ci * CH - camPX), py = (int)(cj * CH - camPY);
@@ -960,6 +974,8 @@ void GameUI::renderMap() {
         drawTerrainRegion(x0, x1, y0, y1);
     }
     drawLiveWater(x0, x1, y0, y1);
+    drawLiveFeatures(x0, x1, y0, y1);
+    drawNaturalLabels(x0, x1, y0, y1);
     drawTradeRoutes();
     // selected band: what it can forage, and how picked-over the land around it is
     if (overlay == OV_NONE && sel() && g_units[sel()->type].cls == UnitClass::Band && sel()->owner == g.player) {

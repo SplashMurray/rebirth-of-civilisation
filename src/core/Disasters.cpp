@@ -36,8 +36,10 @@ void Game::disasterTurn(int c) {
         if (!ci.alive || ci.owner != c) continue;
         Pt nb[6];
         int n = neighbors(ci.x, ci.y, nb);
+        bool wet = hasRiver(ci.x, ci.y);
         for (int k = 0; k < n; k++)
-            if (at(nb[k].x, nb[k].y).terrain == T_COAST) { coastal++; break; }
+            if (at(nb[k].x, nb[k].y).terrain == T_COAST) wet = true;
+        if (wet) coastal++;
         crowd += std::max(0, ci.pop - 5) * 2;
     }
     if (warHappened)
@@ -164,11 +166,14 @@ bool Game::triggerDisaster(int c, int type) {
                 const City& ci = cities[id];
                 Pt nb[6];
                 int n = neighbors(ci.x, ci.y, nb);
+                bool wet = hasRiver(ci.x, ci.y);
                 for (int k = 0; k < n; k++)
-                    if (at(nb[k].x, nb[k].y).terrain == T_COAST) { coast.push_back(id); break; }
+                    if (at(nb[k].x, nb[k].y).terrain == T_COAST) wet = true;
+                if (wet) coast.push_back(id);
             }
             if (coast.empty()) return false;
             City& ci = cities[coast[rng.range((int)coast.size())]];
+            bool riverFlood = hasRiver(ci.x, ci.y);
             if (ci.pop > 1) ci.pop--;
             ci.food /= 2;
             int lost = 0;
@@ -178,7 +183,7 @@ bool Game::triggerDisaster(int c, int type) {
             }
             fx = ci.x; fy = ci.y;
             title = "Flood";
-            body = "A storm surge swept into " + ci.name + ". Lives were lost, stores were ruined" +
+            body = (riverFlood ? "The river burst its banks and flooded " : "A storm surge swept into ") + ci.name + ". Lives were lost, stores were ruined" +
                    (lost ? " and " + std::to_string(lost) + " improvements were washed away." : ".");
             pressure("Flood", PC_ECOLOGY, 8, 0, 0);
             pressure("Flood survivors band together", PC_SOCIAL, 0, 1, 6);

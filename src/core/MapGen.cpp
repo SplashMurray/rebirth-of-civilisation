@@ -78,6 +78,8 @@ void Game::generateMap() {
             for (int k = 0; k < n; k++)
                 if (!g_terrain[at(nb[k].x, nb[k].y).terrain].water) { at(x, y).terrain = T_COAST; break; }
         }
+    generateRivers(elev);
+    generateFeatures();
     // resources
     struct Odds { uint8_t r; int pct10; };  // chance in tenths of a percent
     auto roll = [&](Tile& t, std::initializer_list<Odds> table) {
@@ -90,7 +92,7 @@ void Game::generateMap() {
     for (int y = 0; y < H; y++)
         for (int x = 0; x < W; x++) {
             Tile& t = at(x, y);
-            if (t.mountain || t.terrain == T_OCEAN) continue;
+            if (t.mountain || t.terrain == T_OCEAN || t.feature == F_OASIS || t.feature == F_WONDER) continue;
             double lat = std::abs(y - (H - 1) / 2.0) / ((H - 1) / 2.0);
             if (t.terrain == T_COAST) { roll(t, {{R_FISH, 90}}); continue; }
             if (t.hills) {
@@ -139,7 +141,7 @@ void Game::placeHumanity() {
     for (size_t i = names.size(); i > 1; i--) std::swap(names[i - 1], names[rng.range((int)i)]);
     auto okTile = [&](int x, int y) {
         const Tile& t = at(x, y);
-        return !isWater(x, y) && !t.mountain && t.terrain != T_SNOW && t.site < 0;
+        return !isWater(x, y) && !t.mountain && t.terrain != T_SNOW && t.site < 0 && t.feature != F_WONDER && t.feature != F_OASIS;
     };
     auto farFromSites = [&](int x, int y, int d) {
         for (auto& s : sites) if (dist(s.x, s.y, x, y) < d) return false;
@@ -197,6 +199,7 @@ void Game::placeHumanity() {
         t.ruin = (uint8_t)s.type;
         t.veg = V_NONE;
         t.res = R_NONE;
+        if (t.feature == F_MARSH) t.feature = F_NONE;
         int r = s.type == RUIN_CITY ? 2 : 1;
         for (auto& p : ring(s.x, s.y, r))
             if (!isWater(p.x, p.y)) at(p.x, p.y).owner = CIV_HUMANS;
@@ -204,7 +207,10 @@ void Game::placeHumanity() {
             for (auto& p : ring(s.x, s.y, 1)) {
                 Tile& tt = at(p.x, p.y);
                 if (!isWater(p.x, p.y) && !tt.mountain && tt.veg != V_NONE && rng.chance(0.6)) tt.veg = V_NONE;
-                if (!isWater(p.x, p.y) && !tt.mountain && tt.site < 0 && rng.chance(0.5)) tt.imp = IMP_FARM;
+                if (!isWater(p.x, p.y) && !tt.mountain && tt.site < 0 && tt.feature != F_WONDER && tt.feature != F_OASIS && rng.chance(0.5)) {
+                    tt.imp = IMP_FARM;
+                    if (tt.feature == F_MARSH) tt.feature = F_NONE;  // drained
+                }
             }
     }
 }
@@ -220,7 +226,7 @@ std::vector<Pt> Game::chooseStarts(int count) {
         for (int y = 2; y < H - 2; y++)
             for (int x = 2; x < W - 2; x++) {
                 const Tile& t = at(x, y);
-                if (isWater(x, y) || t.mountain || t.terrain == T_SNOW || t.site >= 0 || t.owner >= 0) continue;
+                if (isWater(x, y) || t.mountain || t.terrain == T_SNOW || t.site >= 0 || t.owner >= 0 || t.feature == F_WONDER || t.feature == F_OASIS) continue;
                 bool ok = true;
                 for (auto& s : sites)
                     if (dist(s.x, s.y, x, y) < (s.type == RUIN_CITY ? dCity : 4)) { ok = false; break; }
@@ -243,6 +249,7 @@ std::vector<Pt> Game::chooseStarts(int count) {
                 for (auto& p : ring(x, y, 5)) if (!isWater(p.x, p.y) && !at(p.x, p.y).mountain) room++;
                 c.quality += room / 3;
                 if (t.terrain == T_DESERT) c.quality -= 10;
+                if (freshWater(x, y)) c.quality += 6;
                 cands.push_back(c);
             }
     }

@@ -201,6 +201,13 @@ private:
     void edgeFade(int sx, int sy, const int* xy, int d, float depth, Color c, int a);
     void drawTerrainRegion(int x0, int x1, int y0, int y1);
     void drawLiveWater(int x0, int x1, int y0, int y1);
+    // ---- rivers, lakes, terrain features and natural wonders (UIRivers.cpp)
+    void drawRiver(int x, int y, int sx, int sy);
+    void drawFeature(int x, int y, int sx, int sy);
+    void drawVolcanoCone(int sx, int sy, bool great);
+    void drawNatural(int x, int y, int sx, int sy);
+    void drawNaturalLabels(int x0, int x1, int y0, int y1);
+    void drawLiveFeatures(int x0, int x1, int y0, int y1);
     void drawHumanSite(int x, int y, int sx, int sy, bool visible);
     void drawCityOnMap(const City& c, int sx, int sy);
     void drawCityBanner(const City& c, int sx, int sy);

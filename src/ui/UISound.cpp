@@ -143,6 +143,7 @@ void GameUI::updateSound(int ms) {
             case POP_VICTORY: sfx(Sfx::Victory, 0.9f); break;
             case POP_DEFEAT: sfx(Sfx::Defeat, 0.9f); break;
             case POP_DISASTER: sfx(Sfx::Thunder, 0.7f); break;
+            case POP_NATURAL: sfx(Sfx::Culture, 0.8f); break;
             case POP_NUKE: break;  // the explosion speaks for itself
             default: if (sndNotifyMs <= 0) sfx(Sfx::Notify, 0.5f); break;
         }

@@ -49,6 +49,8 @@ bool Game::canUpgrade(const Unit& u, std::string* why) const {
     if (!inMap(u.x, u.y) || at(u.x, u.y).owner != u.owner) return fail("Must be inside your own territory");
     if (g_units[u.type].naval() && cargoCount(u) > 0) return fail("Unload the ship first");
     if (u.carrier >= 0) return fail("Cannot be refitted while aboard a ship");
+    if (g_units[u.type].naval() && !g_units[to].river && !isWater(u.x, u.y) && !cityAt(u.x, u.y))
+        return fail("A " + g_units[to].name + " is too big for the river: sail out to open water first");
     if (hasGold(u.owner)) {
         int g = upgradeGold(u, to);
         if (civs[u.owner].gold < g) return fail("Costs " + std::to_string(g) + " gold");

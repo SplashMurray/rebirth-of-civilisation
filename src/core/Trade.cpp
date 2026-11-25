@@ -90,25 +90,24 @@ std::vector<int> Game::tradePath(int c, int from, int to, bool sea) const {
         if (cur == goal) break;
         if (steps[cur] >= range) continue;
         int cx = cur % W, cy = cur / W;
-        if (sea && cur != s && !isWater(cx, cy)) continue;  // a city is only a port at either end
+        if (sea && cur != s && !isWater(cx, cy) && !hasRiver(cx, cy)) continue;  // a city is only a port at either end
         Pt nb[6];
         int n = neighbors(cx, cy, nb);
         for (int k = 0; k < n; k++) {
             int ni = idx(nb[k].x, nb[k].y);
             const Tile& t = tiles[ni];
             int step;
-            if (sea) {
-                if (ni != goal) {
-                    if (!isWater(nb[k].x, nb[k].y)) continue;
-                    if (t.terrain == T_OCEAN && !nav) continue;
-                }
-                if (cur == s && !isWater(nb[k].x, nb[k].y)) continue;
-                step = MP;
+            if (sea) {  // by boat: along the coast, across lakes and up and down rivers
+                if (!waterStep(cx, cy, nb[k].x, nb[k].y, nav, true)) continue;
+                if (!isWater(nb[k].x, nb[k].y) && ni != goal && !hasRiver(nb[k].x, nb[k].y)) continue;
+                step = !isWater(cx, cy) && downstream(cx, cy, nb[k].x, nb[k].y) ? MP * 2 / 3 : MP;
             } else {
                 if (isWater(nb[k].x, nb[k].y) || t.mountain) continue;
                 if (t.site >= 0 && !warHappened && ni != goal) continue;
                 int l = std::min(roadLevelAt(cx, cy), roadLevelAt(nb[k].x, nb[k].y));
-                step = l > 0 ? g_roads[l].cost : MP + (t.hills ? MP / 2 : 0) + (t.veg != V_NONE ? MP / 2 : 0);
+                bool ford = hasRiver(nb[k].x, nb[k].y) && !riverLink(cx, cy, nb[k].x, nb[k].y);
+                step = l > 0 ? g_roads[l].cost
+                             : MP + (t.hills ? MP / 2 : 0) + (t.veg != V_NONE || t.feature == F_MARSH ? MP / 2 : 0) + (ford ? MP / 2 : 0);
             }
             int ng = cc + step;
             if (ng < cost[ni]) {
@@ -206,7 +205,7 @@ RouteOption Game::routeOption(int c, int from, int to, bool sea) const {
         if (r.owner == c && r.from == from && r.to == to) return fail("A caravan already trades between these cities");
     if (sea) {
         if (!hasTech(c, ID.tRafts)) return fail("Needs Rafts");
-        if (!isCoastal(A.x, A.y) || !isCoastal(B.x, B.y)) return fail("Both cities must be on the coast");
+        if (!isPort(A.x, A.y) || !isPort(B.x, B.y)) return fail("Both cities must be on the coast, a lake or a river");
     }
     o.path = tradePath(c, from, to, sea);
     if (o.path.empty()) return fail(sea ? "No sea route within reach" : "Too far overland (" + std::to_string(LAND_RANGE) + " tiles at most)");
@@ -237,7 +236,7 @@ std::vector<RouteOption> Game::tradeOptions(const Unit& u) const {
         if (!me.explored[idx(b.x, b.y)]) continue;
         if (dist(here->x, here->y, b.x, b.y) > SEA_RANGE_NAV + 2) continue;
         RouteOption land = routeOption(u.owner, here->id, b.id, false);
-        RouteOption sea = isCoastal(here->x, here->y) && isCoastal(b.x, b.y) ? routeOption(u.owner, here->id, b.id, true) : RouteOption();
+        RouteOption sea = isPort(here->x, here->y) && isPort(b.x, b.y) ? routeOption(u.owner, here->id, b.id, true) : RouteOption();
         // offer the better of the two ways (by sea only when it pays more or the land way is impossible)
         auto value = [](const RouteOption& o) { return o.origin.gold * 3 + o.origin.sci * 4 + o.origin.food * 3 + o.origin.prod * 3; };
         if (sea.ok && (!land.ok || value(sea) > value(land))) out.push_back(sea);
@@ -337,7 +336,7 @@ void Game::tradeTurn() {
         OccScope occ(*this);  // the unit index is only valid until units appear or move, so only while we look
         for (int ti : r.path) {
             int x = ti % W, y = ti / W;
-            bool water = isWater(x, y);
+            bool water = r.sea;  // boats rob boats, also on rivers
             forUnitsAt(x, y, [&](const Unit& e) {
                 if (robber >= 0 || !g_units[e.type].military() || g_units[e.type].naval() != water || e.carrier >= 0) return;
                 if (atWar(r.owner, e.owner)) { robber = e.owner; rx = x; ry = y; }

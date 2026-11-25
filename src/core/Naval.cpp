@@ -8,8 +8,13 @@
 #include <algorithm>
 
 int Game::aiShipWant(int c, bool warNow) const {
-    int coastal = 0;
-    for (auto& ci : cities) if (ci.alive && ci.owner == c && isCoastal(ci.x, ci.y)) coastal++;
+    int coastal = 0, river = 0;
+    for (auto& ci : cities)
+        if (ci.alive && ci.owner == c) {
+            if (isCoastal(ci.x, ci.y)) coastal++;
+            else if (hasRiver(ci.x, ci.y)) river++;
+        }
+    coastal += river / 2;  // inland river ports want a boat or two as well
     if (!coastal) return 0;
     int sk = skillOf(c);
     // a small navy in peacetime: enough to guard the coast and scout, not to starve the land army
@@ -25,11 +30,11 @@ int Game::aiShipWant(int c, bool warNow) const {
     return want;
 }
 
-int Game::aiBestShip(int c, bool wantRanged) const {
+int Game::aiBestShip(int c, bool wantRanged, bool riverOnly) const {
     int best = -1, bs = -1;
     for (int u : availableUnits(c)) {
         const UnitDef& d = g_units[u];
-        if (!d.naval()) continue;
+        if (!d.naval() || (riverOnly && !d.river)) continue;
         int s = std::max(d.str, d.rstr) * 3 + (d.ocean ? 10 : 0) + (d.ranged() == wantRanged ? 25 : 0);
         if (s > bs) { bs = s; best = u; }
     }
@@ -44,6 +49,7 @@ void Game::aiNaval(Unit& uref) {
     int sk = skillOf(c);
     if (U().moves <= 0) return;
     if (U().order == ORD_FORTIFY || U().order == ORD_SLEEP) U().order = ORD_NONE;
+    auto portFor = [&](const City& ci) { return isCoastal(ci.x, ci.y) || (d.river && hasRiver(ci.x, ci.y)); };  // where this boat can go
     if (aiFerryJob(U())) {
         aiTransportShip(U());
         return;
@@ -96,7 +102,7 @@ void Game::aiNaval(Unit& uref) {
         const City* home = nullptr;
         int hd = 99;
         for (auto& ci : cities)
-            if (ci.alive && ci.owner == c && isCoastal(ci.x, ci.y) && dist(ci.x, ci.y, U().x, U().y) < hd) {
+            if (ci.alive && ci.owner == c && portFor(ci) && dist(ci.x, ci.y, U().x, U().y) < hd) {
                 Unit probe = U();
                 if (!(ci.x == U().x && ci.y == U().y) && findPath(probe, ci.x, ci.y).empty()) continue;
                 hd = dist(ci.x, ci.y, U().x, U().y);
@@ -115,7 +121,7 @@ void Game::aiNaval(Unit& uref) {
     if (atWarAny) {
         int bx = -1, by = -1, bd = 99;
         for (auto& e : units) {
-            if (!e.alive || !atWar(c, e.owner) || !isWater(e.x, e.y)) continue;
+            if (!e.alive || !atWar(c, e.owner) || (!isWater(e.x, e.y) && !g_units[e.type].naval())) continue;
             int dd = dist(e.x, e.y, U().x, U().y);
             if (dd > 8 || dd >= bd) continue;
             auto o = odds(e);
@@ -130,12 +136,12 @@ void Game::aiNaval(Unit& uref) {
         const City* tgt = nullptr;
         if (sk >= 2 && c < (int)aiPlans.size() && aiPlans[c].target >= 0) {
             const City& T = cities[aiPlans[c].target];
-            if (T.alive && isCoastal(T.x, T.y) && (aiPlans[c].assault || d.ranged())) tgt = &T;
+            if (T.alive && portFor(T) && (aiPlans[c].assault || d.ranged())) tgt = &T;
         }
         if (!tgt) {
             int td = 99;
             for (auto& ci : cities)
-                if (ci.alive && ci.owner >= FIRST_PRIMATE_CIV && atWar(c, ci.owner) && isCoastal(ci.x, ci.y) && dist(ci.x, ci.y, U().x, U().y) < std::min(td, 14)) {
+                if (ci.alive && ci.owner >= FIRST_PRIMATE_CIV && atWar(c, ci.owner) && portFor(ci) && dist(ci.x, ci.y, U().x, U().y) < std::min(td, 14)) {
                     td = dist(ci.x, ci.y, U().x, U().y);
                     tgt = &ci;
                 }
@@ -174,7 +180,7 @@ void Game::aiNaval(Unit& uref) {
     }
     const City* home = nullptr;
     for (auto& ci : cities)
-        if (ci.alive && ci.owner == c && isCoastal(ci.x, ci.y) && (!home || dist(ci.x, ci.y, U().x, U().y) < dist(home->x, home->y, U().x, U().y)))
+        if (ci.alive && ci.owner == c && portFor(ci) && (!home || dist(ci.x, ci.y, U().x, U().y) < dist(home->x, home->y, U().x, U().y)))
             home = &ci;
     if (!home) return;
     if (dist(home->x, home->y, U().x, U().y) > 2) {

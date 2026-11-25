@@ -591,6 +591,12 @@ bool Game::resourceVisible(int c, int x, int y) const {
 Yields Game::tileYields(int c, int x, int y) const {
     Yields y0;
     const Tile& t = at(x, y);
+    if (t.feature == F_WONDER && t.natural >= 0) {  // natural wonders yield the same whatever the land
+        y0 = g_naturals[t.natural].y;
+        if (t.fallout >= 2) y0 = Yields();
+        if (c < 0 || !hasGold(c)) y0.gold = 0;
+        return y0;
+    }
     if (t.mountain) return y0;
     const TerrainDef& td = g_terrain[t.terrain];
     y0.food = td.food;
@@ -599,6 +605,16 @@ Yields Game::tileYields(int c, int x, int y) const {
     if (t.veg == V_FOREST) { y0.food = 1; y0.prod = 1; }
     if (t.veg == V_JUNGLE) { y0.food = 2; y0.prod = 0; }
     if (t.hills) { y0.food = std::max(0, y0.food - 1); y0.prod += 2; }
+    if (t.feature != F_NONE && t.feature != F_WONDER && t.feature != F_VOLCANO) {
+        const FeatureDef& fd = g_features[t.feature];
+        y0.food += fd.food; y0.prod = std::max(0, y0.prod + fd.prod); y0.gold += fd.gold;
+    }
+    if (hasRiver(x, y)) y0.gold += 1;  // river trade
+    if (!isWater(x, y)) {  // volcanic ash
+        Pt nb[6];
+        int n = neighbors(x, y, nb);
+        for (int k = 0; k < n; k++) if (at(nb[k].x, nb[k].y).feature == F_VOLCANO) { y0.food += 1; y0.prod += 1; break; }
+    }
     const PrimateDef* pd = c >= 0 ? primate(c) : nullptr;
     if (pd && pd->snowMonkey && (t.terrain == T_TUNDRA || t.terrain == T_SNOW)) { y0.food++; y0.prod++; }
     if (resourceVisible(c, x, y)) {
@@ -610,6 +626,7 @@ Yields Game::tileYields(int c, int x, int y) const {
         y0.food += im.food; y0.prod += im.prod; y0.gold += im.gold;
         if (c >= 0 && t.imp == IMP_FARM && hasTech(c, ID.tChemistry)) y0.food++;
         if (t.imp == IMP_FARM && isCrop(t.res)) y0.food++;  // farmed wheat, rice and maize
+        if (t.imp == IMP_FARM && t.feature == F_FLOODPLAIN) y0.food++;  // irrigated by the floods
         if (c >= 0 && t.imp == IMP_MINE && hasTech(c, ID.tIndustrial)) y0.prod++;
     }
     if (t.ruin != RUIN_NONE && warHappened && c >= 0) {
@@ -656,6 +673,7 @@ void Game::computeCity(City& city) {
     Yields cy = tileYields(c, city.x, city.y);
     cy.food = std::max(cy.food, 2) + 1;
     if (hasTech(c, ID.tCooking)) cy.food += 1;
+    if (freshWater(city.x, city.y)) cy.food += 1;  // a river, lake or oasis to drink from
     cy.prod = std::max(cy.prod, 1) + 1;
     if (hasGold(c)) cy.gold += 1;
     total += cy;
@@ -665,7 +683,7 @@ void Game::computeCity(City& city) {
     for (auto& p : ring(city.x, city.y, 3)) {
         if (p.x == city.x && p.y == city.y) continue;
         const Tile& t = at(p.x, p.y);
-        if (t.city != city.id || t.mountain) continue;
+        if (t.city != city.id || (t.mountain && t.feature != F_WONDER)) continue;
         Yields y = tileYields(c, p.x, p.y);
         int s = y.food * 30 + y.prod * 22 + y.gold * 10 + y.sci * 18 + y.cult * 18;
         cand.push_back({idx(p.x, p.y), y, s});
@@ -751,6 +769,8 @@ bool Game::canFoundAt(int c, int x, int y, std::string* why) const {
     if (isWater(x, y) || t.mountain) return fail("Cannot settle here");
     if (t.fallout > 0) return fail("The land is poisoned by fallout");
     if (t.site >= 0) return fail("Cannot settle on top of human structures");
+    if (t.feature == F_WONDER) return fail("Cannot settle on a natural wonder");
+    if (t.feature == F_OASIS) return fail("Cannot settle on the oasis itself: settle beside it");
     if (t.owner >= 0 && t.owner != c) return fail("Territory belongs to someone else");
     for (auto& ci : cities)
         if (ci.alive && dist(ci.x, ci.y, x, y) <= 3) return fail("Too close to another settlement");
@@ -853,7 +873,7 @@ bool Game::canBuild(const City& city, int kind, int id) const {
         if (!unitBelongs(*this, c, id) || !hasTech(c, g_units[id].techId) || g_units[id].cls == UnitClass::Band) return false;
         if (!hasNeeds(c, g_units[id].needs)) return false;
         if (g_units[id].cls == UnitClass::Settler && city.pop < 2) return false;
-        if (g_units[id].naval() && !isCoastal(city.x, city.y)) return false;
+        if (g_units[id].naval() && !isCoastal(city.x, city.y) && !(g_units[id].river && hasRiver(city.x, city.y))) return false;
         if (g_units[id].cls == UnitClass::Trader) {  // only as many caravans as trade routes allowed
             int busy = tradeUsed(c);
             for (auto& oc : cities)
@@ -1049,10 +1069,14 @@ bool Game::canEmbark(int c, int x, int y) const {
 int Game::moveCost(const Unit& u, int fx, int fy, int tx, int ty) const {
     const Tile& t = at(tx, ty);
     const UnitDef& ud = g_units[u.type];
-    if (ud.naval()) {  // ships: water, or into one of our own coastal cities
-        if (isWater(tx, ty)) return t.terrain == T_OCEAN && !ud.ocean ? -1 : MP;
-        const City* ci = cityAt(tx, ty);
-        return ci && ci->owner == u.owner ? MP : -1;
+    if (ud.naval()) {  // ships: water, into one of our own ports, or along a river
+        if (!isWater(tx, ty)) {
+            const City* ci = cityAt(tx, ty);
+            if (ci && ci->owner != u.owner) return -1;
+        }
+        if (!waterStep(fx, fy, tx, ty, ud.ocean, ud.river)) return -1;
+        if (!isWater(fx, fy) && downstream(fx, fy, tx, ty)) return MP * 2 / 3;  // riding the current
+        return MP;
     }
     if (t.mountain) return -1;
     if (!warHappened && t.site >= 0) return -1;  // living human settlements are off limits
@@ -1071,7 +1095,9 @@ int Game::moveCost(const Unit& u, int fx, int fy, int tx, int ty) const {
         const PrimateDef* pd = primate(u.owner);
         if (!(pd && pd->forestWalker)) cost++;
     }
+    if (t.feature == F_MARSH) cost++;
     cost *= MP;
+    if (hasRiver(tx, ty) && !riverLink(fx, fy, tx, ty)) cost += MP / 2;  // fording the river (a road over it is a bridge)
     // a road joining both tiles speeds the way: a worn track halves rough going, real roads ignore the terrain
     int road = std::min(roadLevelAt(fx, fy), roadLevelAt(tx, ty));
     if (road == ROAD_TRACK) cost = std::max(g_roads[ROAD_TRACK].cost, cost * 2 / 3);
@@ -1205,6 +1231,7 @@ bool Game::stepUnit(Unit& u, int nx, int ny) {
             return true;
         }
     }
+    if (g_units[u.type].naval() && u.owner >= FIRST_PRIMATE_CIV && hasRiver(nx, ny) && riverLink(u.x, u.y, nx, ny)) civs[u.owner].riverSailed++;
     u.x = nx; u.y = ny;
     if (g_units[u.type].naval())  // the cargo sails with the ship
         for (auto& o : units)
@@ -1246,7 +1273,7 @@ bool Game::canAttack(const Unit& u, int tx, int ty) const {
     int dd = dist(u.x, u.y, tx, ty);
     if (d.ranged()) return dd <= d.range && dd >= 1;
     if (dd != 1) return false;
-    if (d.naval()) return isWater(tx, ty) || cityAt(tx, ty) != nullptr;  // rams ships and boats, or storms a coastal city
+    if (d.naval()) return waterStep(u.x, u.y, tx, ty, true, d.river);  // rams boats at sea or on the river, or storms a port
     if (isWater(u.x, u.y) || isWater(tx, ty)) return false;
     return moveCost(u, u.x, u.y, tx, ty) >= 0 || cityAt(tx, ty) != nullptr;
 }
@@ -1435,7 +1462,7 @@ std::vector<int> Game::buildOptions(const Unit& u) const {
     if (g_units[u.type].cls != UnitClass::Worker) return out;
     const Tile& t = at(u.x, u.y);
     if (isWater(u.x, u.y) || t.mountain || t.site >= 0 || t.owner != u.owner || cityAt(u.x, u.y)) return out;
-    if (t.fallout >= 2) return out;
+    if (t.fallout >= 2 || t.feature == F_WONDER || t.feature == F_OASIS) return out;
     for (int im = 1; im < IMP_COUNT; im++) {
         if (t.imp == im || !hasTech(u.owner, g_improvements[im].techId)) continue;
         bool ok = false;
@@ -1443,9 +1470,9 @@ std::vector<int> Game::buildOptions(const Unit& u) const {
         int r = vis ? (int)t.res : (int)R_NONE;
         switch (im) {
             case IMP_FARM: ok = t.veg == V_NONE && t.terrain != T_SNOW && !isMineral(r) && r != R_HORSES; break;
-            case IMP_MINE: ok = t.hills || isMineral(r); break;
+            case IMP_MINE: ok = (t.hills || isMineral(r)) && t.feature != F_MARSH; break;
             case IMP_LUMBER: ok = t.veg == V_FOREST && !isMineral(r); break;
-            case IMP_TRADEPOST: ok = t.veg != V_FOREST && !t.hills && !isMineral(r) && !isCrop(r) && r != R_HORSES; break;
+            case IMP_TRADEPOST: ok = t.veg != V_FOREST && !t.hills && !isMineral(r) && !isCrop(r) && r != R_HORSES && t.feature != F_MARSH; break;
             case IMP_PASTURE: ok = r == R_HORSES; break;
         }
         if (ok) out.push_back(im);

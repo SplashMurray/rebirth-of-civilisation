@@ -5,7 +5,7 @@
 #include <sstream>
 
 namespace {
-const int SAVE_VERSION = 16;
+const int SAVE_VERSION = 17;
 
 struct Archive {
     bool writing;
@@ -107,12 +107,17 @@ void ioGame(Archive& a, Game& g) {
     for (auto& t : g.tiles) {
         a.io(t.terrain); a.io(t.veg); a.io(t.hills); a.io(t.mountain); a.io(t.res); a.io(t.imp);
         a.io(t.owner); a.io(t.city); a.io(t.ruin); a.io(t.ruinDone); a.io(t.site); a.io(t.fallout); a.io(t.foraged); a.io(t.road);
+        a.io(t.river); a.io(t.riverOut); a.io(t.riverSize); a.io(t.feature); a.io(t.natural);
     }
     long long ns = (long long)g.sites.size();
     a.num(ns);
     if (!a.writing) g.sites.assign((size_t)std::max(0LL, ns), HumanSite());
     for (auto& s : g.sites) { a.io(s.name); a.io(s.x); a.io(s.y); a.io(s.type); a.io(s.population); }
     a.io(g.wonderCity);
+    long long nn = (long long)g.naturals.size();
+    a.num(nn);
+    if (!a.writing) g.naturals.assign((size_t)std::max(0LL, nn), NaturalSite());
+    for (auto& n : g.naturals) { a.io(n.type); a.io(n.x); a.io(n.y); a.io(n.found); }
     long long nc = (long long)g.civs.size();
     a.num(nc);
     if (!a.writing) g.civs.assign((size_t)std::max(0LL, nc), Civ());
@@ -130,7 +135,7 @@ void ioGame(Archive& a, Game& g) {
         a.io(c.grievance); a.io(c.goodwill); a.io(c.peaceUntil); a.io(c.denouncedUntil); a.io(c.lastOffer); a.io(c.embargo); a.io(c.dealsMade); a.io(c.backstabs);
         a.io(c.warheads); a.io(c.nukesLaunched); a.io(c.timesNuked); a.io(c.citiesCaptured); a.io(c.citiesLost); a.io(c.bandSplits);
         a.io(c.disastersSuffered); a.io(c.warsDeclared); a.io(c.falloutCleaned); a.io(c.maxBand); a.io(c.shipsSunk); a.io(c.unitsUpgraded); a.io(c.unitsFerried);
-        a.io(c.routesMade); a.io(c.routesPlundered); a.io(c.bestRoad);
+        a.io(c.routesMade); a.io(c.routesPlundered); a.io(c.bestRoad); a.io(c.naturalsFound); a.io(c.riverSailed);
     }
     long long nu = (long long)g.units.size();
     a.num(nu);

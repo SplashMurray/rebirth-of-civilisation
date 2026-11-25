@@ -9,6 +9,8 @@ std::vector<TerrainDef> g_terrain;
 std::vector<ResourceDef> g_resources;
 std::vector<ImprovementDef> g_improvements;
 std::vector<RoadDef> g_roads;
+std::vector<FeatureDef> g_features;
+std::vector<NaturalDef> g_naturals;
 std::vector<RuinDef> g_ruins;
 std::vector<UnitDef> g_units;
 std::vector<BuildingDef> g_buildings;
@@ -127,6 +129,31 @@ void initData() {
         {"Lumber Camp", 0, 1, 0, "Woodcraft", 5},
         {"Trading Post", 0, 0, 2, "Currency", 5},
         {"Pasture", 1, 1, 0, "Animal Taming", 4},
+    };
+
+    // name, food, prod, gold (added to the tile), description
+    g_features = {
+        {"", 0, 0, 0, ""},
+        {"Floodplain", 2, 0, 0, "Silt left by the river's yearly floods: rich, easily farmed soil."},
+        {"Marsh", 1, -1, 0, "Reeds and standing water. Slow going; a farm drains it."},
+        {"Oasis", 3, 0, 1, "A spring in the desert. Fresh water for a city beside it; cannot be improved."},
+        {"Volcano", 0, 0, 0, "A smoking mountain. Its ash makes the land around it fertile - and it may erupt."},
+        {"Reef", 1, 1, 0, "Coral shallows teeming with fish."},
+        {"Lake", 1, 0, 1, "Fresh water. Boats that keep to the coast can sail it; cities beside it grow faster."},
+        {"", 0, 0, 0, ""},
+    };
+
+    // natural wonders: name, yields {food, prod, sci, cult, gold}, where, description
+    g_naturals = {
+        {"Thundering Falls", Yields{0, 2, 0, 2, 2}, WS_FALLS,
+         "A river plunges off a cliff in a roar of spray. Boats cannot pass the falls: cargo must be carried around."},
+        {"Elder Baobab", Yields{2, 0, 0, 3, 1}, WS_FLAT, "A tree so old and vast that whole troops have sheltered in its hollow trunk."},
+        {"Crystal Caverns", Yields{0, 1, 3, 1, 0}, WS_HILLS, "Caves glittering with crystals as long as a gorilla is tall."},
+        {"Coral Gardens", Yields{3, 0, 1, 0, 2}, WS_REEF, "A vast living reef in warm shallow water, swarming with fish."},
+        {"Mirror Salt Flats", Yields{0, 1, 1, 1, 3}, WS_SALT, "A dry lake of white salt that mirrors the sky after rain."},
+        {"Steaming Springs", Yields{2, 0, 1, 2, 1}, WS_COLD, "Hot pools in the frozen north, where the snow monkeys bathe."},
+        {"Ember Crown", Yields{0, 0, 2, 3, 0}, WS_PEAK, "A great volcano, its crater glowing at night. Nothing can climb it."},
+        {"Sky Mesa", Yields{0, 2, 1, 2, 0}, WS_MESA, "A flat-topped mountain of red rock rising sheer from the plains."},
     };
 
     g_ruins = {
@@ -364,14 +391,16 @@ void initData() {
          "The weapon that ended the old world. Kept in your silos: launch it at any tile within 12 of one of your cities. "
          "Destroys everything nearby, wrecks cities and leaves fallout - and the whole world will remember."},
         // ships: built in coastal cities, move on water (early ones keep to the coast)
-        {"Dugout Canoe", "DC", 40, 6, 0, 0, 3, "Rafts", UC::Naval, "", -1, "A hollowed log paddled by warriors. Coastal waters only."},
-        {"War Galley", "WG", 65, 12, 0, 0, 3, "Bronze Working", UC::Naval, "", -1, "Oars and a bronze ram. Coastal waters only."},
-        {"Archer Galley", "AG", 70, 8, 11, 2, 3, "Archery", UC::Naval, "", -1, "Archers on a galley: attacks ships and the shore 2 tiles away. Coastal waters only."},
+        {"Dugout Canoe", "DC", 40, 6, 0, 0, 3, "Rafts", UC::Naval, "", -1, "A hollowed log paddled by warriors. Keeps to coastal waters, lakes and rivers."},
+        {"War Galley", "WG", 65, 12, 0, 0, 3, "Bronze Working", UC::Naval, "", -1, "Oars and a bronze ram. Keeps to coastal waters, lakes and rivers."},
+        {"Archer Galley", "AG", 70, 8, 11, 2, 3, "Archery", UC::Naval, "", -1, "Archers on a galley: attacks ships and the shore 2 tiles away. Keeps to coastal waters, lakes and rivers."},
         {"Caravel", "Cv", 95, 16, 0, 0, 5, "Navigation", UC::Naval, "", -1, "A fast sailing ship that can cross the open ocean."},
         {"Frigate", "Fr", 160, 22, 28, 2, 4, "Gunpowder", UC::Naval, "", -1, "Broadsides of salvaged cannon. Bombards ships and coasts 2 tiles away."},
         {"Salvaged Freighter", "SF", 140, 10, 0, 0, 5, "Steam Power", UC::Naval, "", -1,
          "A rusting human cargo ship, patched and steaming again. Carries 4 land units across the ocean."},
-        {"Ironclad", "Ic", 220, 40, 0, 0, 4, "Steam Power", UC::Naval, "", -1, "A steam-driven, iron-plated ram. Needs Coal."},
+        {"Ironclad", "Ic", 220, 40, 0, 0, 4, "Steam Power", UC::Naval, "", -1, "A steam-driven, iron-plated ram, shallow enough to steam up rivers. Needs Coal."},
+        {"River Gunboat", "RG", 170, 18, 26, 2, 4, "Steam Power", UC::Naval, "", -1,
+         "A shallow-draught steamer with a deck gun. Patrols rivers and coasts and shells the banks 2 tiles away. Needs Coal."},
         {"Salvaged Destroyer", "Ds", 330, 58, 0, 0, 6, "Combustion", UC::Naval, "", -1, "A human destroyer raised from the harbour mud and made to sail again. Needs Oil."},
         {"Salvaged Battleship", "BB", 420, 50, 68, 3, 5, "Motorised Warfare", UC::Naval, "", -1,
          "The humans' greatest warship, restored. Its guns reach 3 tiles inland. Needs Oil."},
@@ -437,10 +466,12 @@ void initData() {
     needU("Nuclear Warhead", {R_URANIUM});
     needU("War Galley", {R_COPPER});
     needU("Ironclad", {R_COAL});
+    needU("River Gunboat", {R_COAL});
     needU("Salvaged Destroyer", {R_OIL});
     needU("Salvaged Battleship", {R_OIL});
     for (const char* n : {"Caravel", "Frigate", "Salvaged Freighter", "Ironclad", "Salvaged Destroyer", "Salvaged Battleship"}) g_units[unitIndex(n)].ocean = true;
     // transport capacity
+    for (const char* n : {"Dugout Canoe", "War Galley", "Archer Galley", "Ironclad", "River Gunboat"}) g_units[unitIndex(n)].river = true;
     auto cargo = [](const char* u, int n) { g_units[unitIndex(u)].cargo = n; };
     cargo("Dugout Canoe", 1);
     cargo("War Galley", 1);

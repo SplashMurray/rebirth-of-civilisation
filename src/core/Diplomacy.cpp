@@ -448,8 +448,8 @@ void Game::expelUnits(int a, int b) {
         for (int r = 1; r <= 12 && !moved; r++)
             for (auto& p : ring(u.x, u.y, r)) {
                 if (dist(p.x, p.y, u.x, u.y) != r || at(p.x, p.y).owner == b || at(p.x, p.y).mountain) continue;
-                if (isWater(p.x, p.y) != g_units[u.type].naval()) continue;
-                if (moveCost(u, p.x, p.y, p.x, p.y) < 0) continue;  // e.g. a coastal boat cannot be pushed onto the ocean
+                if (g_units[u.type].naval() ? !shipCanStand(u, p.x, p.y) : isWater(p.x, p.y)) continue;  // e.g. a coastal boat cannot be pushed onto the ocean
+                if (!g_units[u.type].naval() && moveCost(u, p.x, p.y, p.x, p.y) < 0) continue;
                 if (cityAt(p.x, p.y) && cityAt(p.x, p.y)->owner != a) continue;
                 if (!canEnter(u, p.x, p.y)) continue;
                 u.x = p.x; u.y = p.y;
