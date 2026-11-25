@@ -21,9 +21,11 @@ public:
     void fill(short* out, int frames);  // interleaved stereo
     void play(Sfx s, float vol, float pan, int delayMs) override;
     void setMood(Mood m) override;
+    void call(int primate, float vol, float pan, int delayMs) override;
     void setAmbient(int amb, float level) override;
     void setVolumes(int music, int sfx, int ambient) override;
     int voicesPlaying();
+    int callsLoaded();  // primate call recordings found
     struct Clip;
     struct Stream;
 
@@ -31,7 +33,7 @@ private:
     std::string dir;
     std::atomic<bool> ready{false};
     std::mutex m;
-    std::vector<Clip*> sfx, amb;
+    std::vector<Clip*> sfx, amb, voice;  // voice: 8 primates x VOICES_PER_PRIMATE (empty clips where missing)
     struct Voice { const Clip* c; size_t pos; float gl, gr; int delay; };
     std::vector<Voice> voices;
     float ambTarget[AMB_COUNT] = {}, ambLevel[AMB_COUNT] = {};
@@ -45,4 +47,5 @@ private:
     std::vector<short> tmp;
     bool startTrack();
     bool mixStream(Stream& s, int n);
+    void addVoice(const Clip& c, float vol, float pan, int delayMs);
 };

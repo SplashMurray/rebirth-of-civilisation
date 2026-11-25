@@ -112,6 +112,8 @@ private:
     void sfx(Sfx s, float vol = 1.0f, int screenX = -1, int delayMs = 0);
     void sfxAt(Sfx s, int tx, int ty, float vol = 1.0f, int delayMs = 0);
     void selectSound(const Unit& u);
+    void primateCall(int civ, int tx, int ty, float vol, int delayMs = 0);
+    int callCooldownMs = 0;
     void moveSound(const Unit& u);
     void combatSound(const CombatFx& c);
     void buildSound(int imp);

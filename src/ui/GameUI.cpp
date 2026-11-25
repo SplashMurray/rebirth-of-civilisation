@@ -263,7 +263,7 @@ void GameUI::renderSetup() {
         cv->text(x + 12, y + 70, p.ability, 15, C_GOLD, AL_LEFT, true);
         int ty = textBlock(x + 12, y + 92, cw - 24, p.abilityDesc + (p.evoPct ? " Evolves +" + std::to_string(p.evoPct) + "% faster." : "") + " Leans towards the " + STRAND_NAMES[p.evoLean] + ".", 13, C_TEXT, 3);
         textBlock(x + 12, ty + 6, cw - 24, p.flavor, 12, C_DIM, 2);
-        hot(x, y, cw, ch, [this, i] { setupPrimate = i; });
+        hot(x, y, cw, ch, [this, i] { setupPrimate = i; snd->call(i, 0.6f, 0.0f, 0); });
     }
     int oy = gy + 2 * (ch + gap) + 10;
     const char* sizes[] = {"Small (4 primates)", "Standard (6 primates)", "Large (8 primates)"};
@@ -1224,7 +1224,7 @@ void GameUI::renderDiplomacy() {
             if (g.hasAgreement(AG_RESEARCH, p, c)) tags += "Research  ";
             if (!g.civs[p].war[c] && g.civs[p].peaceUntil[c] > g.turn) tags += "Treaty  ";
             cv->text(px + lw + 6, y + 26, tags, 12, C_GOLD, AL_RIGHT);
-            hot(px + 14, y, lw, rh - 6, [this, c] { diploSel = c; warArm = -1; }, "");
+            hot(px + 14, y, lw, rh - 6, [this, c] { diploSel = c; warArm = -1; primateCall(c, -1, -1, 0.55f); }, "");
         }
         y += rh;
     }

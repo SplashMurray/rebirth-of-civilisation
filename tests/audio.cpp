@@ -22,6 +22,8 @@ int main(int argc, char** argv) {
     for (int f = 0; f < blocks; f++) {
         if (f % 30 == 0) mx.play((Sfx)(f / 30 % (int)Sfx::COUNT), 1.0f, (f % 3) - 1.0f, 0);
         if (f == blocks / 2) mx.setMood(Mood::War);
+        if (f == blocks * 2 / 3) mx.setMood(Mood::ModernWar);
+        if (f % 45 == 10) mx.call(f / 45 % 8, 0.8f, 0.0f, 0);
         if (f == blocks * 3 / 4) mx.setAmbient(AMB_WAVES, 0.0f);
         mx.fill(buf.data(), 1024);
         for (short s : buf) {
@@ -46,6 +48,8 @@ int main(int argc, char** argv) {
         }
     }
     if (!(rms > 0.01 && rms < 0.6) || musicSum <= 0) { printf("FAIL: output level out of range\n"); return 1; }
+    printf("primate calls loaded: %d\n", mx.callsLoaded());
+    if (mx.callsLoaded() < 16) { printf("FAIL: primate calls missing\n"); return 1; }
     printf("OK\n");
     return 0;
 }

@@ -21,10 +21,25 @@ void GameUI::sfxAt(Sfx s, int tx, int ty, float vol, int delayMs) {
     sfx(s, vol, sx, delayMs);
 }
 
+// A call of the species that civ c is, from tile (tx, ty) or the middle of the screen.
+void GameUI::primateCall(int c, int tx, int ty, float vol, int delayMs) {
+    if (!game || c < 0 || c >= (int)game->civs.size() || game->civs[c].primate < 0) return;
+    int sx = W / 2, sy;
+    if (tx >= 0) tileCenter(tx, ty, sx, sy);
+    float pan = W > 0 ? std::max(-0.8f, std::min(0.8f, (sx - W / 2) / (float)(W / 2))) : 0.0f;
+    snd->call(game->civs[c].primate, vol, pan, delayMs);
+}
+
 void GameUI::selectSound(const Unit& u) {
     const UnitDef& d = g_units[u.type];
     Sfx s = d.naval() ? Sfx::Ship : d.cls == UnitClass::Mounted ? Sfx::Horse : d.cls == UnitClass::Siege ? Sfx::SiegeSelect : Sfx::Step;
     sfxAt(s, u.x, u.y, d.cls == UnitClass::Mounted ? 0.45f : 0.6f);
+    // the troop answers: always for a band, now and then for others (so it never grates)
+    bool primateUnit = !d.naval() && d.cls != UnitClass::Siege && d.cls != UnitClass::Armor && d.cls != UnitClass::Nuke;
+    if (primateUnit && (d.cls == UnitClass::Band || callCooldownMs <= 0)) {
+        primateCall(u.owner, u.x, u.y, 0.5f, 60);
+        callCooldownMs = 4000;
+    }
 }
 
 void GameUI::moveSound(const Unit& u) {
@@ -63,6 +78,10 @@ void GameUI::combatSound(const CombatFx& c) {
         shot = d.name.find("Spear") != std::string::npos || d.name.find("Phalanx") != std::string::npos ? Sfx::Spear : Sfx::Sword;
         impact = Sfx::SwordHit;
         if (d.cls == UnitClass::Mounted) sfxAt(Sfx::Horse, c.ax, c.ay, v * 0.6f);
+        if (c.atkOwner >= FIRST_PRIMATE_CIV && callCooldownMs <= 0 && (c.seq & 1)) {  // a war cry, sometimes
+            primateCall(c.atkOwner, c.ax, c.ay, v * 0.45f);
+            callCooldownMs = 2500;
+        }
     }
     sfxAt(shot, c.ax, c.ay, v);
     sfxAt(impact, c.tx, c.ty, v * 0.9f, hit);
@@ -81,6 +100,7 @@ void GameUI::buildSound(int imp) {
 // Called every tick: turn game events into sounds, choose the music, mix the ambience.
 void GameUI::updateSound(int ms) {
     if (moveSndMs > 0) moveSndMs -= ms;
+    if (callCooldownMs > 0) callCooldownMs -= ms;
     if (sndNotifyMs > 0) sndNotifyMs -= ms;
     if (screen != SCR_GAME || !game) {
         snd->setMood(Mood::Title);
@@ -106,7 +126,10 @@ void GameUI::updateSound(int ms) {
     }
     if (techs > sndTechs) sfx(Sfx::Tech, 0.7f);
     if (traits > sndTraits) sfx(Sfx::Evolve, 0.8f);
-    if (cities > sndCities) sfx(Sfx::CityFounded, 0.8f);
+    if (cities > sndCities) {
+        sfx(Sfx::CityFounded, 0.8f);
+        primateCall(g.player, -1, -1, 0.6f, 500);  // the troop celebrates
+    }
     if (routes > sndRoutes) sfx(g.routes.empty() || !g.routes.back().sea ? Sfx::Trade : Sfx::TradeSea, 0.8f);
     if (me.policiesAdopted > sndPolicies) sfx(Sfx::Culture, 0.6f);
     sndTechs = techs; sndTraits = traits; sndCities = cities; sndRoutes = routes; sndPolicies = me.policiesAdopted;
@@ -146,10 +169,10 @@ void GameUI::updateSound(int ms) {
     Mood mood;
     if (g.gameOver) mood = g.winner == g.player ? Mood::Victory : Mood::Defeat;
     else if (nukeT >= 0 || (!g.popups.empty() && g.popups.front().kind == POP_NUKE)) mood = Mood::Fall;
-    else if (atWar && g.turn - lastCombatTurn <= 8) mood = Mood::War;
     else {
         int era = g.era(g.player);
-        mood = cities == 0 || era <= 1 ? Mood::Wander : era <= 4 ? Mood::Ancient : Mood::Later;
+        if (atWar && g.turn - lastCombatTurn <= 8) mood = era >= 6 ? Mood::ModernWar : Mood::War;
+        else mood = cities == 0 || era <= 1 ? Mood::Wander : era <= 4 ? Mood::Ancient : era == 5 ? Mood::Later : era == 6 ? Mood::Industrial : Mood::Modern;
     }
     snd->setMood(mood);
 

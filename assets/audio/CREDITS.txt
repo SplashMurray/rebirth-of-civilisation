@@ -1,21 +1,65 @@
 Rebirth of Civilisation - sound and music credits
 ==================================================
 
-All music, sound effects and ambient sounds in this folder come from
-0 A.D. by Wildfire Games  -  https://www.wildfiregames.com/  (https://play0ad.com/)
-Copyright (C) Wildfire Games. Music composed by Omri Lahav and the 0 A.D. music team.
+The audio comes from three kinds of open source. Every file keeps the licence of its source.
+Changes made for Rebirth of Civilisation: files were renamed, trimmed, given fades,
+loudness-matched, resampled to 44.1 kHz and re-encoded as Ogg Vorbis; some primate calls were
+pitch-shifted (noted below). Exact sources and steps: tools/fetch_audio.sh.
 
-They are licensed under the Creative Commons Attribution-ShareAlike 3.0 licence
-(CC BY-SA 3.0): https://creativecommons.org/licenses/by-sa/3.0/
-See LICENSE.txt in this folder.
+1. 0 A.D. - music in music/ (except the files listed under 2), all of sfx/ and ambient/
+   0 A.D. by Wildfire Games  -  https://www.wildfiregames.com/  (https://play0ad.com/)
+   Copyright (C) Wildfire Games. Music composed by Omri Lahav and the 0 A.D. music team.
+   Licensed under the Creative Commons Attribution-ShareAlike 3.0 licence (CC BY-SA 3.0):
+   https://creativecommons.org/licenses/by-sa/3.0/ - see LICENSE.txt in this folder.
+   The modified files are likewise licensed CC BY-SA 3.0.
 
-Changes made for Rebirth of Civilisation: files were renamed, some sound effects and ambient
-loops were shortened and given fades, everything was resampled to 44.1 kHz and re-encoded as
-Ogg Vorbis. These modified files are likewise licensed CC BY-SA 3.0.
+2. FreePD.com - public domain (CC0) music, obtained via the SoundSafari/CC0-1.0-Music
+   collection (https://github.com/SoundSafari/CC0-1.0-Music, folder freepd.com/).
+   No attribution is required; credited here with thanks. https://freepd.com/
+     industrial_1   Inventing Flight          modern_1       Finally See The Light
+     industrial_2   Construction              modern_2       Novus Initium
+     industrial_3   Circuit                   modern_3       Parhelion
+     industrial_4   Chronos                   fall_2         Dawn of the Apocalypse
+     modern_war_1   Spec Ops                  modern_war_4   Desert Conflict
+     modern_war_2   Guerilla Tactics          modern_war_5   Beginning of Conflict
+     modern_war_3   Behind Enemy Lines
+
+3. Primate calls in voice/
+   chimpanzee_1, chimpanzee_2   "Pant-hoot call made by a male chimpanzee", Pawel Fedurek et al.
+                                (2017), Wikimedia Commons, CC BY 4.0
+                                https://commons.wikimedia.org/wiki/File:Pant-hoot_call_made_by_a_male_chimpanzee.ogg
+   baboon_1, baboon_2           "Yellow Baboon (Papio cynocephalus)", British Library,
+                                Wikimedia Commons, CC BY 4.0
+                                https://commons.wikimedia.org/wiki/File:Yellow_Baboon_(Papio_cynocephalus)_(W_PAPIO_CYNOCEPHALUS_R1_C1).ogg
+   capuchin_1..3                capuchin monkeys in the Atlantic rainforest, ricardoemfield,
+                                Freesound, CC BY 4.0  https://freesound.org/people/ricardoemfield/sounds/795413/
+   gibbon_1, gibbon_2           agile gibbon song, from "Possible Role of Mother-Daughter Vocal
+                                Interactions on the Development of Species-Specific Song in Gibbons",
+                                Koda H, Lemasson A, Oyakawa C, Rizaldi, Pamungkas J, Masataka N
+                                (PLoS ONE, 2013), Wikimedia Commons, CC BY 4.0
+                                https://commons.wikimedia.org/wiki/File:Possible-Role-of-Mother-Daughter-Vocal-Interactions-on-the-Development-of-Species-Specific-Song-in-pone.0071432.s006.oga
+   macaque_1, macaque_2         Japanese macaque coo calls, from "Role of vocal tract
+                                characteristics in individual discrimination by Japanese macaques",
+                                Furuyama T, Kobayasi K, Riquimaroux H (Scientific Reports, 2016),
+                                Wikimedia Commons, CC BY 4.0
+                                https://commons.wikimedia.org/wiki/File:Role-of-vocal-tract-characteristics-in-individual-discrimination-by-Japanese-macaques-(Macaca-srep32042-s2.oga
+   chimpanzee_3                 "S01-23 Chimpanzee Chatter", craigsmith, Freesound, CC0
+                                https://freesound.org/s/675429/ (cropped by Psymbiote for starcup)
+   bonobo_1..3                  the same chimpanzee chatter recording, raised four semitones
+                                (bonobos call higher than chimpanzees; no open bonobo recording
+                                was available), CC0
+   gorilla_1..3                 "Gorilla Sounds", AntumDeluge, OpenGameArt, CC0 (modified by
+                                Psymbiote for starcup)  https://opengameart.org/content/gorilla-sounds
+   orangutan_1, orangutan_2     the same gorilla sounds, lowered three semitones (no open
+                                orangutan recording was available), CC0
+   CC BY 4.0: https://creativecommons.org/licenses/by/4.0/   CC0: https://creativecommons.org/publicdomain/zero/1.0/
+   The calls were found, with their credits, in orkuneyb/animal_sounds_flutter
+   (https://github.com/orkuneyb/animal_sounds_flutter) and teamstarcup/starcup
+   (https://github.com/teamstarcup/starcup). Our trimmed versions keep the licences above.
 The exact sources and conversion are in tools/fetch_audio.sh (0 A.D. git commit
 61a3b9507d974084e6badb88a0826bd89a6d5b8b, folder binaries/data/mods/public/audio).
 
-Music (file <- original 0 A.D. track)
+0 A.D. music (file <- original 0 A.D. track)
   title        Hill of Sorrows
   wander_1     Taiko 1
   wander_2     Sunrise
@@ -41,5 +85,5 @@ ship, animal, construction, farming, mining, water, weather and dayscape sounds 
 tools/fetch_audio.sh for the file-by-file list).
 
 The Ogg Vorbis decoder (third_party/stb_vorbis.c) is by Sean Barrett, public domain / MIT.
-The game's code is MIT licensed (see LICENSE at the top of the project); the CC BY-SA licence
-applies to the audio files only.
+The game's code is MIT licensed (see LICENSE at the top of the project); the licences above
+apply to the audio files only.

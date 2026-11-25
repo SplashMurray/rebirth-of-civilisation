@@ -76,9 +76,12 @@ const std::vector<std::vector<const char*>>& moodTracks() {
         {"ancient_1", "ancient_2", "ancient_3", "ancient_4", "ancient_5"},  // Ancient
         {"later_1", "later_2", "later_3", "ancient_2", "ancient_5"},         // Later
         {"war_1", "war_2", "war_3"},                                         // War
-        {"fall"},                                                            // Fall
+        {"fall", "fall_2"},                                                  // Fall
         {"victory"},                                                         // Victory
-        {"fall"},                                                            // Defeat
+        {"fall", "fall_2"},                                                  // Defeat
+        {"industrial_1", "industrial_2", "industrial_3", "industrial_4"},   // Industrial
+        {"modern_1", "modern_2", "modern_3", "industrial_4"},               // Modern
+        {"modern_war_1", "modern_war_2", "modern_war_3", "modern_war_4", "modern_war_5"},  // ModernWar
     };
     return T;
 }
@@ -103,6 +106,7 @@ Mixer::~Mixer() {
     delete old;
     for (auto* c : sfx) delete c;
     for (auto* c : amb) delete c;
+    for (auto* c : voice) delete c;
 }
 
 bool Mixer::load(const std::string& d) {
@@ -117,13 +121,21 @@ bool Mixer::load(const std::string& d) {
         a.push_back(new Clip);
         loadClip(dir + "ambient/" + ambientName(i) + ".ogg", *a.back());
     }
+    std::vector<Clip*> v;
+    for (int p = 0; p < 8; p++)
+        for (int k = 1; k <= VOICES_PER_PRIMATE; k++) {
+            v.push_back(new Clip);
+            loadClip(dir + "voice/" + primateVoiceName(p) + "_" + std::to_string(k) + ".ogg", *v.back());
+        }
     {
         std::lock_guard<std::mutex> lk(m);
         sfx.swap(s);
         amb.swap(a);
+        voice.swap(v);
     }
     for (auto* c : s) delete c;
     for (auto* c : a) delete c;
+    for (auto* c : v) delete c;
     ready = found > 0;
     return ready;
 }
@@ -225,15 +237,30 @@ void Mixer::fill(short* out, int frames) {
     }
 }
 
-void Mixer::play(Sfx s, float vol, float pan, int delayMs) {
-    if (!ready || (int)s < 0 || (int)s >= (int)Sfx::COUNT) return;
-    std::lock_guard<std::mutex> lk(m);
-    if ((size_t)s >= sfx.size()) return;
-    const Clip& c = *sfx[(size_t)s];
+void Mixer::addVoice(const Clip& c, float vol, float pan, int delayMs) {  // m held
     if (c.pcm.empty() || voices.size() > 24) return;
     pan = std::max(-1.0f, std::min(1.0f, pan));
     float gl = vol * std::sqrt(0.5f * (1.0f - pan)) * 1.41f, gr = vol * std::sqrt(0.5f * (1.0f + pan)) * 1.41f;
     voices.push_back({&c, 0, std::min(gl, 1.2f), std::min(gr, 1.2f), delayMs * (RATE / 1000)});
+}
+
+void Mixer::play(Sfx s, float vol, float pan, int delayMs) {
+    if (!ready || (int)s < 0 || (int)s >= (int)Sfx::COUNT) return;
+    std::lock_guard<std::mutex> lk(m);
+    if ((size_t)s < sfx.size()) addVoice(*sfx[(size_t)s], vol, pan, delayMs);
+}
+
+void Mixer::call(int primate, float vol, float pan, int delayMs) {
+    if (!ready || primate < 0 || primate >= 8) return;
+    std::lock_guard<std::mutex> lk(m);
+    std::vector<const Clip*> have;
+    for (int k = 0; k < VOICES_PER_PRIMATE; k++) {
+        size_t i = (size_t)(primate * VOICES_PER_PRIMATE + k);
+        if (i < voice.size() && !voice[i]->pcm.empty()) have.push_back(voice[i]);
+    }
+    if (have.empty()) return;
+    rng = rng * 1103515245u + 12345u;
+    addVoice(*have[(rng >> 8) % have.size()], vol, pan, delayMs);
 }
 
 void Mixer::setMood(Mood md) {
@@ -258,4 +285,11 @@ void Mixer::setVolumes(int music, int sfxV, int ambient) {
 int Mixer::voicesPlaying() {
     std::lock_guard<std::mutex> lk(m);
     return (int)voices.size();
+}
+
+int Mixer::callsLoaded() {
+    std::lock_guard<std::mutex> lk(m);
+    int n = 0;
+    for (auto* c : voice) if (!c->pcm.empty()) n++;
+    return n;
 }

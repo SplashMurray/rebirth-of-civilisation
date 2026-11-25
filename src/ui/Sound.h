@@ -25,10 +25,17 @@ inline const char* sfxName(Sfx s) {
 }
 
 // The music to play: each mood has a few tracks that play in turn, crossfading when the mood changes.
-enum class Mood { None, Title, Wander, Ancient, Later, War, Fall, Victory, Defeat };
+enum class Mood { None, Title, Wander, Ancient, Later, War, Fall, Victory, Defeat, Industrial, Modern, ModernWar };
 
 // Looping background sounds, mixed by how much of each is on screen.
 enum Ambient { AMB_WAVES, AMB_JUNGLE, AMB_BIRDS, AMB_WIND, AMB_COUNT };
+// file name stems under assets/audio/voice, in g_primates order
+inline const char* primateVoiceName(int p) {
+    static const char* N[] = {"chimpanzee", "bonobo", "orangutan", "gorilla", "baboon", "capuchin", "gibbon", "macaque"};
+    return p >= 0 && p < 8 ? N[p] : "";
+}
+const int VOICES_PER_PRIMATE = 3;
+
 inline const char* ambientName(int a) {
     static const char* N[] = {"waves", "jungle", "birds", "wind"};
     return N[a];
@@ -40,6 +47,8 @@ public:
     // vol 0..1, pan -1 (left) .. 1 (right), delayMs: start later (e.g. an impact after the shot)
     virtual void play(Sfx s, float vol = 1.0f, float pan = 0.0f, int delayMs = 0) { (void)s; (void)vol; (void)pan; (void)delayMs; }
     virtual void setMood(Mood m) { (void)m; }
+    // a call of one primate species (index into g_primates); a few recordings per species
+    virtual void call(int primate, float vol = 1.0f, float pan = 0.0f, int delayMs = 0) { (void)primate; (void)vol; (void)pan; (void)delayMs; }
     virtual void setAmbient(int amb, float level) { (void)amb; (void)level; }
     virtual void setVolumes(int music, int sfx, int ambient) { (void)music; (void)sfx; (void)ambient; }  // 0..100
 };
