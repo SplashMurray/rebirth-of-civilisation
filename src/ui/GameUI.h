@@ -203,6 +203,10 @@ private:
     void edgeFade(int sx, int sy, const int* xy, int d, float depth, Color c, int a);
     void drawTerrainRegion(int x0, int x1, int y0, int y1);
     void drawLiveWater(int x0, int x1, int y0, int y1);
+    // ---- resources (UIResources.cpp)
+    Color resourceKindColor(int kind) const;
+    void drawResourceIcon(int res, int cx, int cy, int r, bool badge = true);
+    void drawResourceScene(int x, int y, int sx, int sy);
     // ---- minor tribes
     void renderTribes();
     void drawTribeBadge(int x, int y, int r, int tribeCiv);

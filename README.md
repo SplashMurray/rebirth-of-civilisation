@@ -31,6 +31,7 @@
 
 * **Anti-aliased, illustrated graphics** (GDI+):
   * **Terrain** blends softly from tile to tile, with sandy shores, sunlit shallows, light and shade across the ground, gradient-lit mountains with snow caps, rolling hills, layered conifers, round-crowned woods and jungle with palms. The known world fades into darkness at its edges.
+  * **Resources** each have their own icon on a medallion whose rim shows the kind (green: bonus, yellow-green: crop, red: strategic, gold: luxury), and they change the tile itself: golden wheat rows, rice paddies, maize, shoals of fish, oyster beds, grazing horses and deer, quarry stones, rust-red iron, copper with green verdigris, coal seams, glinting gold, crystals, salt crusts, black oil seeps, glowing uranium, rusted scrap, beehives, cacao pods, spice bushes, vineyards and foxes. A resource appears once you have the technology to recognise it. The top bar shows your strategic resources as icons with counts.
   * **Live water**: glints drift across the sea and surf rolls onto the beaches.
   * **Units** are bronze-rimmed medallions (shields for civilians) in their owner's colour, with an icon for every unit type. They **glide** from tile to tile and **lunge** at their targets. Arrows and stones arc through the air, bullets and shells streak, hits flash and spark, damage numbers float up and destroyed units vanish in smoke.
   * **Cities** grow from huts round a fire, to brick and stone houses with tiled roofs, to smoking factories and glass towers. Walls gain towers, and capitals fly a fluttering pennant.
@@ -246,6 +247,7 @@
 | ![Rivers, lakes and marshes](docs/screenshots/26_rivers.png) | ![Boats up the river](docs/screenshots/27_river_boats.png) |
 | ![A celebrating city](docs/screenshots/28_happiness.png) | ![Moods on the map](docs/screenshots/29_moods.png) |
 | ![The Tribes screen](docs/screenshots/30_tribes.png) | ![A tribe and its ally](docs/screenshots/31_tribe_city.png) |
+| ![Every resource](docs/screenshots/32_resources.png) | |
 | ![Start](docs/screenshots/04_start_map.png) | ![The Fall](docs/screenshots/07_fall_popup.png) |
 | ![A drought](docs/screenshots/11c_disaster.png) | ![Late game](docs/screenshots/16_lategame.png) |
 | ![Excavating ruins](docs/screenshots/09_unit_panel.png) | ![Tech tree](docs/screenshots/10_tech_tree.png) |
@@ -306,6 +308,7 @@ src/ui/          User interface, drawn through the small Canvas interface
   UIArt.cpp        primate portraits, the title scene, mushroom clouds
   UITrade.cpp      the caravan's route chooser
   UIRivers.cpp     drawing rivers, terrain features and natural wonders
+  UIResources.cpp  resource icons and how resources look on the map
   UISound.cpp      which sounds, music and ambience play when
 src/audio/Mixer.cpp  portable software mixer (effects, ambient loops, streamed Ogg music)
 src/platform/win32/main_win32.cpp   Windows window, input and GDI+ renderer

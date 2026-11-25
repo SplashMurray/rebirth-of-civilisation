@@ -489,17 +489,35 @@ void GameUI::renderTopBar() {
          "Culture accumulates towards your next Tradition. Adopting " + std::to_string(CULTURE_WIN_POLICIES) + " Traditions wins a Cultural victory.", [this] { overlay = OV_POLICY; });
     if (can) item(compact ? "TRADITION!" : "TRADITION READY", rgb(255, 160, 255), "Choose a new Tradition", [this] { overlay = OV_POLICY; });
     {
-        std::string abbr, tip;
+        std::string tip;
         for (int r = 1; r < R_COUNT; r++) {
             if (g_resources[r].kind != RK_STRATEGIC || !g.hasTech(g.player, g_resources[r].revealTechId)) continue;
             int n = g.resourceCount(g.player, r);
-            if (n > 0) abbr += (abbr.empty() ? "" : " ") + g_resources[r].abbr;
             tip += (tip.empty() ? "" : ", ") + g_resources[r].name + " " + std::to_string(n);
         }
-        if (!tip.empty())
-            item(abbr.empty() ? "No resources" : abbr, rgb(230, 170, 120),
-                 "Strategic resources inside your borders: " + tip +
-                 ". Some units and buildings need them (Bronze Phalanx: Copper and Tin; riders: Horses; Iron Blades: Iron or Scrap Metal; Factory: Coal; tanks: Oil).");
+        std::string fullTip = "Strategic resources inside your borders: " + tip +
+                              ". Some units and buildings need them (Bronze Phalanx: Copper and Tin; riders: Horses; Iron Blades: Iron or Scrap Metal; Factory: Coal; tanks: Oil).";
+        std::vector<std::pair<int, int>> have;  // resource, count
+        for (int r = 1; r < R_COUNT; r++)
+            if (g_resources[r].kind == RK_STRATEGIC && g.hasTech(g.player, g_resources[r].revealTechId) && g.hasResource(g.player, r))
+                have.push_back({r, g.resourceCount(g.player, r)});
+        if (!tip.empty() && have.empty()) item("No resources", rgb(230, 170, 120), fullTip);
+        else if (!have.empty()) {  // each resource's icon and how many you have
+            int w = 0;
+            auto label = [](int n) { return n > 0 ? std::to_string(n) : std::string("+"); };  // "+": lent or from an ally
+            for (auto& hv : have) w += 20 + cv->textWidth(label(hv.second), 12, true) + 6;
+            if (x + w <= limit) {
+                int ix = x;
+                for (auto& hv : have) {
+                    drawResourceIcon(hv.first, ix + 9, TOP / 2, 9);
+                    std::string n = label(hv.second);
+                    cv->text(ix + 20, y + 1, n, 12, rgb(230, 200, 160), AL_LEFT, true);
+                    ix += 20 + cv->textWidth(n, 12, true) + 6;
+                }
+                hot(x - 4, 0, w + 8, TOP, nullptr, fullTip);
+                x += w + (compact ? 14 : 22);
+            }
+        }
     }
     // research, in whatever space is left
     std::string rs = me.research >= 0 ? g_techs[me.research].name + " (" + std::to_string(g.researchTurns(g.player)) + ")" : "Choose research";

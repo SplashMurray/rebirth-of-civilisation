@@ -310,6 +310,7 @@ void GameUI::drawTile(int x, int y, int sx, int sy, bool visible) {
         drawRiver(x, y, sx, sy);
         if (g.roadLevelAt(x, y) > 0 && !water) drawRoads(x, y, sx, sy);
     }
+    drawResourceScene(x, y, sx, sy);
     if (t.feature == F_WONDER) drawNatural(x, y, sx, sy);
     if (t.site >= 0) drawHumanSite(x, y, sx, sy, true);
     // improvements
@@ -345,14 +346,12 @@ void GameUI::drawTile(int x, int y, int sx, int sy, bool visible) {
         }
     }
     // resource
-    if (g.resourceVisible(g.player, x, y) && hs >= 16) {
-        const ResourceDef& r = g_resources[t.res];
-        int rx = PX(4), ry = PY(3), rr = std::max(4, u / 6);
-        cv->fillCircleA(rx + 1, ry + 2, rr + 1, rgb(0, 0, 0), 90);
-        cv->fillCircle(rx, ry, rr + 1, rgb(24, 24, 24));
-        cv->fillCircle(rx, ry, rr, r.color);
-        cv->fillCircleA(rx - rr / 3, ry - rr / 3, std::max(1, rr / 2), rgb(255, 255, 255), 70);
-        if (hs >= 34) cv->text(rx, ry + rr + 1, r.abbr, std::max(9, u / 4), rgb(250, 250, 250), AL_CENTER, true);
+    if (g.resourceVisible(g.player, x, y) && hs >= 10) {
+        if (hs >= 16) drawResourceIcon(t.res, PX(4), PY(4), std::max(8, u * 28 / 100));
+        else {  // zoomed far out: a dot in the resource's colour
+            cv->fillCircle(PX(4), PY(4), 3, rgb(14, 14, 16));
+            cv->fillCircle(PX(4), PY(4), 2, g_resources[t.res].color);
+        }
     }
     if (t.fallout > 0 && hs >= 16) drawTrefoil(PX(3), PY(-4), std::max(4, u / 6 + t.fallout));
 }
