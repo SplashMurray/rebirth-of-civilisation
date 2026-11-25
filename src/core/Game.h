@@ -247,6 +247,7 @@ struct GameSettings {
     uint64_t seed = 1;
     bool allAI = false;  // simulation / test mode
     int speed = 1;       // 0 quick, 1 standard, 2 epic
+    bool tutorial = false;  // guide a new player step by step
 };
 
 struct CombatResult {
@@ -502,6 +503,7 @@ public:
     void reportMood(City& city);
     // ---- rivers and terrain features (Rivers.cpp)
     std::vector<NaturalSite> naturals;
+    int tutorialStep = -1;  // the tutorial's current step (-1: no tutorial); the steps live in the interface
     int dirTo(int fx, int fy, int tx, int ty) const;           // 0..5, or -1 if not neighbours
     bool hasRiver(int x, int y) const { return !isWater(x, y) && at(x, y).river != 0; }
     bool riverLink(int fx, int fy, int tx, int ty) const;      // a river runs straight from one tile into the other

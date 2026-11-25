@@ -389,6 +389,7 @@ void enableDpiAwareness() {
 
 std::string settingsPath();
 int g_appliedAnim = -1;     // animOn last saved
+int g_appliedTips = -1;     // advisorTips last saved
 int g_appliedVol = -1;      // volumes last saved (packed)
 int packedVolumes() { return g_ui->musicVol * 1000000 + g_ui->sfxVol * 1000 + g_ui->ambVol; }
 void loadSettings() {
@@ -400,6 +401,7 @@ void loadSettings() {
         int v = 0;
         if (sscanf(line, "uiscale=%d", &v) == 1 && v >= GameUI::UI_SCALE_MIN && v <= GameUI::UI_SCALE_MAX) g_ui->uiScalePct = v;
         if (sscanf(line, "animations=%d", &v) == 1) g_ui->animOn = v != 0;
+        if (sscanf(line, "advisortips=%d", &v) == 1) g_ui->advisorTips = v != 0;
         if (sscanf(line, "music=%d", &v) == 1) g_ui->musicVol = vol(v);
         if (sscanf(line, "effects=%d", &v) == 1) g_ui->sfxVol = vol(v);
         if (sscanf(line, "ambience=%d", &v) == 1) g_ui->ambVol = vol(v);
@@ -407,13 +409,15 @@ void loadSettings() {
     fclose(f);
 }
 void saveSettingsIfChanged() {
-    if (g_ui->uiScalePct == g_appliedPct && (int)g_ui->animOn == g_appliedAnim && packedVolumes() == g_appliedVol) return;
+    if (g_ui->uiScalePct == g_appliedPct && (int)g_ui->animOn == g_appliedAnim && packedVolumes() == g_appliedVol && (int)g_ui->advisorTips == g_appliedTips) return;
+    g_appliedTips = (int)g_ui->advisorTips;
     g_appliedPct = g_ui->uiScalePct;
     g_appliedAnim = (int)g_ui->animOn;
     g_appliedVol = packedVolumes();
     FILE* f = fopen(settingsPath().c_str(), "w");
     if (!f) return;
-    fprintf(f, "uiscale=%d\nanimations=%d\nmusic=%d\neffects=%d\nambience=%d\n", g_appliedPct, g_appliedAnim, g_ui->musicVol, g_ui->sfxVol, g_ui->ambVol);
+    fprintf(f, "uiscale=%d\nanimations=%d\nmusic=%d\neffects=%d\nambience=%d\nadvisortips=%d\n", g_appliedPct, g_appliedAnim, g_ui->musicVol, g_ui->sfxVol,
+            g_ui->ambVol, g_appliedTips);
     fclose(f);
 }
 

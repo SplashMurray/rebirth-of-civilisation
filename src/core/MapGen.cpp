@@ -347,6 +347,7 @@ void Game::newGame(const GameSettings& s) {
     for (int t = 0; t < (int)g_tribes.size(); t++) tribePool.push_back(t);
     for (size_t i = tribePool.size(); i > 1; i--) std::swap(tribePool[i - 1], tribePool[rng.range((int)i)]);
     allyResTurn = -1;
+    tutorialStep = s.tutorial ? 0 : -1;
     std::vector<int> pool;
     for (int p = 0; p < (int)g_primates.size(); p++) if (p != s.primate) pool.push_back(p);
     for (size_t i = pool.size(); i > 1; i--) std::swap(pool[i - 1], pool[rng.range((int)i)]);

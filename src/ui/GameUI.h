@@ -26,6 +26,7 @@ public:
     // reads this after each input event and rescales the canvas when it changes.
     int uiScalePct = 100;
     bool animOn = true;
+    bool advisorTips = true;  // advisors speak up at the start of turns (saved in settings.ini)
     // ---- sound: the platform plugs in a backend; volumes 0..100 (saved in settings.ini)
     SoundSink silence;
     SoundSink* snd = &silence;
@@ -36,7 +37,7 @@ public:
 
     // ---- used by tests / screenshot tool
     enum Screen { SCR_TITLE, SCR_SETUP, SCR_GAME };
-    enum Overlay { OV_NONE, OV_CITY, OV_TECH, OV_POLICY, OV_DIPLO, OV_MENU, OV_HELP, OV_LOG, OV_EVO, OV_ACHIEVEMENTS, OV_TRADE, OV_ROUTES, OV_TRIBES };
+    enum Overlay { OV_NONE, OV_CITY, OV_TECH, OV_POLICY, OV_DIPLO, OV_MENU, OV_HELP, OV_LOG, OV_EVO, OV_ACHIEVEMENTS, OV_TRADE, OV_ROUTES, OV_TRIBES, OV_ADVISORS };
     Screen screen = SCR_TITLE;
     Overlay overlay = OV_NONE;
     std::unique_ptr<Game> game;
@@ -203,6 +204,37 @@ private:
     void edgeFade(int sx, int sy, const int* xy, int d, float depth, Color c, int a);
     void drawTerrainRegion(int x0, int x1, int y0, int y1);
     void drawLiveWater(int x0, int x1, int y0, int y1);
+    // ---- tutorial (UITutorial.cpp)
+    struct UIRect { int x, y, w, h; };
+    std::unordered_map<std::string, UIRect> uiRects;  // where named controls were drawn, for the tutorial to point at
+    void markRect(const std::string& id, int x, int y, int w, int h);
+    struct TutInfo {
+        std::string title, text, rect, nextLabel = "Next";
+        int tileX = -1, tileY = -1;
+        bool canNext = false, done = false;
+    };
+    TutInfo tutorialInfo();
+    int tutorialSteps() const;
+    void tutorialAdvance();
+    void renderTutorial();
+    void drawHighlight(int x, int y, int w, int h);
+    int tutRefStep = -1, tutRefTurn = 0, tutRefX = -1, tutRefY = -1, tutRefCount = 0;
+    bool setupTutorial = false;
+    // ---- advisors (UIAdvisors.cpp)
+    struct Advice {
+        int who = 0, pri = 0;
+        std::string text;
+        std::function<void()> go;
+        std::string goLabel;
+    };
+    std::vector<Advice> gatherAdvice();
+    void renderAdvisors();
+    void drawAdvisor(int who, int cx, int cy, int r);
+    void updateAdvisorTip();
+    void renderAdvisorTip();
+    struct { Advice advice; bool active = false; } tip;
+    int tipTurn = -1;
+    std::unordered_map<std::string, int> tipShown;  // advice text -> turn last raised
     // ---- resources (UIResources.cpp)
     Color resourceKindColor(int kind) const;
     void drawResourceIcon(int res, int cx, int cy, int r, bool badge = true);

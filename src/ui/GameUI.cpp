@@ -216,20 +216,22 @@ void GameUI::renderTitle() {
     cv->textA(W / 2 + 1, H / 6 + ts + 15, "2034. Humanity destroys itself. The primates inherit the Earth.", 20, rgb(0, 0, 0), AL_CENTER, false, 160);
     cv->text(W / 2, H / 6 + ts + 14, "2034. Humanity destroys itself. The primates inherit the Earth.", 20, rgb(255, 230, 210), AL_CENTER);
     int bw = 280, bx = (W - bw) / 2, by = H / 6 + ts + 70;
-    bool titleVolumes = by + 436 <= H;
-    cv->fillRoundRectGrad(bx - 22, by - 20, bw + 44, 290 + 74 + (titleVolumes ? 88 : 0), 14, rgb(20, 14, 20), rgb(8, 6, 10), 150);
-    cv->roundRect(bx - 22, by - 20, bw + 44, 290 + 74 + (titleVolumes ? 88 : 0), 14, rgb(220, 170, 100), 1, 90);
-    button(bx, by, bw, 46, "New Game", true, [this] { screen = SCR_SETUP; }, "", rgb(92, 66, 46), 18);
+    bool titleVolumes = by + 494 <= H;
+    cv->fillRoundRectGrad(bx - 22, by - 20, bw + 44, 348 + 74 + (titleVolumes ? 88 : 0), 14, rgb(20, 14, 20), rgb(8, 6, 10), 150);
+    cv->roundRect(bx - 22, by - 20, bw + 44, 348 + 74 + (titleVolumes ? 88 : 0), 14, rgb(220, 170, 100), 1, 90);
+    button(bx, by, bw, 46, "New Game", true, [this] { setupTutorial = false; screen = SCR_SETUP; }, "", rgb(92, 66, 46), 18);
+    button(bx, by + 58, bw, 46, "Tutorial", true, [this] { setupTutorial = true; setupSize = 0; setupDiff = 0; screen = SCR_SETUP; },
+           "A guided first game: choose your primate, then follow the steps (small map, Easy rivals)", rgb(92, 66, 46), 18);
     bool hasSave = (bool)std::ifstream(savePath);
-    button(bx, by + 58, bw, 46, "Load Game", hasSave, [this] { loadGame(); }, hasSave ? "" : "No saved game found", rgb(92, 66, 46), 18);
-    button(bx, by + 116, bw, 46, "How to Play", true, [this] { overlay = OV_HELP; helpScroll = 0; }, "", rgb(92, 66, 46), 18);
-    button(bx, by + 174, bw, 46, "Achievements (" + std::to_string(ach.unlocked.size()) + "/" + std::to_string(g_achievements.size()) + ")", true,
+    button(bx, by + 116, bw, 46, "Load Game", hasSave, [this] { loadGame(); }, hasSave ? "" : "No saved game found", rgb(92, 66, 46), 18);
+    button(bx, by + 174, bw, 46, "How to Play", true, [this] { overlay = OV_HELP; helpScroll = 0; }, "", rgb(92, 66, 46), 18);
+    button(bx, by + 232, bw, 46, "Achievements (" + std::to_string(ach.unlocked.size()) + "/" + std::to_string(g_achievements.size()) + ")", true,
            [this] { overlay = OV_ACHIEVEMENTS; achScroll = 0; }, "", rgb(92, 66, 46), 18);
-    button(bx, by + 232, bw, 46, "Exit", true, [this] { quit = true; }, "", rgb(92, 66, 46), 18);
-    uiScaleControl(bx, by + 290, bw);
+    button(bx, by + 290, bw, 46, "Exit", true, [this] { quit = true; }, "", rgb(92, 66, 46), 18);
+    uiScaleControl(bx, by + 348, bw);
     if (titleVolumes) {  // when there is room (the in-game menu always has them)
-        volumeControl(bx, by + 334, bw, "Music", musicVol);
-        volumeControl(bx, by + 378, bw, "Sound effects", sfxVol);
+        volumeControl(bx, by + 392, bw, "Music", musicVol);
+        volumeControl(bx, by + 436, bw, "Sound effects", sfxVol);
     }
     cv->text(W - 12, H - 22, "Open source - MIT licence", 12, rgb(170, 200, 170), AL_RIGHT);
     if (overlay == OV_HELP) renderHelp();
@@ -293,8 +295,14 @@ void GameUI::renderSetup() {
     for (int i = 0; i < 3; i++)
         button(gx + 110 + i * s3, oy + 88, s3 - 10, 34, std::string(SPEED_NAMES[i]) + " (" + std::to_string(SPEED_TURNS[i]) + " turns)", true,
                [this, i] { setupSpeed = i; }, SPEED_TIPS[i], setupSpeed == i ? rgb(110, 90, 40) : C_PANEL2, 14);
+    // guidance: the tutorial and advisor tips
+    button(beginX, oy + 84, 108, 34, std::string("Tutorial: ") + (setupTutorial ? "On" : "Off"), true, [this] { setupTutorial = !setupTutorial; },
+           "Step-by-step guidance through your first game", setupTutorial ? rgb(110, 90, 40) : C_PANEL2, 12);
+    button(beginX + 112, oy + 84, 108, 34, std::string("Tips: ") + (advisorTips ? "On" : "Off"), true, [this] { advisorTips = !advisorTips; },
+           "Advisor tips: your advisors speak up at the start of a turn when something needs you", advisorTips ? rgb(110, 90, 40) : C_PANEL2, 12);
     button(beginX, oy + 4, 220, 70, "Begin", true, [this] {
         GameSettings s;
+        s.tutorial = setupTutorial;
         s.primate = setupPrimate;
         s.mapSize = setupSize;
         s.difficulty = setupDiff;
@@ -343,6 +351,7 @@ void GameUI::renderGame() {
         case OV_POLICY: renderPolicies(); break;
         case OV_DIPLO: renderDiplomacy(); break;
         case OV_TRIBES: renderTribes(); break;
+        case OV_ADVISORS: renderAdvisors(); break;
         case OV_TRADE: renderTrade(); break;
         case OV_ROUTES: renderRoutes(); break;
         case OV_MENU: renderMenu(); break;
@@ -354,6 +363,8 @@ void GameUI::renderGame() {
     }
     renderTopBar();
     if (blastT >= 0) { renderBlast(); return; }
+    renderAdvisorTip();
+    renderTutorial();
     if (nukeMode || nukeArmX >= 0) renderNukeTargeting();
     if (!g.popups.empty()) renderPopup();
 }
@@ -370,18 +381,20 @@ void GameUI::renderTopBar() {
     hot(0, 0, W, TOP, nullptr);
     // right side first: buttons and date
     int bx = W - 8;
-    auto rb = [&](const std::string& l, std::function<void()> fn, const std::string& tip) {
+    auto rb = [&](const char* id, const std::string& l, std::function<void()> fn, const std::string& tip) {
         int w = cv->textWidth(l, 13, true) + (compact ? 12 : 18);
         bx -= w + 4;
         button(bx, 6, w, TOP - 12, l, true, fn, tip, C_PANEL2, 13);
+        markRect(id, bx, 6, w, TOP - 12);
     };
-    rb("Menu", [this] { overlay = overlay == OV_MENU ? OV_NONE : OV_MENU; }, "Save, load, help (Esc)");
-    rb("Log", [this] { overlay = overlay == OV_LOG ? OV_NONE : OV_LOG; logScroll = 0; }, "Event log (L)");
-    rb(compact ? "Evo" : "Evolution", [this] { overlay = overlay == OV_EVO ? OV_NONE : OV_EVO; }, "Evolutionary traits and pressures (V)");
-    rb(compact ? "Tribes" : "Tribes", [this] { overlay = overlay == OV_TRIBES ? OV_NONE : OV_TRIBES; tribeWarArm = -1; }, "Minor tribes: influence, gifts, allies (I)");
-    rb(compact ? "Diplo" : "Diplomacy", [this] { overlay = overlay == OV_DIPLO ? OV_NONE : OV_DIPLO; }, "Other civilisations (D)");
-    rb(compact ? "Trad" : "Traditions", [this] { overlay = overlay == OV_POLICY ? OV_NONE : OV_POLICY; }, "Adopt traditions with culture (P)");
-    rb("Tech", [this] { overlay = overlay == OV_TECH ? OV_NONE : OV_TECH; }, "Technology tree (T)");
+    rb("menu", "Menu", [this] { overlay = overlay == OV_MENU ? OV_NONE : OV_MENU; }, "Save, load, help (Esc)");
+    rb("log", "Log", [this] { overlay = overlay == OV_LOG ? OV_NONE : OV_LOG; logScroll = 0; }, "Event log (L)");
+    rb("advisors", compact ? "Adv" : "Advisors", [this] { overlay = overlay == OV_ADVISORS ? OV_NONE : OV_ADVISORS; }, "Your advisors' advice (A)");
+    rb("evo", compact ? "Evo" : "Evolution", [this] { overlay = overlay == OV_EVO ? OV_NONE : OV_EVO; }, "Evolutionary traits and pressures (V)");
+    rb("tribes", "Tribes", [this] { overlay = overlay == OV_TRIBES ? OV_NONE : OV_TRIBES; tribeWarArm = -1; }, "Minor tribes: influence, gifts, allies (I)");
+    rb("diplo", compact ? "Diplo" : "Diplomacy", [this] { overlay = overlay == OV_DIPLO ? OV_NONE : OV_DIPLO; }, "Other civilisations (D)");
+    rb("trad", compact ? "Trad" : "Traditions", [this] { overlay = overlay == OV_POLICY ? OV_NONE : OV_POLICY; }, "Adopt traditions with culture (P)");
+    rb("tech", "Tech", [this] { overlay = overlay == OV_TECH ? OV_NONE : OV_TECH; }, "Technology tree (T)");
     std::string date = "Turn " + std::to_string(g.turn) + "  |  " + g.dateString(g.turn);
     if (compact) {
         date = "T" + std::to_string(g.turn) + " | ";
@@ -940,6 +953,7 @@ void GameUI::renderEndTurn() {
     int bw = mmW + 8, bh = 54;
     int x = mmX - 4, y = mmY - 4 - bh - 8;
     Color c = action == 0 ? rgb(52, 112, 64) : rgb(132, 96, 36);
+    markRect("endturn", x, y, bw, bh);
     button(x, y, bw, bh, label, true, [this] { endTurnButton(); },
            action == 0 ? "End your turn (Enter)" : "Click to resolve. Press Enter to end the turn anyway.", c, 18);
 }
@@ -1874,6 +1888,10 @@ void GameUI::renderHelp() {
         "Oil for tanks. Wheat, Rice and Maize are crops: build a Farm on them for extra food. Build Pastures on Horses and Mines on minerals.\n"
         "GOLD  Your people only learn the value of money with the Currency technology. From then on cities earn Gold, used to buy items.\n"
         "CITIES  Your first cities are founded by bands; after that, cities train Elder Troops to found more. Click a city to choose what it builds. Cities grow with surplus food and claim land with culture.\n"
+        "TUTORIAL AND ADVISORS  Choose Tutorial on the title screen (or switch it on when setting up a game) for a guided first game; "
+        "it points at what to do and moves on when you have done it, and Skip tutorial turns it off. Your four advisors (Advisors, or A) "
+        "suggest what to do next, most urgent first, with a button that takes you there; with advisor tips on they also speak up at the "
+        "start of a turn when something needs you.\n"
         "MINOR TRIBES  Small one-city peoples of other primate species - lemurs, mandrills, tarsiers, howlers and more - live among the "
         "great powers (4, 6 or 8 by map size). They do not expand or seek victory; they defend their home and keep up with the technology "
         "most species know. Each is Cultured (Culture), Learned (Science), Mercantile (Gold), Maritime (Food) or Militant (gifts of troops). "
@@ -2402,10 +2420,10 @@ void GameUI::key(int k, bool shift, bool ctrl) {
         case KEY_ENTER: endTurnNow(); return;
         default: break;
     }
-    if (overlay == OV_CITY && (k == 'T' || k == 'P' || k == 'D' || k == 'L' || k == 'V' || k == 'I')) overlay = OV_NONE;
+    if (overlay == OV_CITY && (k == 'T' || k == 'P' || k == 'D' || k == 'L' || k == 'V' || k == 'I' || k == 'A')) overlay = OV_NONE;
     if (overlay != OV_NONE && overlay != OV_CITY) {
         if ((k == 'T' && overlay == OV_TECH) || (k == 'P' && overlay == OV_POLICY) || (k == 'D' && overlay == OV_DIPLO) || (k == 'L' && overlay == OV_LOG) ||
-            (k == 'V' && overlay == OV_EVO) || (k == 'I' && overlay == OV_TRIBES))
+            (k == 'V' && overlay == OV_EVO) || (k == 'I' && overlay == OV_TRIBES) || (k == 'A' && overlay == OV_ADVISORS))
             overlay = OV_NONE;
         return;
     }
@@ -2416,6 +2434,7 @@ void GameUI::key(int k, bool shift, bool ctrl) {
         case 'L': overlay = OV_LOG; logScroll = 0; return;
         case 'V': overlay = OV_EVO; return;
         case 'I': overlay = OV_TRIBES; tribeWarArm = -1; return;
+        case 'A': overlay = OV_ADVISORS; return;
         case KEY_TAB: { int n = nextUnitNeedingOrders(selUnit); if (n >= 0) selectUnit(n, true); return; }
         case 'C': if (sel()) centerOn(sel()->x, sel()->y); return;
         case 'M': if (sel()) moveMode = !moveMode; return;
