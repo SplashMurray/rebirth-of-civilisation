@@ -18,6 +18,20 @@ std::vector<TechDef> g_techs;
 std::vector<PolicyDef> g_policies;
 std::vector<PrimateDef> g_primates;
 std::vector<TribeDef> g_tribes;
+const char* GREAT_KIND_NAMES[GK_COUNT + 1] = {"Great Thinker", "Great Artisan", "Great Merchant", "Great Storyteller", "Great Warleader", "The Last Human"};
+const char* GREAT_SOURCE[GK_COUNT] = {"Science", "Production", "Gold and trade routes", "Culture", "Battles won"};
+std::vector<std::vector<std::string>> g_greatNames = {
+    {"Ishi the Stargazer", "Tamba Knot-Tier", "Grey Ula", "Bakari Who-Counts", "Sefu the Patient", "Nyota of the Long Look", "Old Ponderer", "Kesi Seed-Reader",
+     "Lumo Fire-Keeper", "Wise Adaeze"},
+    {"Mosi Stone-Shaper", "Chuma the Smith", "Zola Weaver", "Hodari Bridge-Builder", "Kito Many-Hands", "Imara the Potter", "Jengo Wheelwright",
+     "Asha Kiln-Mother", "Baraka Who-Mends", "Tumo the Tinker"},
+    {"Amani Far-Trader", "Dalia Salt-Seller", "Faraji of the Caravans", "Neema Sharp-Eye", "Obi Pearl-Diver", "Rehema Gold-Purse", "Simba Honey-Merchant",
+     "Tisa the Broker", "Zuri Long-Road", "Juma Fair-Weigh"},
+    {"Hadithi Fire-Talker", "Wanjiru Song-Keeper", "Kaya Who-Remembers", "Nia Dream-Teller", "Omari the Laughing", "Sauti Loud-Voice", "Tendai Mask-Maker",
+     "Ayo Drum-Beater", "Malaika the Dancer", "Shani Moon-Singer"},
+    {"Jabari the Fearless", "Shaka Scar-Brow", "Kifo Iron-Grip", "Moto Fire-Eyes", "Nguvu the Unbroken", "Rafiki Shield-Wall", "Tau the Ambusher",
+     "Vita Spear-Mother", "Askari Ten-Battles", "Kali the Swift"},
+};
 const char* TRIBE_KIND_NAMES[TK_COUNT] = {"Cultured", "Learned", "Mercantile", "Maritime", "Militant"};
 const char* TRIBE_KIND_GIFTS[TK_COUNT] = {"Culture", "Science", "Gold", "Food", "Troops"};
 std::vector<TraitDef> g_traits;
@@ -439,6 +453,22 @@ void initData() {
         {"Caravan", "Cv", 50, 0, 0, 0, 2, "Currency", UC::Trader, "", -1,
          "Sets up a trade route from the city it stands in to another city - yours or another species' - for 30 turns (more at slower speeds), then comes home. "
          "Earns gold and science abroad, food and production at home. Roads make routes richer. Walks through closed borders, but embargoes and wars end its routes."},
+        // Great Primates (never built: they are born of a people's deeds)
+        {"Great Thinker", "GT", 0, 0, 0, 0, 2, "", UC::Great, "", -2,
+         "A mind ahead of its time. Share an insight for a burst of Science, or settle in a city to add +3 Science there for good."},
+        {"Great Artisan", "GA", 0, 0, 0, 0, 2, "", UC::Great, "", -2,
+         "A master maker. Throw their skill into what a city is building, or settle there to add +3 Production for good."},
+        {"Great Merchant", "GM", 0, 0, 0, 0, 2, "", UC::Great, "", -2,
+         "A trader whose name opens every gate. A trade mission to another people's city brings gold and goodwill (and much influence "
+         "with a tribe); or settle in your city for +4 Gold."},
+        {"Great Storyteller", "GS", 0, 0, 0, 0, 2, "", UC::Great, "", -2,
+         "Their tales are told at every fire. Tell a great tale for Culture and a season of festivals (+2 Happiness in every city), or "
+         "settle in a city for +3 Culture."},
+        {"Great Warleader", "GW", 0, 0, 0, 0, 3, "", UC::Great, "", -2,
+         "A legendary commander. Rallies the troops around them: full health and +20% strength for a while."},
+        {"The Last Human", "LH", 0, 0, 0, 0, 2, "", UC::Great, "", -2,
+         "Cassandra, the last human, who fell from a blue box in the sky. She remembers the old world - and insists she is, technically, "
+         "a primate."},
         // hostile wildlife and leftovers of humanity (never buildable, primate == -2)
         {"Feral Dogs", "FD", 0, 7, 0, 0, 2, "", UC::Melee, "", -2, "Packs of former pets, gone wild."},
         {"Mutant Hounds", "MH", 0, 20, 0, 0, 3, "", UC::Melee, "", -2, "Radiation has made them huge."},
@@ -620,6 +650,7 @@ void initData() {
     ID.tBanking = techIndex("Banking");
     ID.tBartering = techIndex("Bartering");
     ID.uCaravan = unitIndex("Caravan");
+    for (int k = 0; k <= GK_COUNT; k++) ID.uGreat[k] = unitIndex(GREAT_KIND_NAMES[k]);
     ID.tDigging = techIndex("Digging");
     ID.tWoodcraft = techIndex("Woodcraft");
     ID.tIndustrial = techIndex("Industrialisation");

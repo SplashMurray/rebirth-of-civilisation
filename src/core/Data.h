@@ -92,7 +92,7 @@ extern const char* RUIN_TIER_NAME[RUIN_TIERS];
 extern int g_ruinTierTech[RUIN_TIERS];
 
 // ---------------------------------------------------------------- units
-enum class UnitClass { Settler, Worker, Recon, Melee, Ranged, Mounted, Siege, Armor, Band, Nuke, Naval, Trader };
+enum class UnitClass { Settler, Worker, Recon, Melee, Ranged, Mounted, Siege, Armor, Band, Nuke, Naval, Trader, Great };
 
 struct UnitDef {
     std::string name, abbr;
@@ -109,7 +109,7 @@ struct UnitDef {
     int cargo = 0;           // ships: land units it can carry
     bool river = false;      // ships: shallow enough to sail up rivers
     int upgradeId = -1;      // the next unit in this unit's line (base units only)
-    bool civilian() const { return cls == UnitClass::Settler || cls == UnitClass::Worker || cls == UnitClass::Band || cls == UnitClass::Trader; }
+    bool civilian() const { return cls == UnitClass::Settler || cls == UnitClass::Worker || cls == UnitClass::Band || cls == UnitClass::Trader || cls == UnitClass::Great; }
     bool military() const { return !civilian() && cls != UnitClass::Nuke; }
     bool ranged() const { return rstr > 0; }
     bool naval() const { return cls == UnitClass::Naval; }
@@ -268,6 +268,13 @@ struct TribeDef {
     Color color;
 };
 extern std::vector<TribeDef> g_tribes;
+
+// ---------------------------------------------------------------- Great Primates
+// Remarkable individuals born of a people's science, industry, trade, stories and battles.
+enum GreatKind { GK_THINKER, GK_ARTISAN, GK_MERCHANT, GK_STORYTELLER, GK_WARLEADER, GK_COUNT, GK_LAST_HUMAN = GK_COUNT };
+extern const char* GREAT_KIND_NAMES[GK_COUNT + 1];
+extern const char* GREAT_SOURCE[GK_COUNT];
+extern std::vector<std::vector<std::string>> g_greatNames;  // per kind
 extern const char* TRIBE_KIND_NAMES[TK_COUNT];
 extern const char* TRIBE_KIND_GIFTS[TK_COUNT];
 extern std::vector<TraitDef> g_traits;
@@ -284,6 +291,7 @@ std::string needsText(const std::vector<int>& needs);
 // commonly referenced ids (filled by initData)
 struct DataIds {
     int uElder, uGatherer, uScout, uWarband, uTinkerer, uBand, uNuke, uCaravan;
+    int uGreat[GK_COUNT + 1] = {};  // the Great Primates, and the Last Human
     int bPalace, bRebirth;
     int tCurrency, tRafts, tNavigation, tRadiology, tSalvaging, tDeciphering, tReverse, tComputing, tRebirth;
     int tCooking;

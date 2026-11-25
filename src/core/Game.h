@@ -89,6 +89,8 @@ struct Unit {
     int ferryX = -1, ferryY = -1;  // AI: where a ferried unit (or its ship) is heading
     int band = 0;       // Roaming Band: members
     int bandFood = 0;   // Roaming Band: food store towards the next member
+    std::string name;   // Great Primates have names
+    int rallyUntil = -1;  // rallied by a Great Warleader: +20% strength through this turn
 };
 
 enum BuildKind { BK_NONE = 0, BK_UNIT = 1, BK_BUILDING = 2 };
@@ -113,6 +115,7 @@ struct City {
     int foodSurplus = 0;
     std::vector<int> worked;
     int droughtTurns = 0;   // drought: -33% food while > 0
+    Yields greatBonus;      // Great Primates who settled here
     int happy = 0, unhappy = 0;  // derived: citizens' mood (see Happiness.cpp)
     int8_t moodWas = 0;     // mood last turn, to report changes
 };
@@ -123,9 +126,9 @@ static const int CONTENT_BASE = 5;  // citizens content with nothing at all
 
 // Where a city's happiness and unhappiness come from.
 struct MoodParts {
-    int luxuries = 0, buildings = 0, wonders = 0, naturals = 0, traditions = 0;  // happiness
-    int crowding = 0, empire = 0, war = 0;                                      // unhappiness
-    int happy() const { return luxuries + buildings + wonders + naturals + traditions; }
+    int luxuries = 0, buildings = 0, wonders = 0, naturals = 0, traditions = 0, festival = 0;  // happiness
+    int crowding = 0, empire = 0, war = 0;                                                    // unhappiness
+    int happy() const { return luxuries + buildings + wonders + naturals + traditions + festival; }
     int unhappy() const { return crowding + empire + war; }
 };
 
@@ -199,6 +202,13 @@ struct Civ {
     // ...and a major civ's dealings with tribes
     int tribeFoodCapital = 0, tribeFoodAll = 0;  // maritime tribes' gifts (derived each turn)
     int questsCompleted = 0, mostAllies = 0;
+    // Great Primates
+    int greatPts[GK_COUNT] = {};    // points towards the next of each kind
+    int greatBorn[GK_COUNT] = {};   // how many of each kind have been born
+    int festivalUntil = -1;         // a Great Storyteller's festival: +2 happiness in every city through this turn
+    bool preservation = false;      // the Last Human's memories: excavations yield half as much again
+    bool metCassandra = false;
+    int greatEarned = 0;
 };
 
 // Influence thresholds with a minor tribe.
@@ -232,7 +242,7 @@ struct Notification {
     int x = -1, y = -1;
 };
 
-enum PopupKind { POP_INFO, POP_NUKE, POP_INTRO, POP_TECH, POP_RUIN, POP_WAR, POP_VICTORY, POP_DEFEAT, POP_WONDER, POP_EVOLUTION, POP_DISASTER, POP_SETTLE, POP_DEAL, POP_NATURAL };
+enum PopupKind { POP_INFO, POP_NUKE, POP_INTRO, POP_TECH, POP_RUIN, POP_WAR, POP_VICTORY, POP_DEFEAT, POP_WONDER, POP_EVOLUTION, POP_DISASTER, POP_SETTLE, POP_DEAL, POP_NATURAL, POP_GREAT };
 struct Popup {
     int kind = POP_INFO;
     std::string title, body;
@@ -314,7 +324,7 @@ public:
     // Bigger maps give each species more room and bigger empires, so (as in Civilization) research,
     // traditions and the Rebirth Project cost more on them. Derived from the map size, not saved.
     int mapCostPct() const { static const int P[] = {100, 130, 170}; return P[std::clamp(settings.mapSize, 0, 2)]; }
-    int researchCost(int v) const { return (int)((long long)sc(v) * mapCostPct() / 100); }
+    int researchCost(int v) const { return (int)((long long)sc(v) * mapCostPct() * 103 / 10000); }  // +3%: Great Primates speed things up
     int techCost(int t) const { return researchCost(g_techs[t].cost); }
     int traitCost(int t, int k) const { return sc(g_traits[t].cost[k]); }
     int statWars = 0, statCaptures = 0, statRazes = 0, statNukes = 0;  // diagnostics only (not saved)
@@ -472,6 +482,21 @@ public:
     bool canEmbark(int c, int x, int y) const;
     bool isCoastal(int x, int y) const;  // next to water
     void aiNaval(Unit& u);
+    // ---- Great Primates (Great.cpp)
+    int cassandraTurn = -1;  // when the blue box fell (-1: not yet)
+    int cassandraX = -1, cassandraY = -1;
+    enum GreatAct { GA_USE, GA_JOIN };
+    int greatKind(const Unit& u) const;              // -1 if not a Great Primate
+    int greatCost(int c, int kind) const;
+    void addGreatPoints(int c, int kind, int pts);
+    void greatTurn(int c, int sci, int cult, int gold, int prod);
+    int spawnGreat(int c, int kind, int x = -1, int y = -1);
+    bool canGreatAct(const Unit& u, int act, std::string* why = nullptr) const;
+    std::string greatActName(const Unit& u, int act) const;
+    std::string greatActTip(const Unit& u, int act) const;
+    bool greatAct(Unit& u, int act);
+    void cassandraCheck();
+    void aiGreat(int c);
     // ---- minor tribes (Tribes.cpp)
     bool isMinor(int c) const { return c >= FIRST_PRIMATE_CIV && c < (int)civs.size() && civs[c].minor; }
     bool isMajor(int c) const { return c >= FIRST_PRIMATE_CIV && c < (int)civs.size() && !civs[c].minor; }

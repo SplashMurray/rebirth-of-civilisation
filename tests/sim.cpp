@@ -36,8 +36,9 @@ static void invariants(Game& g) {
             if (!b.alive || a.x != b.x || a.y != b.y) continue;
             if (a.owner == b.owner && (a.carrier >= 0 || b.carrier >= 0)) continue;  // aboard a ship
             CHECK(a.owner == b.owner, "enemy units stacked %d %d at %d,%d", a.owner, b.owner, a.x, a.y);
-            auto layer = [](const UnitDef& d) { return d.civilian() ? 0 : d.naval() ? 2 : 1; };
-            CHECK(layer(g_units[a.type]) != layer(g_units[b.type]), "illegal stack %s + %s", g_units[a.type].name.c_str(), g_units[b.type].name.c_str());
+            auto layer = [](const UnitDef& d) { return d.cls == UnitClass::Great ? 3 : d.civilian() ? 0 : d.naval() ? 2 : 1; };
+            CHECK(layer(g_units[a.type]) != layer(g_units[b.type]) || layer(g_units[a.type]) == 3, "illegal stack %s + %s", g_units[a.type].name.c_str(),
+                  g_units[b.type].name.c_str());
         }
     }
     for (auto& u : g.units)
@@ -251,6 +252,14 @@ int main(int argc, char** argv) {
                 for (int m = FIRST_PRIMATE_CIV; m < (int)g.civs.size(); m++) if (g.isMajor(m) && g.tribeStatus(m, t) == TS_FRIEND) friends++;
             }
             std::printf("tribes: %d of %d alive, %d allied, %d friendships, %d quests completed\n", alive, total, allied, friends, quests);
+        }
+        {
+            int born[GK_COUNT] = {}, settled = 0;
+            for (int c = FIRST_PRIMATE_CIV; c < (int)g.civs.size(); c++)
+                if (g.isMajor(c)) for (int k = 0; k < GK_COUNT; k++) born[k] += g.civs[c].greatBorn[k];
+            for (auto& ci : g.cities) if (ci.alive) settled += ci.greatBonus.sci + ci.greatBonus.prod + ci.greatBonus.gold + ci.greatBonus.cult;
+            std::printf("great: thinkers %d artisans %d merchants %d storytellers %d warleaders %d; settled yields %d; blue box at turn %d\n", born[0], born[1],
+                        born[2], born[3], born[4], settled, g.cassandraTurn);
         }
         int sailed = 0;
         for (auto& cv : g.civs) sailed += cv.riverSailed;

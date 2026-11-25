@@ -5,7 +5,7 @@
 #include <sstream>
 
 namespace {
-const int SAVE_VERSION = 20;
+const int SAVE_VERSION = 21;
 
 struct Archive {
     bool writing;
@@ -97,7 +97,7 @@ void ioYields(Archive& a, Yields& y) { a.io(y.food); a.io(y.prod); a.io(y.sci); 
 void ioGame(Archive& a, Game& g) {
     a.io(g.W); a.io(g.H); a.io(g.turn); a.io(g.player);
     a.io(g.rng.s);
-    a.io(g.settings.primate); a.io(g.settings.mapSize); a.io(g.settings.difficulty); a.io(g.settings.seed); a.io(g.settings.allAI); a.io(g.settings.speed); a.io(g.settings.tutorial); a.io(g.tutorialStep);
+    a.io(g.settings.primate); a.io(g.settings.mapSize); a.io(g.settings.difficulty); a.io(g.settings.seed); a.io(g.settings.allAI); a.io(g.settings.speed); a.io(g.settings.tutorial); a.io(g.tutorialStep); a.io(g.cassandraTurn); a.io(g.cassandraX); a.io(g.cassandraY);
     a.io(g.speedPct); a.io(g.costPct); a.io(g.maxTurns); a.io(g.yearAF);
     a.io(g.warHappened); a.io(g.gameOver); a.io(g.winner); a.io(g.victoryType);
     // tiles
@@ -138,6 +138,8 @@ void ioGame(Archive& a, Game& g) {
         a.io(c.routesMade); a.io(c.routesPlundered); a.io(c.bestRoad); a.io(c.naturalsFound); a.io(c.riverSailed); a.io(c.weariness); a.io(c.mostCelebrating); a.io(c.mostLuxuries);
         a.io(c.minor); a.io(c.tribe); a.io(c.influence); a.io(c.ally); a.io(c.questKind); a.io(c.questTarget); a.io(c.questUntil);
         a.io(c.questDone); a.io(c.lastUnitGift); a.io(c.firstMet); a.io(c.tribeFoodCapital); a.io(c.tribeFoodAll); a.io(c.questsCompleted); a.io(c.mostAllies);
+        for (int k = 0; k < GK_COUNT; k++) { a.io(c.greatPts[k]); a.io(c.greatBorn[k]); }
+        a.io(c.festivalUntil); a.io(c.preservation); a.io(c.metCassandra); a.io(c.greatEarned);
     }
     if (!a.writing) g.allyResTurn = -1;
     long long nu = (long long)g.units.size();
@@ -146,7 +148,7 @@ void ioGame(Archive& a, Game& g) {
     for (auto& u : g.units) {
         a.io(u.id); a.io(u.type); a.io(u.owner); a.io(u.x); a.io(u.y); a.io(u.hp); a.io(u.moves);
         a.io(u.order); a.io(u.gx); a.io(u.gy); a.io(u.work); a.io(u.buildImp); a.io(u.fortTurns);
-        a.io(u.acted); a.io(u.attacked); a.io(u.alive); a.io(u.band); a.io(u.bandFood); a.io(u.carrier); a.io(u.ferryX); a.io(u.ferryY);
+        a.io(u.acted); a.io(u.attacked); a.io(u.alive); a.io(u.band); a.io(u.bandFood); a.io(u.name); a.io(u.rallyUntil); a.io(u.carrier); a.io(u.ferryX); a.io(u.ferryY);
     }
     long long ncity = (long long)g.cities.size();
     a.num(ncity);
@@ -155,7 +157,7 @@ void ioGame(Archive& a, Game& g) {
         a.io(c.id); a.io(c.name); a.io(c.owner); a.io(c.origOwner); a.io(c.capital); a.io(c.origCapital);
         a.io(c.x); a.io(c.y); a.io(c.pop); a.io(c.food); a.io(c.prod); a.io(c.buildKind); a.io(c.buildId);
         a.io(c.has); a.io(c.borderCulture); a.io(c.claims); a.io(c.hp); a.io(c.alive); a.io(c.founded);
-        ioYields(a, c.yields); a.io(c.foodSurplus); a.io(c.worked); a.io(c.droughtTurns); a.io(c.happy); a.io(c.unhappy); a.io(c.moodWas);
+        ioYields(a, c.yields); a.io(c.foodSurplus); a.io(c.worked); a.io(c.droughtTurns); a.io(c.happy); a.io(c.unhappy); a.io(c.moodWas); ioYields(a, c.greatBonus);
     }
     long long nl = (long long)g.log.size();
     a.num(nl);

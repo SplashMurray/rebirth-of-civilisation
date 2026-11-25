@@ -288,6 +288,7 @@ void Game::aiTurn(int c) {
     aiUpgrades(c);
     aiDiplomacy(c);
     aiTribes(c);
+    aiGreat(c);
     aiPacts(c);
     aiOffers(c);
     for (size_t i = 0; i < cities.size(); i++)
@@ -451,6 +452,7 @@ void Game::aiUnit(Unit& uref) {
         aiBand(U());
         return;
     }
+    if (d.cls == UnitClass::Great) return;  // see aiGreat
     if (d.naval()) {
         aiNaval(U());
         return;

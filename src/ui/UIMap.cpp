@@ -601,6 +601,23 @@ void GameUI::drawUnitIcon(int type, int cx, int cy, int s, Color ic, Color accen
         cv->fillPoly(xy, n, col);
     };
     auto circ = [&](double fx, double fy, double r, Color col) { int a, b; P(fx, fy, a, b); cv->fillCircle(a, b, std::max(1, (int)(r * s)), col); };
+    if (d.cls == UnitClass::Great) {
+        if (type == ID.uGreat[GK_LAST_HUMAN]) {  // a person - an upright, hairless one
+            circ(0, -0.52, 0.24, ic);
+            poly({-0.12, -0.28, 0.12, -0.28, 0.55, 0.8, -0.55, 0.8}, ic);
+            L(-0.2, -0.05, -0.62, 0.3, lw);
+            L(0.2, -0.05, 0.62, 0.3, lw);
+            return;
+        }
+        int xy[20];  // a star, with the mark of their gift at its heart
+        for (int k = 0; k < 10; k++) {
+            double a = -1.5708 + k * 0.6283, r = k % 2 ? 0.4 : 0.92;
+            P(std::cos(a) * r, std::sin(a) * r + 0.05, xy[k * 2], xy[k * 2 + 1]);
+        }
+        cv->fillPoly(xy, 10, ic);
+        circ(0, 0.05, 0.26, accent);
+        return;
+    }
     if (d.primate == -2 && d.cls != UnitClass::Armor) {  // feral beasts: a paw print
         circ(0, 0.3, 0.42, ic);
         circ(-0.5, -0.25, 0.18, ic); circ(-0.18, -0.55, 0.18, ic); circ(0.18, -0.55, 0.18, ic); circ(0.5, -0.25, 0.18, ic);
@@ -627,6 +644,7 @@ void GameUI::drawUnitIcon(int type, int cx, int cy, int s, Color ic, Color accen
                 if (d.ranged()) circ(0.45, 0.42, 0.08, rgb(30, 30, 30));
             }
             break;
+        case UnitClass::Great: break;  // drawn above
         case UnitClass::Nuke:  // radiation trefoil
             circ(0, 0, 0.16, ic);
             for (int k = 0; k < 3; k++) {
@@ -722,7 +740,9 @@ void GameUI::drawUnitToken(const Unit& u, int sx, int sy, int r) {
     if (d.civilian()) {
         // civilians carry a shield-shaped flag
         int sxy[10] = {sx - r - 1, sy - r, sx + r + 1, sy - r, sx + r + 1, sy + r / 4, sx, sy + r + 3, sx - r - 1, sy + r / 4};
-        cv->fillPolyGrad(sxy, 5, rgb(238, 226, 190), 255, rgb(120, 104, 70), 255, sx, sy - r, sx, sy + r + 3);
+        if (d.cls == UnitClass::Great)  // Great Primates carry a golden one
+            cv->fillPolyGrad(sxy, 5, rgb(255, 236, 150), 255, rgb(170, 118, 30), 255, sx, sy - r, sx, sy + r + 3);
+        else cv->fillPolyGrad(sxy, 5, rgb(238, 226, 190), 255, rgb(120, 104, 70), 255, sx, sy - r, sx, sy + r + 3);
         int ixy[10] = {sx - r + 1, sy - r + 2, sx + r - 1, sy - r + 2, sx + r - 1, sy + r / 4 - 1, sx, sy + r, sx - r + 1, sy + r / 4 - 1};
         cv->fillPolyGrad(ixy, 5, lighten(cc, 0.3f), 255, darken(cc, 0.62f), 255, sx - r / 2, sy - r, sx + r / 2, sy + r);
         cv->fillRectA(sx - r + 2, sy - r + 3, 2 * r - 4, r / 2, rgb(255, 255, 255), 40);

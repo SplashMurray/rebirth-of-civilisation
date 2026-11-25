@@ -165,6 +165,11 @@ bool GameUI::tick(int ms) {
         if (nukeT > NUKE_LEN) nukeT = -1;
         redraw = true;
     }
+    if (boxT >= 0) {
+        boxT += ms;
+        if (boxT > BOX_LEN) boxT = -1;
+        redraw = true;
+    }
     if (achBannerMs > 0) {
         achBannerMs -= ms;
         if (achBannerMs <= 0 && !achBanners.empty()) {
@@ -317,6 +322,8 @@ void GameUI::startGame(const GameSettings& s) {
     game.reset(new Game());
     game->newGame(s);
     resetMotion();
+    boxPlayed = false;
+    boxT = -1;
     screen = SCR_GAME;
     overlay = OV_NONE;
     selUnit = selCity = -1;
@@ -333,9 +340,24 @@ void GameUI::startGame(const GameSettings& s) {
 // ============================================================ game screen
 void GameUI::renderGame() {
     Game& g = *game;
+    if (!boxPlayed && g.cassandraTurn >= 0 && g.civs[g.player].metCassandra && nukeT < 0) {  // the blue box: play its fall once
+        boxPlayed = true;
+        for (auto& p : g.popups)
+            if (p.kind == POP_GREAT && p.x == g.cassandraX && p.y == g.cassandraY && animOn) {
+                boxT = 0;
+                overlay = OV_NONE;
+                centerOn(g.cassandraX, g.cassandraY);
+                sfx(Sfx::Thunder, 0.35f, -1, 1500);
+                break;
+            }
+    }
     renderMap();
     if (nukeT >= 0) {
         renderNuke();
+        return;
+    }
+    if (boxT >= 0) {
+        renderBlueBox();
         return;
     }
     if (overlay != OV_CITY) {
@@ -720,7 +742,7 @@ void GameUI::renderUnitPanel() {
     int wash[8] = {px + 1, py + 1, px + pw - 1, py + 1, px + pw - 1, py + 60, px + 1, py + 60};
     cv->fillPolyGrad(wash, 4, civColor(u.owner), 110, civColor(u.owner), 0, px, py, px, py + 60);
     drawUnitToken(u, px + 32, py + 36, 20);
-    cv->text(px + 62, py + 12, d.name, 19, C_TEXT, AL_LEFT, true);
+    cv->text(px + 62, py + 12, u.name.empty() ? d.name : u.name, 19, C_TEXT, AL_LEFT, true);
     std::string stats;
     if (d.military()) stats = "Strength " + std::to_string(d.str) + (d.ranged() ? "   Ranged " + std::to_string(d.rstr) + " (range " + std::to_string(d.range) + ")" : "");
     else if (d.cls == UnitClass::Band) {
@@ -729,6 +751,9 @@ void GameUI::renderUnitPanel() {
                 " (" + (forage - u.band >= 0 ? "+" : "") + std::to_string(forage - u.band) + ")";
     } else if (d.cls == UnitClass::Trader) {
         stats = "Trade routes in use " + std::to_string(g.routesOf(u.owner)) + " of " + std::to_string(g.tradeCapacity(u.owner));
+    } else if (d.cls == UnitClass::Great) {
+        stats = d.name;
+        hot(px + 62, py + 32, 340, 20, nullptr, d.desc);
     } else stats = d.cls == UnitClass::Settler ? "Founds settlements" : "Builds improvements, roads; excavates ruins";
     if (d.naval() && d.cargo > 0) {
         std::string aboard;
@@ -805,6 +830,21 @@ void GameUI::renderUnitPanel() {
             acts.push_back({"Build " + nx.name, false, nullptr, "Research " + nx.tech + " to upgrade this road"});
         }
         if (g.canDecon(u)) acts.push_back({"Decontaminate (X)", u.moves > 0, [this] { unitCommand('X'); }, "Reduce fallout on this tile by one level"});
+    }
+    if (d.cls == UnitClass::Great) {
+        for (int act : {Game::GA_USE, Game::GA_JOIN}) {
+            if (act == Game::GA_JOIN && (g.greatKind(u) == GK_WARLEADER || g.greatKind(u) == GK_LAST_HUMAN)) continue;
+            std::string why;
+            bool ok = g.canGreatAct(u, act, &why);
+            std::string tip = g.greatActTip(u, act);
+            acts.push_back({g.greatActName(u, act), ok, [this, uid, act] {
+                                Unit& gu = game->units[uid];
+                                game->greatAct(gu, act);
+                                sfx(Sfx::Culture, 0.8f);
+                                afterUnitAction();
+                            },
+                            ok ? tip : why + ". (" + tip + ")"});
+        }
     }
     if (d.cls == UnitClass::Trader) {
         const City* here = g.cityAt(u.x, u.y);
@@ -1888,6 +1928,13 @@ void GameUI::renderHelp() {
         "Oil for tanks. Wheat, Rice and Maize are crops: build a Farm on them for extra food. Build Pastures on Horses and Mines on minerals.\n"
         "GOLD  Your people only learn the value of money with the Currency technology. From then on cities earn Gold, used to buy items.\n"
         "CITIES  Your first cities are founded by bands; after that, cities train Elder Troops to found more. Click a city to choose what it builds. Cities grow with surplus food and claim land with culture.\n"
+        "GREAT PRIMATES  Science, Production, Gold (and trade routes), Culture and battles won build up points towards Great Thinkers, "
+        "Artisans, Merchants, Storytellers and Warleaders; when there are enough, one is born in your capital (the Advisors screen shows "
+        "progress; each takes more points than the last). Select one to use their gift at once - Share Insight (Science), Masterwork "
+        "(Production in the city they stand in; not the Rebirth Project), Trade Mission (Gold and goodwill in another people's city, +60 "
+        "influence with a tribe), Great Tale (Culture and +2 Happiness in every city for a while) or Rally Troops (nearby troops heal and "
+        "fight at +20%) - or Settle in City for a lasting +3 Science, Production or Culture or +4 Gold there. Great Primates can share a "
+        "tile with any of your units.\n"
         "TUTORIAL AND ADVISORS  Choose Tutorial on the title screen (or switch it on when setting up a game) for a guided first game; "
         "it points at what to do and moves on when you have done it, and Skip tutorial turns it off. Your four advisors (Advisors, or A) "
         "suggest what to do next, most urgent first, with a button that takes you there; with advisor tips on they also speak up at the "
@@ -1980,7 +2027,7 @@ void GameUI::renderPopup() {
     if (p.kind == POP_NUKE) ph = std::max(ph, 330);
     int px = (W - pw) / 2, py = std::max(TOP + 10, (H - ph) / 2);
     Color head = p.kind == POP_NUKE ? rgb(150, 50, 30) : p.kind == POP_WAR ? rgb(140, 40, 40) : p.kind == POP_VICTORY ? rgb(150, 120, 40) :
-                 p.kind == POP_DEFEAT ? rgb(80, 40, 40) : p.kind == POP_RUIN ? rgb(130, 84, 40) : p.kind == POP_TECH ? rgb(40, 80, 130) : p.kind == POP_EVOLUTION ? rgb(40, 110, 70) : p.kind == POP_DISASTER ? rgb(150, 70, 20) : p.kind == POP_SETTLE ? rgb(150, 112, 40) : p.kind == POP_DEAL ? rgb(60, 90, 120) : p.kind == POP_NATURAL ? rgb(40, 104, 96) : rgb(56, 70, 92);
+                 p.kind == POP_DEFEAT ? rgb(80, 40, 40) : p.kind == POP_RUIN ? rgb(130, 84, 40) : p.kind == POP_TECH ? rgb(40, 80, 130) : p.kind == POP_EVOLUTION ? rgb(40, 110, 70) : p.kind == POP_DISASTER ? rgb(150, 70, 20) : p.kind == POP_SETTLE ? rgb(150, 112, 40) : p.kind == POP_DEAL ? rgb(60, 90, 120) : p.kind == POP_NATURAL ? rgb(40, 104, 96) : p.kind == POP_GREAT ? rgb(120, 92, 30) : rgb(56, 70, 92);
     cv->fillRectA(0, TOP, W, H - TOP, rgb(0, 0, 0), 70);  // dim the world behind
     for (int k = 4; k >= 1; k--) cv->fillRoundRectGrad(px - k * 2 + 3, py - k * 2 + 6, pw + k * 4, ph + k * 4, 10 + k * 2, rgb(0, 0, 0), rgb(0, 0, 0), 30);
     cv->fillRoundRectGrad(px, py, pw, ph, 10, rgb(36, 41, 52), rgb(16, 19, 25));
@@ -2231,6 +2278,7 @@ void GameUI::saveGame() {
 }
 
 void GameUI::loadGame() {
+    boxT = -1;
     std::unique_ptr<Game> g(new Game());
     if (!g->load(savePath)) {
         toast = "Could not load the saved game";
@@ -2238,6 +2286,7 @@ void GameUI::loadGame() {
         return;
     }
     game = std::move(g);
+    boxPlayed = game->cassandraTurn >= 0;  // already seen before it was saved
     resetMotion();
     screen = SCR_GAME;
     overlay = OV_NONE;
@@ -2295,6 +2344,10 @@ void GameUI::mouseUp(int x, int y, int button) {
     if (button == MOUSE_LEFT && wasDrag) return;
     if (screen == SCR_GAME && game && nukeT >= 0) {
         skipNuke();
+        return;
+    }
+    if (screen == SCR_GAME && game && boxT >= 0) {  // a click skips the blue box
+        boxT = -1;
         return;
     }
     // UI hotspots, top-most first

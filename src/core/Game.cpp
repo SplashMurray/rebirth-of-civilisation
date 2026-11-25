@@ -696,6 +696,7 @@ void Game::computeCity(City& city) {
         total += cand[k].y;
         city.worked.push_back(cand[k].i);
     }
+    total += city.greatBonus;  // Great Primates who settled here
     // base yields from population
     total.sci += 1 + city.pop * 2 / 3;
     total.cult += 1;
@@ -1136,15 +1137,16 @@ bool Game::canEnter(const Unit& u, int x, int y) const {
     if (const City* c = cityAt(x, y)) {
         if (c->owner != u.owner) return false;
     }
-    // one civilian, one land military unit and one ship may share a tile; units aboard a ship don't count
-    auto layer = [](const UnitDef& d) { return d.civilian() ? 0 : d.naval() ? 2 : 1; };
+    // one civilian, one land military unit and one ship may share a tile; units aboard a ship don't count;
+    // Great Primates go where they like among their own people
+    auto layer = [](const UnitDef& d) { return d.cls == UnitClass::Great ? 3 : d.civilian() ? 0 : d.naval() ? 2 : 1; };
     int mine = layer(g_units[u.type]);
     bool boarding = !g_units[u.type].naval() && isWater(x, y) && transportAt(u.owner, x, y, u.id);
     bool ok = true;
     forUnitsAt(x, y, [&](const Unit& o) {
         if (!ok || o.id == u.id) return;
         if (o.owner == u.owner && (o.carrier >= 0 || boarding)) return;
-        if (o.owner != u.owner || layer(g_units[o.type]) == mine) ok = false;
+        if (o.owner != u.owner || (layer(g_units[o.type]) == mine && mine != 3)) ok = false;
     });
     return ok;
 }
@@ -1325,6 +1327,7 @@ int Game::unitStrength(const Unit& u, bool attacking, bool rangedAtk, int x, int
         pct += policyPct(u.owner, PolicyEffect::Combat);
         pct += civs[u.owner].fx.combat;
         if (ownsWonderSpecial(u.owner, BSpecial::CombatBonus)) pct += 10;
+        if (u.rallyUntil >= turn) pct += 20;  // rallied by a Great Warleader
     }
     if (!attacking && !water) {
         const Tile& t = at(x, y);
@@ -1446,6 +1449,8 @@ CombatResult Game::attackImpl(Unit& u, int tx, int ty) {
         int dx = tx, dy = ty;
         if (res.defenderDied && g_units[def->type].naval() && u.owner >= FIRST_PRIMATE_CIV) civs[u.owner].shipsSunk++;
         if (res.defenderDied && def->owner == CIV_FERAL) feralKilled(u.owner, *def);  // the tribes are grateful
+        if (res.defenderDied) addGreatPoints(u.owner, GK_WARLEADER, def->owner == CIV_FERAL ? 2 : 6);  // victories make Great Warleaders
+        if (res.attackerDied) addGreatPoints(def->owner, GK_WARLEADER, u.owner == CIV_FERAL ? 2 : 6);
         if (u.owner >= FIRST_PRIMATE_CIV && def->owner >= FIRST_PRIMATE_CIV) {  // losses wear a people down
             if (res.defenderDied) addWeariness(def->owner, 3);
             if (res.attackerDied) addWeariness(u.owner, 3);
@@ -1566,6 +1571,7 @@ void Game::excavateReward(int c, int x, int y, int tier) {
     int mult = 100 + policyPct(c, PolicyEffect::RuinBonus);
     if (const PrimateDef* pd = primate(c)) mult += pd->ruinPct;
     if (ownsWonderSpecial(c, BSpecial::RuinBonus)) mult += 100;
+    if (cv.preservation) mult += 50;  // the Last Human's memories
     // diminishing returns: the richest finds come first, later digs mostly confirm what is already known
     mult = mult * 12 / (12 + cv.ruinsExcavated);
     std::string site = t.site >= 0 ? sites[t.site].name : g_ruins[t.ruin].ruinName;

@@ -50,6 +50,10 @@ public:
     int hoverX = -1, hoverY = -1;  // hovered tile
     int mouseX = 0, mouseY = 0;
     int nukeT = -1;                // nuclear war animation timer (ms), -1 = off
+    int boxT = -1;                 // the blue box falling (ms), -1 = off
+    bool boxPlayed = false;
+    static const int BOX_LEN = 3600;
+    void renderBlueBox();
     static constexpr int NUKE_LEN = 6000, NUKE_FADE = 1500;  // plays by itself, fading out over the last NUKE_FADE ms
     void renderUnitGallery(Canvas& c);  // test helper: every unit flag at large size
 

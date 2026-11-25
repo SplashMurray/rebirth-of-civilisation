@@ -193,6 +193,7 @@ void Game::endTurn() {
     feralTurn();
     tradeTurn();
     tribesTurn();
+    cassandraCheck();
     volcanoTurn();
     regrowForage();
     for (int c = 0; c < (int)civs.size(); c++)
@@ -220,7 +221,7 @@ void Game::processCiv(int c) {
         return;
     }
     if (isMajor(c)) wearinessTurn(c);
-    int sci = 0, cult = 0, gold = 0;
+    int sci = 0, cult = 0, gold = 0, prod = 0;
     for (auto& ci : cities) {
         if (!ci.alive || ci.owner != c) continue;
         processCity(ci);
@@ -228,6 +229,7 @@ void Game::processCiv(int c) {
         sci += ci.yields.sci;
         cult += ci.yields.cult;
         gold += ci.yields.gold;
+        prod += ci.yields.prod;
     }
     processBands(c, sci, cult);
     cv.sciencePerTurn = sci;
@@ -241,6 +243,7 @@ void Game::processCiv(int c) {
         processUnitsEndOfTurn(c);
         return;
     }
+    greatTurn(c, sci, cult, cv.goldPerTurn, prod);
     disasterTurn(c);
     processEvolution(c);
     processUnitsEndOfTurn(c);

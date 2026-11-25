@@ -110,6 +110,12 @@ std::vector<GameUI::Advice> GameUI::gatherAdvice() {
         if (!building && can) add(0, 50, "There is still room to spread out. An Elder Troop can found another city.", showCity(mine[0]->id), "Open city");
     }
 
+    for (auto& u : g.units)
+        if (u.alive && u.owner == p && g.greatKind(u) >= 0 && u.order == ORD_NONE) {
+            int uid = u.id;
+            add(g.greatKind(u) == GK_WARLEADER ? 2 : g.greatKind(u) == GK_MERCHANT ? 3 : g.greatKind(u) == GK_THINKER || g.greatKind(u) == GK_LAST_HUMAN ? 1 : 0, 70,
+                u.name + " awaits your word: use their gift now, or settle them in a city.", [this, uid] { overlay = OV_NONE; selectUnit(uid, true); }, "Select");
+        }
     // ---- the Keeper of Knowledge: science and evolution
     bool canRes = false;
     for (size_t t = 0; t < g_techs.size(); t++) if (g.canResearch(p, (int)t)) canRes = true;
@@ -245,13 +251,31 @@ void GameUI::renderAdvisors() {
     int px = (W - pw) / 2, py = TOP + 8;
     panel(px, py, pw, ph);
     cv->text(px + 20, py + 12, "Advisors", 24, C_TEXT, AL_LEFT, true);
-    cv->text(px + 150, py + 20, "Most urgent first. Advisor tips at the start of a turn: " + std::string(advisorTips ? "on" : "off"), 13, C_DIM);
+    cv->text(px + 150, py + 20, "Most urgent first. Below: progress towards your next Great Primates.", 13, C_DIM);
     button(px + pw - 190, py + 10, 140, 28, advisorTips ? "Turn tips off" : "Turn tips on", true, [this] { advisorTips = !advisorTips; }, "", rgb(46, 56, 72), 12);
     button(px + pw - 40, py + 10, 28, 28, "X", true, [this] { overlay = OV_NONE; });
     auto all = gatherAdvice();
-    int gap = 12, cw = (pw - 40 - gap) / 2, ch = (ph - 70 - gap) / 2;
+    // progress towards the next Great Primate of each kind
+    {
+        Game& g = *game;
+        int p = g.player, bw = (pw - 40 - 4 * 10) / GK_COUNT, by = py + 50;
+        for (int k = 0; k < GK_COUNT; k++) {
+            int bx = px + 20 + k * (bw + 10);
+            int have = g.civs[p].greatPts[k], cost = g.greatCost(p, k);
+            Unit probe;
+            probe.type = ID.uGreat[k];
+            probe.owner = p;
+            drawUnitToken(probe, bx + 12, by + 14, 11);
+            cv->text(bx + 30, by, GREAT_KIND_NAMES[k], 12, C_TEXT, AL_LEFT, true);
+            bar(bx + 30, by + 18, bw - 34, 6, std::min(1.0, (double)have / std::max(1, cost)), rgb(230, 190, 80));
+            hot(bx, by - 2, bw, 30, nullptr,
+                std::string(GREAT_KIND_NAMES[k]) + ": " + std::to_string(have) + " of " + std::to_string(cost) + " points. Earned from " + GREAT_SOURCE[k] +
+                    ". Born in your capital; each one takes more points than the last.");
+        }
+    }
+    int gap = 12, cw = (pw - 40 - gap) / 2, ch = (ph - 110 - gap) / 2;
     for (int who = 0; who < 4; who++) {
-        int x = px + 20 + (who % 2) * (cw + gap), y = py + 56 + (who / 2) * (ch + gap);
+        int x = px + 20 + (who % 2) * (cw + gap), y = py + 96 + (who / 2) * (ch + gap);
         cv->fillRoundRectGrad(x, y, cw, ch, 8, rgb(38, 44, 58), rgb(26, 30, 40));
         cv->roundRect(x, y, cw, ch, 8, darken(ADVISOR_COLORS[who], 0.7f), 1);
         drawAdvisor(who, x + 40, y + 40, 26);
@@ -320,4 +344,59 @@ void GameUI::renderAdvisorTip() {
     button(px + 176, by, 76, 24, "Dismiss", true, [this] { tip.active = false; }, "", rgb(46, 56, 72), 12);
     button(px + 258, by, 90, 24, "Tips off", true, [this] { tip.active = false; advisorTips = false; },
            "Stop advisors speaking up at the start of turns (turn back on from the Advisors screen)", rgb(46, 56, 72), 12);
+}
+
+// ============================================================ the blue box
+// A box tumbles out of the sky, lands upright on the tile, a figure steps out, and the box flickers and
+// fades away. Drawn as a plain blue box: an affectionate nod, nothing more.
+void GameUI::renderBlueBox() {
+    Game& g = *game;
+    int tx, ty;
+    tileCenter(g.cassandraX, g.cassandraY, tx, ty);
+    double t = boxT / 1000.0;
+    int bw = std::max(18, hs * 7 / 10), bh = bw * 16 / 10;
+    double fall = std::min(1.0, t / 1.4), ease = fall * fall;
+    int groundY = ty - bh / 2 + hs / 6;
+    int cy = (int)(-bh * 2 + (groundY + bh * 2) * ease);
+    int cx = tx - hs / 4 + (int)((1 - ease) * hs * 2);
+    double ang = t < 1.4 ? (1.4 - t) * 7.0 : 0.0;  // tumbling, upright on landing
+    double alpha = 1.0;
+    if (t > 2.3) alpha = std::max(0.0, (3.4 - t) / 1.1) * (0.55 + 0.45 * std::sin(t * 38.0));  // fading in and out of the world
+    // a shadow growing as it falls
+    cv->glowEllipse(tx - hs / 4, ty + hs / 3, (int)(bw * (0.3 + 0.7 * ease)), bw / 4, rgb(0, 0, 0), (int)(140 * ease * alpha));
+    auto rot = [&](double fx, double fy, int& ox, int& oy) {
+        double c = std::cos(ang), s = std::sin(ang);
+        ox = cx + (int)std::lround(fx * c - fy * s);
+        oy = cy + (int)std::lround(fx * s + fy * c);
+    };
+    auto quad = [&](double x0, double y0, double x1, double y1, Color col, int a) {
+        int p[8];
+        rot(x0, y0, p[0], p[1]); rot(x1, y0, p[2], p[3]); rot(x1, y1, p[4], p[5]); rot(x0, y1, p[6], p[7]);
+        cv->fillPolyA(p, 4, col, a);
+    };
+    int A = (int)(255 * alpha);
+    if (A > 4) {
+        double hw = bw / 2.0, hh = bh / 2.0;
+        quad(-hw, -hh, hw, hh, rgb(18, 40, 96), A);                          // the box
+        quad(-hw + 3, -hh + 3, hw - 3, hh - 3, rgb(30, 64, 140), A);         // its face
+        quad(-hw * 0.12, -hh + 3, hw * 0.12, hh - 3, rgb(18, 40, 96), A);    // the door's seam
+        quad(-hw - 2, -hh - 4, hw + 2, -hh + 2, rgb(14, 30, 74), A);         // the roof
+        quad(-hw + 6, -hh * 0.6, -hw * 0.25, -hh * 0.25, rgb(200, 220, 250), A * 3 / 4);  // two little windows
+        quad(hw * 0.25, -hh * 0.6, hw - 6, -hh * 0.25, rgb(200, 220, 250), A * 3 / 4);
+        if (t > 1.4 && t < 2.2) cv->glowEllipse(cx, cy, bw, bh * 2 / 3, rgb(220, 235, 255), (int)(120 * (2.2 - t) / 0.8));  // the door opens
+    }
+    if (t > 1.6) {  // the figure who fell out
+        double f = std::min(1.0, (t - 1.6) / 0.5);
+        int fx = tx + hs / 3, fy = ty + hs / 10, s = std::max(5, hs / 5);
+        int a = (int)(255 * f);
+        cv->fillCircleA(fx, fy - s * 2, s * 2 / 3, rgb(236, 210, 190), a);
+        int body[8] = {fx - s / 3, fy - s * 3 / 2, fx + s / 3, fy - s * 3 / 2, fx + s, fy + s, fx - s, fy + s};
+        cv->fillPolyA(body, 4, rgb(240, 236, 228), a);
+    }
+    if (t > 0.3 && t < 3.3) {
+        std::string cap = t < 1.4 ? "Something is falling out of the sky..." : t < 2.3 ? "A figure tumbles out onto the grass!" : "...and the box fades away.";
+        int w = cv->textWidth(cap, 18, true) + 40;
+        cv->fillRoundRectGrad(W / 2 - w / 2, H - 120, w, 36, 8, rgb(14, 22, 44), rgb(8, 12, 26), 220);
+        cv->text(W / 2, H - 112, cap, 18, rgb(220, 232, 255), AL_CENTER, true);
+    }
 }
