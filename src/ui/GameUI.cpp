@@ -156,6 +156,7 @@ void GameUI::skipNuke() {
 }
 
 bool GameUI::tick(int ms) {
+    updateSound(ms);
     animMs += ms;
     bool redraw = false;
     if (toastMs > 0) { toastMs -= ms; redraw = true; }
@@ -215,8 +216,9 @@ void GameUI::renderTitle() {
     cv->textA(W / 2 + 1, H / 6 + ts + 15, "2034. Humanity destroys itself. The primates inherit the Earth.", 20, rgb(0, 0, 0), AL_CENTER, false, 160);
     cv->text(W / 2, H / 6 + ts + 14, "2034. Humanity destroys itself. The primates inherit the Earth.", 20, rgb(255, 230, 210), AL_CENTER);
     int bw = 280, bx = (W - bw) / 2, by = H / 6 + ts + 70;
-    cv->fillRoundRectGrad(bx - 22, by - 20, bw + 44, 290 + 74, 14, rgb(20, 14, 20), rgb(8, 6, 10), 150);
-    cv->roundRect(bx - 22, by - 20, bw + 44, 290 + 74, 14, rgb(220, 170, 100), 1, 90);
+    bool titleVolumes = by + 436 <= H;
+    cv->fillRoundRectGrad(bx - 22, by - 20, bw + 44, 290 + 74 + (titleVolumes ? 88 : 0), 14, rgb(20, 14, 20), rgb(8, 6, 10), 150);
+    cv->roundRect(bx - 22, by - 20, bw + 44, 290 + 74 + (titleVolumes ? 88 : 0), 14, rgb(220, 170, 100), 1, 90);
     button(bx, by, bw, 46, "New Game", true, [this] { screen = SCR_SETUP; }, "", rgb(92, 66, 46), 18);
     bool hasSave = (bool)std::ifstream(savePath);
     button(bx, by + 58, bw, 46, "Load Game", hasSave, [this] { loadGame(); }, hasSave ? "" : "No saved game found", rgb(92, 66, 46), 18);
@@ -225,6 +227,10 @@ void GameUI::renderTitle() {
            [this] { overlay = OV_ACHIEVEMENTS; achScroll = 0; }, "", rgb(92, 66, 46), 18);
     button(bx, by + 232, bw, 46, "Exit", true, [this] { quit = true; }, "", rgb(92, 66, 46), 18);
     uiScaleControl(bx, by + 290, bw);
+    if (titleVolumes) {  // when there is room (the in-game menu always has them)
+        volumeControl(bx, by + 334, bw, "Music", musicVol);
+        volumeControl(bx, by + 378, bw, "Sound effects", sfxVol);
+    }
     cv->text(W - 12, H - 22, "Open source - MIT licence", 12, rgb(170, 200, 170), AL_RIGHT);
     if (overlay == OV_HELP) renderHelp();
     if (overlay == OV_ACHIEVEMENTS) renderAchievements();
@@ -691,7 +697,7 @@ void GameUI::renderUnitPanel() {
             if (idf.prod) tip += "+" + std::to_string(idf.prod) + " Production ";
             if (idf.gold) tip += "+" + std::to_string(idf.gold) + " Gold ";
             tip += "(" + std::to_string(g.workTurns(u, idf.turns)) + " turns)";
-            acts.push_back({idf.name, u.moves > 0, [this, uid, im] { game->startBuild(game->units[uid], im); afterUnitAction(); }, tip});
+            acts.push_back({idf.name, u.moves > 0, [this, uid, im] { game->startBuild(game->units[uid], im); buildSound(im); afterUnitAction(); }, tip});
         }
         int tier = g.excavateTier(u);
         if (tier >= 0)
@@ -708,7 +714,7 @@ void GameUI::renderUnitPanel() {
         int ro = g.roadOption(u);
         if (ro > 0) {
             const RoadDef& rd = g_roads[ro];
-            acts.push_back({"Build " + rd.name, u.moves > 0, [this, uid] { game->startBuild(game->units[uid], IMP_ROAD); afterUnitAction(); },
+            acts.push_back({"Build " + rd.name, u.moves > 0, [this, uid] { game->startBuild(game->units[uid], IMP_ROAD); buildSound(IMP_ROAD); afterUnitAction(); },
                             rd.name + " (" + std::to_string(g.workTurns(u, rd.turns)) + " turns): moving along it costs " + fmtMoves(rd.cost) +
                                 (ro == ROAD_TRACK ? " or two-thirds of the usual," : "") + " of a move between road tiles, and trade routes over it earn +" +
                                 std::to_string(rd.tradePct) + "%."});
@@ -1672,7 +1678,7 @@ void GameUI::uiScaleControl(int x, int y, int w) {
 }
 
 void GameUI::renderMenu() {
-    int pw = 320, ph = 508, px = (W - pw) / 2, py = (H - ph) / 2;
+    int pw = 340, ph = 628, px = (W - pw) / 2, py = std::max(TOP + 4, (H - ph) / 2);
     hot(0, 0, W, H, [this] { overlay = OV_NONE; });
     panel(px, py, pw, ph);
     cv->text(px + pw / 2, py + 16, "Menu", 24, C_TEXT, AL_CENTER, true);
@@ -1684,6 +1690,12 @@ void GameUI::renderMenu() {
     b("How to Play (F1)", [this] { overlay = OV_HELP; helpScroll = 0; });
     b("Achievements", [this] { overlay = OV_ACHIEVEMENTS; achScroll = 0; });
     uiScaleControl(px + 30, y, pw - 60);
+    y += 44;
+    volumeControl(px + 30, y, pw - 60, "Music", musicVol);
+    y += 44;
+    volumeControl(px + 30, y, pw - 60, "Sound effects", sfxVol);
+    y += 44;
+    volumeControl(px + 30, y, pw - 60, "Ambience", ambVol);
     y += 52;
     button(px + 30, y, pw - 60, 40, std::string("Animations: ") + (animOn ? "On" : "Off"), true, [this] { animOn = !animOn; resetMotion(); },
            "Moving water, units gliding between tiles and combat effects. Turn off on slow computers.", C_PANEL2, 16);
@@ -1931,6 +1943,7 @@ void GameUI::selectUnit(int id, bool center) {
     disbandArm = -1;
     if (id < 0 || !game) return;
     const Unit& u = game->units[id];
+    if (u.owner == game->player) selectSound(u);
     int sx, sy;
     tileCenter(u.x, u.y, sx, sy);
     if (center || sx < 80 || sy < TOP + 60 || sx > W - 330 || sy > H - 200) centerOn(u.x, u.y);
@@ -2158,6 +2171,7 @@ void GameUI::mouseUp(int x, int y, int button) {
         if (x >= h.x && y >= h.y && x < h.x + h.w && y < h.y + h.h) {
             if (button == MOUSE_LEFT && h.fn) {
                 auto fn = h.fn;  // copy: the callback may rebuild state
+                if (!h.silent) sfx(Sfx::Click, 0.45f, x);
                 fn();
             }
             return;

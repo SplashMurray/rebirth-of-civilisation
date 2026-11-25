@@ -1,0 +1,45 @@
+Rebirth of Civilisation - sound and music credits
+==================================================
+
+All music, sound effects and ambient sounds in this folder come from
+0 A.D. by Wildfire Games  -  https://www.wildfiregames.com/  (https://play0ad.com/)
+Copyright (C) Wildfire Games. Music composed by Omri Lahav and the 0 A.D. music team.
+
+They are licensed under the Creative Commons Attribution-ShareAlike 3.0 licence
+(CC BY-SA 3.0): https://creativecommons.org/licenses/by-sa/3.0/
+See LICENSE.txt in this folder.
+
+Changes made for Rebirth of Civilisation: files were renamed, some sound effects and ambient
+loops were shortened and given fades, everything was resampled to 44.1 kHz and re-encoded as
+Ogg Vorbis. These modified files are likewise licensed CC BY-SA 3.0.
+The exact sources and conversion are in tools/fetch_audio.sh (0 A.D. git commit
+61a3b9507d974084e6badb88a0826bd89a6d5b8b, folder binaries/data/mods/public/audio).
+
+Music (file <- original 0 A.D. track)
+  title        Hill of Sorrows
+  wander_1     Taiko 1
+  wander_2     Sunrise
+  wander_3     Mountain Idyll
+  wander_4     Whistler
+  wander_5     Harsh Lands, Rugged People
+  ancient_1    Cradle of Civilization
+  ancient_2    Forging a City-State
+  ancient_3    Land Between Rivers
+  ancient_4    The Fledgling Kingdom
+  ancient_5    Harvest Festival
+  later_1      The Road Ahead
+  later_2      Rise of Macedon
+  later_3      Expedition
+  war_1        Calm Before the Storm
+  war_2        Tale of Warriors
+  war_3        Taiko 2
+  fall         Dried Tears
+  victory      You are Victorious!
+
+Sound effects and ambience: 0 A.D. interface, weapon, impact, siege, destruction, footstep,
+ship, animal, construction, farming, mining, water, weather and dayscape sounds (see
+tools/fetch_audio.sh for the file-by-file list).
+
+The Ogg Vorbis decoder (third_party/stb_vorbis.c) is by Sean Barrett, public domain / MIT.
+The game's code is MIT licensed (see LICENSE at the top of the project); the CC BY-SA licence
+applies to the audio files only.

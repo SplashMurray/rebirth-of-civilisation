@@ -79,6 +79,8 @@ jobs:
             Write-Host "Packaging an unsigned executable"
           }
           Copy-Item README.md, LICENSE, CODE_SIGNING_POLICY.md dist/
+          New-Item -ItemType Directory -Force dist/assets | Out-Null
+          Copy-Item -Recurse assets/audio dist/assets/audio
           Compress-Archive -Path dist/* -DestinationPath RebirthOfCivilisation-windows-x64.zip -Force
 
       - name: Upload build artifact

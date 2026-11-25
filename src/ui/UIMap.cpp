@@ -1237,6 +1237,7 @@ void GameUI::updateMotion() {
             bool seen = d < 99 && (me.visible[g.idx(u.x, u.y)] || me.visible[g.idx(lastX[i], lastY[i])]);
             if (animOn && seen && d <= 4) glides[(int)i] = {lastX[i], lastY[i], u.x, u.y, animMs, std::min(560, 110 + 110 * d)};
             else glides.erase((int)i);
+            if (u.owner == g.player && d <= 6 && u.carrier < 0) moveSound(u);
         }
         lastX[i] = u.x;
         lastY[i] = u.y;
@@ -1246,9 +1247,10 @@ void GameUI::updateMotion() {
     for (auto& c : g.combatFx) {
         if (c.seq <= fxSeen) continue;
         fxSeen = c.seq;
-        if (!animOn || !g.inMap(c.ax, c.ay) || !g.inMap(c.tx, c.ty)) continue;
+        if (!g.inMap(c.ax, c.ay) || !g.inMap(c.tx, c.ty)) continue;
         if (!me.visible[g.idx(c.ax, c.ay)] && !me.visible[g.idx(c.tx, c.ty)]) continue;
-        fxs.push_back({c, animMs});
+        combatSound(c);
+        if (animOn) fxs.push_back({c, animMs});
     }
     fxs.erase(std::remove_if(fxs.begin(), fxs.end(), [&](const Fx& f) { return animMs - f.start > 1700; }), fxs.end());
 }

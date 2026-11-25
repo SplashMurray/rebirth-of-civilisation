@@ -22,6 +22,7 @@ using std::min;
 #include <unordered_map>
 #include <memory>
 #include "../../ui/GameUI.h"
+#include "audio_win32.h"
 
 #ifndef WM_DPICHANGED
 #define WM_DPICHANGED 0x02E0
@@ -388,25 +389,47 @@ void enableDpiAwareness() {
 
 std::string settingsPath();
 int g_appliedAnim = -1;     // animOn last saved
+int g_appliedVol = -1;      // volumes last saved (packed)
+int packedVolumes() { return g_ui->musicVol * 1000000 + g_ui->sfxVol * 1000 + g_ui->ambVol; }
 void loadSettings() {
     FILE* f = fopen(settingsPath().c_str(), "r");
     if (!f) return;
     char line[128];
+    auto vol = [](int v) { return std::max(0, std::min(100, v)); };
     while (fgets(line, sizeof line, f)) {
         int v = 0;
         if (sscanf(line, "uiscale=%d", &v) == 1 && v >= GameUI::UI_SCALE_MIN && v <= GameUI::UI_SCALE_MAX) g_ui->uiScalePct = v;
         if (sscanf(line, "animations=%d", &v) == 1) g_ui->animOn = v != 0;
+        if (sscanf(line, "music=%d", &v) == 1) g_ui->musicVol = vol(v);
+        if (sscanf(line, "effects=%d", &v) == 1) g_ui->sfxVol = vol(v);
+        if (sscanf(line, "ambience=%d", &v) == 1) g_ui->ambVol = vol(v);
     }
     fclose(f);
 }
 void saveSettingsIfChanged() {
-    if (g_ui->uiScalePct == g_appliedPct && (int)g_ui->animOn == g_appliedAnim) return;
+    if (g_ui->uiScalePct == g_appliedPct && (int)g_ui->animOn == g_appliedAnim && packedVolumes() == g_appliedVol) return;
     g_appliedPct = g_ui->uiScalePct;
     g_appliedAnim = (int)g_ui->animOn;
+    g_appliedVol = packedVolumes();
     FILE* f = fopen(settingsPath().c_str(), "w");
     if (!f) return;
-    fprintf(f, "uiscale=%d\nanimations=%d\n", g_appliedPct, g_appliedAnim);
+    fprintf(f, "uiscale=%d\nanimations=%d\nmusic=%d\neffects=%d\nambience=%d\n", g_appliedPct, g_appliedAnim, g_ui->musicVol, g_ui->sfxVol, g_ui->ambVol);
     fclose(f);
+}
+
+// The folder holding the game's sounds: assets\audio next to the .exe (UTF-8)
+std::string audioDir() {
+    wchar_t buf[MAX_PATH * 2];
+    DWORD n = GetModuleFileNameW(nullptr, buf, MAX_PATH * 2);
+    if (n == 0 || n >= MAX_PATH * 2) return "";
+    std::wstring dir(buf, n);
+    size_t slash = dir.find_last_of(L"\\/");
+    dir = slash == std::wstring::npos ? L"" : dir.substr(0, slash + 1);
+    dir += L"assets\\audio\\";
+    int len = WideCharToMultiByte(CP_UTF8, 0, dir.c_str(), (int)dir.size(), nullptr, 0, nullptr, nullptr);
+    std::string out((size_t)std::max(0, len), '\0');
+    if (len > 0) WideCharToMultiByte(CP_UTF8, 0, dir.c_str(), (int)dir.size(), &out[0], len, nullptr, nullptr);
+    return out;
 }
 
 void ensureBackBuffer(HDC wdc, int w, int h) {
@@ -584,6 +607,10 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE, LPSTR, int show) {
     g_canvas.reset(new GdiCanvas());
     loadSettings();
     g_appliedPct = g_ui->uiScalePct;
+    g_appliedVol = packedVolumes();
+    std::unique_ptr<WinAudio> audio(new WinAudio());
+    if (audio->start(audioDir())) g_ui->snd = &audio->mixer;  // silent if there is no sound device or no sounds
+    g_ui->applyVolumes();
 
     WNDCLASSEXW wc;
     ZeroMemory(&wc, sizeof(wc));
@@ -616,6 +643,8 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE, LPSTR, int show) {
     if (g_bmp) DeleteObject(g_bmp);
     if (g_memDC) DeleteDC(g_memDC);
     g_canvas.reset();  // fonts and layers must go before GDI+ shuts down
+    g_ui->snd = &g_ui->silence;
+    audio.reset();     // stop the sound thread before the interface goes
     g_ui.reset();
     Gdiplus::GdiplusShutdown(gdipToken);
     return 0;

@@ -11,7 +11,7 @@
 ## Download and play
 
 * **Download:** open the [Releases](../../releases) page and download `RebirthOfCivilisation-windows-x64.zip`. Every push also produces a build under **Actions → latest run → Artifacts**.
-* **Install:** none. Unzip the file and run `RebirthOfCivilisation.exe`. It is one native Win32 program with no runtime dependencies, and it runs on Windows 7 through 11.
+* **Install:** none. Unzip the file and run `RebirthOfCivilisation.exe`. It is one native Win32 program with no runtime dependencies, and it runs on Windows 7 through 11. Keep the `assets` folder next to the .exe - it holds the music and sounds (without it the game simply plays silently).
 * **Saves:** stored in `%APPDATA%\RebirthOfCivilisation\savegame.roc`. The game also autosaves every 5 turns.
 * **Code signing policy:** see [CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md). Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org) (application in progress; current downloads are unsigned, so Windows 11 Smart App Control may block them).
 * **Privacy:** the game never connects to the internet and collects no data. See the privacy policy in [CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md#privacy-policy).
@@ -35,6 +35,7 @@
   * **Units** are bronze-rimmed medallions (shields for civilians) in their owner's colour, with an icon for every unit type. They **glide** from tile to tile and **lunge** at their targets. Arrows and stones arc through the air, bullets and shells streak, hits flash and spark, damage numbers float up and destroyed units vanish in smoke.
   * **Cities** grow from huts round a fire, to brick and stone houses with tiled roofs, to smoking factories and glass towers. Walls gain towers, and capitals fly a fluttering pennant.
   * **Screens** have rounded, shaded panels and buttons, illustrated portraits of each primate, and an animated title scene: a ruined city at sunset under a mushroom cloud.
+* **Sound and music.** Music changes with your story: a sombre theme on the title screen, drums and flutes in the wandering age, fuller pieces as civilisation grows, battle music while you are fighting a war, a lament for the Fall and a fanfare for victory - crossfading as the mood changes. Every fight sounds the part (swords, spears, bows, slings, muskets, catapults and cannon, impacts, falling cities and sinking ships), as do footsteps and hooves, ships, gatherers at work, new technologies, evolution, cities, trade, wars, disasters and the bombs. Ambient sound follows what is on screen: surf by the sea, birds and jungle in the forests, wind over snow, mountains and fallout. Music, sound effects and ambience each have a volume control (in the menu; music and effects also on the title screen). The music and sounds are from the open-source game [0 A.D.](https://play0ad.com/) by Wildfire Games, used under [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/) - see [assets/audio/CREDITS.txt](assets/audio/CREDITS.txt).
   * **Animations** can be turned off in the menu for slow computers. The terrain is cached in chunks, so scrolling the map stays smooth.
 * **Hex map**, randomly generated, with grassland, plains, desert, tundra, snow, coast and ocean, plus forest, jungle, hills, mountains and resources. Small (60 × 38), Standard (74 × 46) and Large (84 × 54) sizes with 4, 6 or 8 primate civilisations: about 570 tiles per species, the same room each as in Civilization VI.
 * **Eight playable primates**, each with its own bonuses, a unique unit and a preferred starting terrain (see below).
@@ -293,7 +294,13 @@ src/ui/          User interface, drawn through the small Canvas interface
   UIMap.cpp        hex map rendering, unit motion and combat effects
   UIArt.cpp        primate portraits, the title scene, mushroom clouds
   UITrade.cpp      the caravan's route chooser
+  UISound.cpp      which sounds, music and ambience play when
+src/audio/Mixer.cpp  portable software mixer (effects, ambient loops, streamed Ogg music)
 src/platform/win32/main_win32.cpp   Windows window, input and GDI+ renderer
+src/platform/win32/audio_win32.cpp  plays the mixer through waveOut
+assets/audio/    music, sound effects and ambience (CC BY-SA 3.0, from 0 A.D.)
+third_party/     stb_vorbis Ogg decoder (public domain)
+tools/fetch_audio.sh  rebuilds assets/audio from its sources
 tests/           AI simulation tests, screenshot renderer, random-input stress test
 res/             Icon and Windows resources
 ```
@@ -304,16 +311,15 @@ Most balance changes only need edits to `src/core/Data.cpp`.
 
 Pull requests are welcome, from balance tweaks and new primates to better AI, sound, graphics and ports. Run `ctest` before you submit. Some ideas for future work:
 
-* Sound and music
 * Proper unit artwork (sprites) instead of tokens
 * Naval units and air units
-* Trade routes, city-states made from surviving primate troops, and religion
+* City-states made from surviving primate troops, and religion
 * Multiplayer (hot-seat)
 * A Linux and macOS front end (only `src/platform/` needs a new backend)
 
 ## Licence
 
-[MIT](LICENSE). Contributors are expected to follow the [Code of conduct](CODE_OF_CONDUCT.md). Security issues: see [SECURITY.md](SECURITY.md).
+The code is [MIT](LICENSE). The music and sounds in `assets/audio` are from [0 A.D.](https://play0ad.com/) by Wildfire Games and are licensed [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/) (see [CREDITS](assets/audio/CREDITS.txt)); the stb_vorbis decoder is public domain. Contributors are expected to follow the [Code of conduct](CODE_OF_CONDUCT.md). Security issues: see [SECURITY.md](SECURITY.md).
 
 ## Code signing policy
 

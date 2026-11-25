@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(RebirthOfCivilisation VERSION 0.10.0 LANGUAGES CXX)
+project(RebirthOfCivilisation VERSION 0.11.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -33,12 +33,28 @@ add_library(rebirth_game STATIC
   src/ui/UIMap.cpp
   src/ui/UIArt.cpp
   src/ui/UITrade.cpp
+  src/ui/UISound.cpp
 )
 target_include_directories(rebirth_game PUBLIC src)
 if(MSVC)
   target_compile_options(rebirth_game PRIVATE /W3 /utf-8 /permissive-)
 else()
   target_compile_options(rebirth_game PRIVATE -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers)
+endif()
+
+# ---- audio: a portable software mixer and the stb_vorbis decoder (public domain)
+add_library(rebirth_audio STATIC
+  src/audio/Mixer.cpp
+  third_party/stb_vorbis.c
+)
+target_include_directories(rebirth_audio PUBLIC src)
+find_package(Threads REQUIRED)
+target_link_libraries(rebirth_audio PUBLIC Threads::Threads)
+if(MSVC)
+  set_source_files_properties(third_party/stb_vorbis.c PROPERTIES COMPILE_OPTIONS "/w")
+  target_compile_options(rebirth_audio PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/W3 /utf-8>)
+else()
+  set_source_files_properties(third_party/stb_vorbis.c PROPERTIES COMPILE_OPTIONS "-w")
 endif()
 
 # ---- the Windows game (native Win32 + GDI)
@@ -49,9 +65,10 @@ if(WIN32)
   configure_file(res/rebirth.rc.in "${CMAKE_CURRENT_BINARY_DIR}/rebirth.rc" @ONLY)
   add_executable(RebirthOfCivilisation WIN32
     src/platform/win32/main_win32.cpp
+    src/platform/win32/audio_win32.cpp
     "${CMAKE_CURRENT_BINARY_DIR}/rebirth.rc"
   )
-  target_link_libraries(RebirthOfCivilisation PRIVATE rebirth_game gdiplus gdi32 user32 ole32)
+  target_link_libraries(RebirthOfCivilisation PRIVATE rebirth_game rebirth_audio gdiplus gdi32 user32 ole32 winmm)
   target_compile_definitions(RebirthOfCivilisation PRIVATE _WIN32_WINNT=0x0601 WINVER=0x0601)
   if(MSVC)
     target_compile_options(RebirthOfCivilisation PRIVATE /W3 /utf-8 /permissive-)
@@ -69,4 +86,7 @@ if(REBIRTH_BUILD_TESTS)
   target_link_libraries(rebirth_screens PRIVATE rebirth_game)
   add_test(NAME ai_simulation_small_quick COMMAND rebirth_sim 2 0 0)
   add_test(NAME ai_simulation_standard_map_standard_speed COMMAND rebirth_sim 1 1 1)
+  add_executable(rebirth_audio_test tests/audio.cpp)
+  target_link_libraries(rebirth_audio_test PRIVATE rebirth_audio)
+  add_test(NAME audio_mixer COMMAND rebirth_audio_test "${CMAKE_CURRENT_SOURCE_DIR}/assets/audio/")
 endif()

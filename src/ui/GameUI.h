@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "Canvas.h"
+#include "Sound.h"
 #include "../core/Game.h"
 #include "../core/Achievements.h"
 #include <functional>
@@ -24,7 +25,12 @@ public:
     // Interface size as a percentage on top of the system display scaling. The platform layer
     // reads this after each input event and rescales the canvas when it changes.
     int uiScalePct = 100;
-    bool animOn = true;  // animated water, unit movement and combat effects (saved in settings.ini)
+    bool animOn = true;
+    // ---- sound: the platform plugs in a backend; volumes 0..100 (saved in settings.ini)
+    SoundSink silence;
+    SoundSink* snd = &silence;
+    int musicVol = 60, sfxVol = 80, ambVol = 60;
+    void applyVolumes() { snd->setVolumes(musicVol, sfxVol, ambVol); }  // animated water, unit movement and combat effects (saved in settings.ini)
     static constexpr int UI_SCALE_MIN = 60, UI_SCALE_MAX = 200, UI_SCALE_STEP = 10;
     void adjustUiScale(int dir);  // dir: +1 bigger, -1 smaller, 0 reset
 
@@ -67,6 +73,7 @@ private:
         std::function<void()> fn;
         std::string tip;
         bool wheelArea;
+        bool silent = false;  // no click sound
     };
     std::vector<Hot> hots;
     bool quit = false;
@@ -101,6 +108,19 @@ private:
     void drawTrophy(int x, int y, int s, bool lit);
     void renderNukeTargeting();
     void renderBlast();
+    // ---- sound (UISound.cpp)
+    void sfx(Sfx s, float vol = 1.0f, int screenX = -1, int delayMs = 0);
+    void sfxAt(Sfx s, int tx, int ty, float vol = 1.0f, int delayMs = 0);
+    void selectSound(const Unit& u);
+    void moveSound(const Unit& u);
+    void combatSound(const CombatFx& c);
+    void buildSound(int imp);
+    void updateSound(int ms);
+    void volumeControl(int x, int y, int w, const std::string& label, int& v);
+    int sndTechs = -1, sndTraits = -1, sndCities = -1, sndRoutes = -1, sndPolicies = -1, sndAch = 0, sndAmbMs = 0, sndNotifyMs = 0;
+    int sndNuke = -1, sndBlast = -1, lastCombatTurn = -1000, moveSndMs = 0;
+    const void* sndGame = nullptr;
+    std::string sndPopup;
     // ---- caravans: the route chooser, roads and routes on the map
     int routeUnit = -1, routeHover = -1, routeScroll = 0;
     std::vector<RouteOption> routeOpts;
