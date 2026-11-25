@@ -94,23 +94,23 @@ void Game::generateMap() {
             Tile& t = at(x, y);
             if (t.mountain || t.terrain == T_OCEAN || t.feature == F_OASIS || t.feature == F_WONDER) continue;
             double lat = std::abs(y - (H - 1) / 2.0) / ((H - 1) / 2.0);
-            if (t.terrain == T_COAST) { roll(t, {{R_FISH, 90}}); continue; }
+            if (t.terrain == T_COAST) { roll(t, {{R_FISH, 90}, {R_PEARLS, lat < 0.6 && t.feature != F_LAKE ? 14 : 0}}); continue; }
             if (t.hills) {
-                roll(t, {{R_STONE, 45}, {R_IRON, 50}, {R_COPPER, 55}, {R_TIN, 40}, {R_COAL, 45}, {R_GOLD, 20}, {R_URANIUM, 15}});
+                roll(t, {{R_STONE, 45}, {R_IRON, 50}, {R_COPPER, 55}, {R_TIN, 40}, {R_COAL, 45}, {R_GOLD, 20}, {R_URANIUM, 15}, {R_GEMS, 22}});
                 continue;
             }
-            if (t.veg == V_JUNGLE) { roll(t, {{R_FRUIT, 110}, {R_RICE, 15}}); continue; }
-            if (t.veg == V_FOREST) { roll(t, {{R_GAME, 95}, {R_COAL, 20}}); continue; }
+            if (t.veg == V_JUNGLE) { roll(t, {{R_FRUIT, 110}, {R_RICE, 15}, {R_CACAO, 30}, {R_SPICES, 20}, {R_HONEY, 10}}); continue; }
+            if (t.veg == V_FOREST) { roll(t, {{R_GAME, 95}, {R_COAL, 20}, {R_HONEY, 22}, {R_FURS, lat > 0.5 ? 30 : 0}}); continue; }
             switch (t.terrain) {
                 case T_GRASS:
-                    if (lat < 0.45) roll(t, {{R_RICE, 50}, {R_FRUIT, 30}, {R_MAIZE, 30}, {R_HORSES, 25}, {R_COPPER, 10}});
-                    else roll(t, {{R_WHEAT, 50}, {R_MAIZE, 25}, {R_HORSES, 35}, {R_FRUIT, 15}, {R_COPPER, 10}});
+                    if (lat < 0.45) roll(t, {{R_RICE, 50}, {R_FRUIT, 30}, {R_MAIZE, 30}, {R_HORSES, 25}, {R_COPPER, 10}, {R_SPICES, 14}});
+                    else roll(t, {{R_WHEAT, 50}, {R_MAIZE, 25}, {R_HORSES, 35}, {R_FRUIT, 15}, {R_COPPER, 10}, {R_GRAPES, 18}});
                     break;
                 case T_PLAINS:
-                    roll(t, {{R_WHEAT, 65}, {R_MAIZE, 30}, {R_HORSES, 60}, {R_STONE, 20}, {R_COPPER, 20}, {R_TIN, 10}});
+                    roll(t, {{R_WHEAT, 65}, {R_MAIZE, 30}, {R_HORSES, 60}, {R_STONE, 20}, {R_COPPER, 20}, {R_TIN, 10}, {R_GRAPES, 20}, {R_SALT, 10}});
                     break;
-                case T_DESERT: roll(t, {{R_OIL, 70}, {R_GOLD, 20}, {R_URANIUM, 20}, {R_COPPER, 15}}); break;
-                case T_TUNDRA: roll(t, {{R_GAME, 70}, {R_OIL, 40}, {R_TIN, 25}, {R_URANIUM, 20}, {R_COAL, 20}}); break;
+                case T_DESERT: roll(t, {{R_OIL, 70}, {R_GOLD, 20}, {R_URANIUM, 20}, {R_COPPER, 15}, {R_SALT, 30}}); break;
+                case T_TUNDRA: roll(t, {{R_GAME, 70}, {R_OIL, 40}, {R_TIN, 25}, {R_URANIUM, 20}, {R_COAL, 20}, {R_FURS, 40}}); break;
                 default: break;
             }
         }

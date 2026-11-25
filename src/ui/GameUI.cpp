@@ -455,11 +455,36 @@ void GameUI::renderTopBar() {
                      if (u.alive && u.owner == game->player && g_units[u.type].cls == UnitClass::Trader) { selectUnit(u.id, true); return; }
              });
     }
+    if (g.numCities(g.player) > 0) {  // luxuries and the mood of your cities
+        auto lux = g.luxuriesOf(g.player);
+        int sad = 0, riot = 0, party = 0;
+        for (auto& ci : g.cities) {
+            if (!ci.alive || ci.owner != g.player) continue;
+            int m = g.moodOf(ci);
+            if (m == MOOD_UNREST) riot++;
+            else if (m == MOOD_UNHAPPY) sad++;
+            else if (m == MOOD_CELEBRATING) party++;
+        }
+        std::string names;
+        for (int r : lux) names += (names.empty() ? "" : ", ") + g_resources[r].name;
+        std::string tip = "Luxuries: " + (names.empty() ? std::string("none yet") : names) +
+                          ".\nEach kind of luxury you own or are lent makes every city 1 happier. Luxuries are found on the map (Honey, Cacao, Spices, "
+                          "Grapes, Salt, Pearls, Furs, Gems, Gold Ore) and count once inside your borders - or trade for them in Diplomacy.\n";
+        tip += std::to_string(party) + " celebrating, " + std::to_string(sad) + " unhappy, " + std::to_string(riot) + " in unrest.";
+        if (me.weariness >= 25) tip += "\nWar weariness: " + std::to_string(std::min(4, me.weariness / 25)) + " unhappy in every city. Peace lets it fade.";
+        Color lc = riot ? rgb(240, 90, 80) : sad ? rgb(240, 170, 90) : party ? rgb(140, 230, 120) : rgb(210, 200, 150);
+        std::string label = (compact ? "Lux " : "Luxuries ") + std::to_string(lux.size());
+        if (riot || sad) label += compact ? " (" + std::to_string(riot + sad) + "!)" : " (" + std::to_string(riot + sad) + " unhappy)";
+        item(label, lc, tip, [this] {
+            for (auto& ci : game->cities)
+                if (ci.alive && ci.owner == game->player && game->moodOf(ci) < MOOD_CONTENT) { openCity(ci.id); return; }
+        });
+    }
     int pc = g.policyCost(g.player);
     bool can = false;
     for (size_t p = 0; p < g_policies.size(); p++) if (g.canAdopt(g.player, (int)p)) can = true;
     item((compact ? "Cult " : "Culture ") + std::to_string(me.culture) + "/" + std::to_string(pc) + " (+" + std::to_string(me.culturePerTurn) + ")", C_CULT,
-         "Culture accumulates towards your next Tradition. Adopting every Tradition wins a Cultural victory.", [this] { overlay = OV_POLICY; });
+         "Culture accumulates towards your next Tradition. Adopting " + std::to_string(CULTURE_WIN_POLICIES) + " Traditions wins a Cultural victory.", [this] { overlay = OV_POLICY; });
     if (can) item(compact ? "TRADITION!" : "TRADITION READY", rgb(255, 160, 255), "Choose a new Tradition", [this] { overlay = OV_POLICY; });
     {
         std::string abbr, tip;
@@ -585,6 +610,9 @@ void GameUI::renderTileInfo() {
         const ResourceDef& rd = g_resources[t.res];
         static const char* KIND[] = {"Bonus resource", "Strategic resource", "Luxury resource", "Crop"};
         lines.push_back({std::string(KIND[rd.kind]) + ": " + rd.name + (rd.hint.empty() ? "" : ". " + rd.hint), rgb(230, 190, 120)});
+        if (rd.kind == RK_LUXURY)
+            lines.push_back({g.hasResource(g.player, t.res) ? std::string("You already enjoy this luxury: another source adds nothing, but you can trade it")
+                                                            : std::string("Inside your borders: +1 happiness in every city"), rgb(140, 230, 120)});
     }
     if (t.owner >= 0) {
         std::string o = g.civs[t.owner].name;
@@ -939,9 +967,22 @@ void GameUI::renderCity() {
     int need = g.growthThreshold(c.pop);
     int tg = g.turnsToGrow(c);
     cv->text(px + 16, y, "Growth: " + std::to_string(c.food) + "/" + std::to_string(need) + " food (" + fmtPct(c.foodSurplus) + "/turn)" +
-             (tg > 0 ? " - grows in " + std::to_string(tg) + " turns" : c.foodSurplus < 0 ? " - STARVING" : " - stagnant"), 13, C_FOOD);
+             (tg > 0 ? " - grows in " + std::to_string(tg) + " turns" : c.foodSurplus < 0 ? " - STARVING" : g.moodOf(c) <= MOOD_UNHAPPY ? " - not growing (unhappy)" : c.happy <= c.unhappy ? " - not growing: no happiness to spare" : " - stagnant"),
+             13, C_FOOD);
     bar(px + 16, y + 18, pw - 32, 6, (double)c.food / need, C_FOOD);
     y += 32;
+    {  // the citizens' mood
+        int m = g.moodOf(c);
+        std::string ms = std::string("Mood: ") + Game::moodName(m) + "  (" + std::to_string(c.happy) + " happy, " + std::to_string(c.unhappy) + " unhappy)";
+        if (m == MOOD_CELEBRATING) ms += "  +10% Food and Gold";
+        if (m == MOOD_UNHAPPY) ms += "  - not growing";
+        if (m == MOOD_UNREST) ms += "  - no growth, -25% output";
+        int mw = cv->textWidth(ms, 13, true);
+        drawMoodFace(px + 24, y + 3, 8, m);
+        cv->text(px + 38, y - 4, ms, 13, moodColor(m), AL_LEFT, true);
+        hot(px + 12, y - 6, mw + 34, 18, nullptr, moodTip(c));
+        y += 18;
+    }
     if (c.droughtTurns > 0) {
         cv->text(px + 16, y - 4, "DROUGHT: -33% Food for " + std::to_string(c.droughtTurns) + " more turns", 13, rgb(240, 160, 80), AL_LEFT, true);
         y += 16;
@@ -1006,6 +1047,7 @@ void GameUI::renderCity() {
         add(bd.pct.food, "Food", true); add(bd.pct.prod, "Production", true); add(bd.pct.sci, "Science", true);
         add(bd.pct.cult, "Culture", true); add(bd.pct.gold, "Gold", true);
         if (bd.defense) eff += (eff.empty() ? "" : ", ") + std::string("+") + std::to_string(bd.defense) + " Defence";
+        if (bd.happy) eff += (eff.empty() ? "" : ", ") + std::string("+") + std::to_string(bd.happy) + " Happiness";
         if (!bd.desc.empty()) eff += (eff.empty() ? "" : ". ") + bd.desc;
         if (!bd.needs.empty()) eff += ". Uses " + needsText(bd.needs);
         rows.push_back({BK_BUILDING, b, bd.name + (bd.wonder ? " (Wonder)" : ""), "", bd.name + ": " + eff});
@@ -1165,10 +1207,11 @@ void GameUI::renderPolicies() {
     cv->text(px + 20, py + 14, "Traditions", 26, C_CULT, AL_LEFT, true);
     cv->text(px + 20, py + 48, "Culture " + std::to_string(me.culture) + " / " + std::to_string(g.policyCost(g.player)) + " needed for the next tradition (+" +
              std::to_string(me.culturePerTurn) + " per turn).  Adopted " + std::to_string(me.policiesAdopted) + " of " + std::to_string(g_policies.size()) +
-             " - adopting all of them wins a Cultural victory.", 13, C_DIM);
+             " - adopting " + std::to_string(CULTURE_WIN_POLICIES) + " wins a Cultural victory.", 13, C_DIM);
     button(px + pw - 40, py + 12, 28, 28, "X", true, [this] { overlay = OV_NONE; });
-    int cols = 4, gap = 10;
-    int cw = (pw - 40 - gap * (cols - 1)) / cols, ch = std::min(112, (ph - 90 - gap * 3) / 4);
+    int cols = g_policies.size() > 16 ? 5 : 4, gap = 10;
+    int rows = ((int)g_policies.size() + cols - 1) / cols;
+    int cw = (pw - 40 - gap * (cols - 1)) / cols, ch = std::min(112, (ph - 90 - gap * (rows - 1)) / rows);
     for (size_t i = 0; i < g_policies.size(); i++) {
         const PolicyDef& p = g_policies[i];
         int x = px + 20 + (int)(i % cols) * (cw + gap), y = py + 78 + (int)(i / cols) * (ch + gap);
@@ -1487,7 +1530,7 @@ void GameUI::renderTrade() {
         for (int r : res) {
             bool on = draftItem(DI_RESOURCE, giver, r) != nullptr;
             chip(x, y, w, g_resources[r].name, on, true, [this, giver, r] { toggleDraft(DI_RESOURCE, giver, r); },
-                 std::string(g_resources[r].kind == RK_STRATEGIC ? "Strategic resource" : "Luxury") + ": counts as the receiver's own while the deal lasts");
+                 std::string(g_resources[r].kind == RK_STRATEGIC ? "Strategic resource" : "Luxury (+1 happiness in every city)") + ": counts as the receiver's own while the deal lasts");
             y += 34;
             if (y > top + ph - 220) break;
         }
@@ -1730,7 +1773,7 @@ void GameUI::renderHelp() {
         "THE STORY  The game begins in 2032, shortly before humanity wipes itself out in a global nuclear war in August 2034. "
         "You lead a band of primates. Survive the Fall, then build a new civilisation from the ashes.\n"
         "WINNING  Rebirth victory: research Rebirth and complete the Rebirth Project. Domination: control every original primate capital. "
-        "Cultural: adopt every Tradition. Otherwise the highest score wins when time runs out.\n"
+        "Cultural: adopt 16 Traditions. Otherwise the highest score wins when time runs out.\n"
         "EVOLUTION  Your species starts unable to learn deliberately: it earns no science until it evolves an Enlarged Neocortex. Four kinds of "
         "evolutionary pressure fill four pools each turn: Social (cities, population, culture), Ecological (survival, territory, harsh lands, the "
         "nuclear winter), Conflict (war, battles, predators) and Mutation (fallout). On the Evolution screen (V) you choose which trait to evolve "
@@ -1804,6 +1847,15 @@ void GameUI::renderHelp() {
         "Oil for tanks. Wheat, Rice and Maize are crops: build a Farm on them for extra food. Build Pastures on Horses and Mines on minerals.\n"
         "GOLD  Your people only learn the value of money with the Currency technology. From then on cities earn Gold, used to buy items.\n"
         "CITIES  Your first cities are founded by bands; after that, cities train Elder Troops to found more. Click a city to choose what it builds. Cities grow with surplus food and claim land with culture.\n"
+        "HAPPINESS AND LUXURIES  Each city has a mood. Its first 5 citizens are content with nothing; every citizen beyond that is "
+        "unhappy, as are the people of a large empire (1 more in every city per 4 cities beyond the first) and a people weary of war "
+        "(fighting and losses build weariness; peace lets it fade). Luxuries make them happy: each kind you have - Honey, Cacao, Spices, "
+        "Grapes, Salt, Pearls, Furs, Gems or Gold Ore, inside your borders or lent to you in a deal - adds 1 happiness in every city, so "
+        "a second source of the same luxury adds nothing: trade it for another. Totems, Shrines, Markets, Temples, Arenas, Hospitals, "
+        "Stadiums and Broadcast Towers make their city happier, the Festival Grounds wonder cheers every city, and so do the Mutual Grooming "
+        "and Public Festivals traditions and any natural wonder in a city's lands. A city grows only while it has at least 1 happiness to spare. With 3 "
+        "or more to spare (size 3+) it celebrates: +10% Food and Gold. Below 0 it is unhappy and stops growing; 3 or more short, "
+        "it falls into unrest: no growth and -25% Production, Science, Culture and Gold. The face beside a city's name shows its mood.\n"
         "COMBAT  Move a military unit onto an enemy to attack. Ranged units attack from a distance. Hills, forest, jungle and fortifying help defence. "
         "Capture cities by reducing their HP to zero with a melee unit. Beware the feral packs that roam the wastelands.\n"
         "CONTROLS  Left-click: select.  Right-click: move / attack.  Drag or arrow keys: scroll.  Wheel or +/-: zoom.  Enter: end turn.  "
@@ -2519,4 +2571,51 @@ void GameUI::renderBlast() {
     }
     if (t < 300) cv->fillRectA(0, 0, W, H, rgb(255, 255, 255), 255 - t * 255 / 300);
     hot(0, 0, W, H, [this] { if (blastT > 900) blastT = -1; }, "");
+}
+
+// ============================================================ happiness
+Color GameUI::moodColor(int mood) const {
+    switch (mood) {
+        case MOOD_UNREST: return rgb(240, 90, 80);
+        case MOOD_UNHAPPY: return rgb(240, 170, 90);
+        case MOOD_CELEBRATING: return rgb(140, 230, 120);
+        default: return rgb(200, 210, 170);
+    }
+}
+
+// A little face: a smile, a straight mouth, a frown, or an angry red frown.
+void GameUI::drawMoodFace(int x, int y, int r, int mood) {
+    Color c = moodColor(mood);
+    cv->fillCircle(x, y, r, c);
+    cv->circle(x, y, r, darken(c, 0.5f), 1);
+    Color ink = rgb(40, 30, 20);
+    int e = std::max(1, r / 4);
+    cv->fillCircle(x - r / 3, y - r / 4, e, ink);
+    cv->fillCircle(x + r / 3, y - r / 4, e, ink);
+    int lw = std::max(1, r / 5);
+    if (mood == MOOD_CELEBRATING) {
+        int p[6] = {x - r / 2, y + r / 5, x, y + r / 2, x + r / 2, y + r / 5};
+        cv->polylineA(p, 3, ink, lw, 255);
+    } else if (mood == MOOD_CONTENT) {
+        cv->lineA(x - r / 2, y + r / 3, x + r / 2, y + r / 3, ink, lw, 255);
+    } else {
+        int p[6] = {x - r / 2, y + r / 2, x, y + r / 4, x + r / 2, y + r / 2};
+        cv->polylineA(p, 3, ink, lw, 255);
+    }
+}
+
+std::string GameUI::moodTip(const City& c) const {
+    const Game& g = *game;
+    MoodParts m = g.moodParts(c);
+    auto line = [](const char* what, int n) { return n ? std::string("\n  ") + what + ": " + std::to_string(n) : std::string(); };
+    std::string lux;
+    for (int r : g.luxuriesOf(c.owner)) lux += (lux.empty() ? "" : ", ") + g_resources[r].name;
+    std::string s = "Happy " + std::to_string(m.happy()) + line("luxuries", m.luxuries) + line("buildings", m.buildings) + line("wonders", m.wonders) +
+                    line("natural wonders in its lands", m.naturals) + line("traditions", m.traditions);
+    s += "\nUnhappy " + std::to_string(m.unhappy()) + line("citizens beyond the first 5", m.crowding) + line("size of your empire", m.empire) +
+         line("war weariness", m.war);
+    s += "\nLuxuries: " + (lux.empty() ? std::string("none - find them, settle near them or trade for them") : lux) + ".";
+    s += "\nA city grows only while it has at least 1 happiness to spare. 3 or more to spare (size 3+): celebrating, +10% Food and "
+         "Gold. Below 0: unhappy, no growth. 3 or more short: unrest, no growth and -25% Production, Science, Culture and Gold.";
+    return s;
 }

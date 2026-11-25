@@ -305,7 +305,12 @@ double Game::dealValue(int c, const Deal& d, std::string* why) const {
                     bool useful = !strategic;
                     for (auto& u : g_units) for (int need : u.needs) if (need == r && hasTech(c, u.techId) && unitBelongsTo(c, unitIndex(u.name))) useful = true;
                     for (auto& b : g_buildings) for (int need : b.needs) if (need == r && hasTech(c, b.techId)) useful = true;
-                    v += useful ? (strategic ? 140 : 90) : 15;
+                    if (!strategic) {  // a luxury: worth more the closer our cities are to unrest
+                        int sad = 0, n = 0;
+                        for (auto& ci : cities)
+                            if (ci.alive && ci.owner == c) { n++; if (ci.happy - ci.unhappy <= 0) sad++; }
+                        v += 60 + (n ? 90 * sad / n : 0);
+                    } else v += useful ? 140 : 15;
                 } else if (gives) {
                     if (att <= -2) return refuse("We will not supply our enemies");
                     v -= 25 + (strategic && att < 1 ? 70 : 0) + greed * 3;

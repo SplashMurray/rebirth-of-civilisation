@@ -59,7 +59,8 @@ int resourceIndex(const std::string& n) {
 }
 bool isCrop(int r) { return r > 0 && r < (int)g_resources.size() && g_resources[r].kind == RK_CROP; }
 bool isMineral(int r) {
-    return r == R_STONE || r == R_IRON || r == R_OIL || r == R_SCRAP || r == R_COPPER || r == R_TIN || r == R_COAL || r == R_URANIUM || r == R_GOLD;
+    return r == R_STONE || r == R_IRON || r == R_OIL || r == R_SCRAP || r == R_COPPER || r == R_TIN || r == R_COAL || r == R_URANIUM || r == R_GOLD ||
+           r == R_SALT || r == R_GEMS;
 }
 std::string needsText(const std::vector<int>& needs) {
     std::string s;
@@ -111,6 +112,15 @@ void initData() {
         {"Wheat", "Wh", 1, 0, 0, "", rgb(232, 206, 120), RK_CROP, "Farm: +2 Food"},
         {"Rice", "Ri", 1, 0, 0, "", rgb(236, 240, 220), RK_CROP, "Farm: +2 Food"},
         {"Maize", "Mz", 1, 0, 0, "", rgb(248, 190, 40), RK_CROP, "Farm: +2 Food"},
+        // luxuries: each kind you have makes every city happier
+        {"Honey", "Hn", 1, 0, 1, "", rgb(240, 170, 30), RK_LUXURY, ""},
+        {"Cacao", "Ca", 0, 0, 2, "Foraging", rgb(120, 70, 40), RK_LUXURY, "Trading Post: +2 Gold"},
+        {"Spices", "Sp", 1, 0, 1, "Bartering", rgb(220, 90, 40), RK_LUXURY, "Trading Post: +2 Gold"},
+        {"Grapes", "Gp", 1, 0, 1, "Cultivation", rgb(140, 60, 150), RK_LUXURY, "Trading Post: +2 Gold"},
+        {"Salt", "Sa", 1, 0, 1, "Digging", rgb(236, 236, 236), RK_LUXURY, "Mine: +2 Production"},
+        {"Pearls", "Pe", 1, 0, 2, "Rafts", rgb(250, 240, 250), RK_LUXURY, ""},
+        {"Furs", "Fu", 0, 1, 1, "Spearcraft", rgb(170, 120, 80), RK_LUXURY, "Lumber Camp or Trading Post"},
+        {"Gems", "Ge", 0, 0, 3, "Masonry", rgb(90, 220, 210), RK_LUXURY, "Mine: +2 Production"},
     };
 
     // name, tech, Gatherer turns, movement cost (in MP), trade bonus % per road tile
@@ -437,15 +447,18 @@ void initData() {
         {"Printing House", 200, "Printing", Y(0, 0, 2, 3, 0), Y(0, 0, 10, 10, 0), 0, 0, false, BSpecial::None, ""},
         {"Bank", 170, "Banking", Y(0, 0, 0, 0, 3), Y(0, 0, 0, 0, 25), 0, 0, false, BSpecial::None, ""},
         {"Hospital", 220, "Radiology", Y(3, 0, 0, 0, 0), Y(0, 0, 0, 0, 0), 0, 0, false, BSpecial::HealBonus, "Units in or next to the city heal fully"},
+        {"Arena", 140, "Construction", Y(0, 0, 0, 1, 0), Y(0, 0, 0, 0, 0), 0, 0, false, BSpecial::None, "Games and contests"},
         {"Steam Workshop", 200, "Steam Power", Y(0, 3, 0, 0, 0), Y(0, 15, 0, 0, 0), 0, 0, false, BSpecial::None, ""},
         {"Bastion", 260, "Rifling", Y(0, 0, 0, 0, 0), Y(0, 0, 0, 0, 0), 14, 100, false, BSpecial::None, ""},
         {"Factory", 300, "Industrialisation", Y(0, 4, 0, 0, 0), Y(0, 25, 0, 0, 0), 0, 0, false, BSpecial::None, ""},
         {"Power Station", 350, "Electricity", Y(0, 2, 0, 0, 0), Y(0, 20, 0, 0, 0), 0, 0, false, BSpecial::None, ""},
+        {"Stadium", 280, "Industrialisation", Y(0, 0, 0, 1, 1), Y(0, 0, 0, 0, 0), 0, 0, false, BSpecial::None, "Crowds cheering their team"},
         {"Broadcast Tower", 340, "Mass Media", Y(0, 0, 0, 5, 0), Y(0, 0, 0, 25, 0), 0, 0, false, BSpecial::None, ""},
         {"Research Lab", 450, "Computing", Y(0, 0, 6, 0, 0), Y(0, 0, 40, 0, 0), 0, 0, false, BSpecial::None, ""},
         {"Gene Clinic", 500, "Genetics", Y(4, 0, 2, 0, 0), Y(20, 0, 0, 0, 0), 0, 0, false, BSpecial::None, ""},
         // wonders
         {"Great Canopy", 150, "Woodcraft", Y(2, 0, 0, 3, 0), Y(0, 0, 0, 0, 0), 0, 0, true, BSpecial::GrowthBonus, "+10% Food in every city"},
+        {"Festival Grounds", 260, "Bartering", Y(0, 0, 0, 3, 1), Y(0, 0, 0, 0, 0), 0, 0, true, BSpecial::HappyAll, "+1 Happiness in every city"},
         {"Monolith of Bones", 220, "Masonry", Y(0, 0, 0, 5, 0), Y(0, 0, 0, 0, 0), 0, 0, true, BSpecial::CombatBonus, "+10% combat strength for all units"},
         {"The First Library", 260, "Writing", Y(0, 0, 5, 2, 0), Y(0, 0, 0, 0, 0), 0, 0, true, BSpecial::FreeTech, "Grants a free technology"},
         {"Hall of Human Relics", 420, "Deciphering", Y(0, 0, 4, 4, 0), Y(0, 0, 0, 0, 0), 0, 0, true, BSpecial::RuinBonus, "+100% rewards from human ruins"},
@@ -453,6 +466,10 @@ void initData() {
         {"Rebirth Project", 3000, "Rebirth", Y(0, 0, 0, 0, 0), Y(0, 0, 0, 0, 0), 0, 0, true, BSpecial::Victory, "Rebuild civilisation. Completing it wins the game."},
     };
     for (auto& b : g_buildings) b.techId = needTech(b.tech);
+    // happiness from buildings
+    for (auto& hb : std::vector<std::pair<const char*, int>>{{"Totem", 1}, {"Shrine", 1}, {"Market", 1}, {"Temple", 2}, {"Arena", 3},
+                                                             {"Hospital", 1}, {"Stadium", 3}, {"Broadcast Tower", 2}, {"Nest Hall", 1}})
+        g_buildings[buildingIndex(hb.first)].happy = hb.second;
     // strategic resource requirements (unique units inherit those of the unit they replace)
     auto needU = [](const char* u, std::vector<int> r) { g_units[unitIndex(u)].needs = r; };
     auto needB = [](const char* b, std::vector<int> r) { g_buildings[buildingIndex(b)].needs = r; };
@@ -522,6 +539,9 @@ void initData() {
         {"Merchant Troops", "+30% Gold", PolicyEffect::Gold, 30, "Currency"},
         {"Free Thought", "+3 Science in every city", PolicyEffect::FlatSci, 3, "Philosophy"},
         {"Festival Songs", "+3 Culture in every city", PolicyEffect::FlatCult, 3, "Theology"},
+        {"Mutual Grooming", "+1 Happiness in every city", PolicyEffect::Happy, 1, ""},
+        {"Public Festivals", "+2 Happiness in every city", PolicyEffect::Happy, 2, "Construction"},
+        {"Rally Calls", "War weariness builds half as fast", PolicyEffect::Weariness, 50, "Mass Media"},
         {"Field Medicine", "Units heal +10 HP per turn", PolicyEffect::Heal, 10, "Radiology"},
         {"Industrial Will", "+20% Production", PolicyEffect::Prod, 20, "Industrialisation"},
         {"Open Archives", "+25% Science", PolicyEffect::Sci, 25, "Computing"},

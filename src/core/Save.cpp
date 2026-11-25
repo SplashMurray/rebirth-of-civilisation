@@ -5,7 +5,7 @@
 #include <sstream>
 
 namespace {
-const int SAVE_VERSION = 17;
+const int SAVE_VERSION = 18;
 
 struct Archive {
     bool writing;
@@ -135,7 +135,7 @@ void ioGame(Archive& a, Game& g) {
         a.io(c.grievance); a.io(c.goodwill); a.io(c.peaceUntil); a.io(c.denouncedUntil); a.io(c.lastOffer); a.io(c.embargo); a.io(c.dealsMade); a.io(c.backstabs);
         a.io(c.warheads); a.io(c.nukesLaunched); a.io(c.timesNuked); a.io(c.citiesCaptured); a.io(c.citiesLost); a.io(c.bandSplits);
         a.io(c.disastersSuffered); a.io(c.warsDeclared); a.io(c.falloutCleaned); a.io(c.maxBand); a.io(c.shipsSunk); a.io(c.unitsUpgraded); a.io(c.unitsFerried);
-        a.io(c.routesMade); a.io(c.routesPlundered); a.io(c.bestRoad); a.io(c.naturalsFound); a.io(c.riverSailed);
+        a.io(c.routesMade); a.io(c.routesPlundered); a.io(c.bestRoad); a.io(c.naturalsFound); a.io(c.riverSailed); a.io(c.weariness); a.io(c.mostCelebrating); a.io(c.mostLuxuries);
     }
     long long nu = (long long)g.units.size();
     a.num(nu);
@@ -152,7 +152,7 @@ void ioGame(Archive& a, Game& g) {
         a.io(c.id); a.io(c.name); a.io(c.owner); a.io(c.origOwner); a.io(c.capital); a.io(c.origCapital);
         a.io(c.x); a.io(c.y); a.io(c.pop); a.io(c.food); a.io(c.prod); a.io(c.buildKind); a.io(c.buildId);
         a.io(c.has); a.io(c.borderCulture); a.io(c.claims); a.io(c.hp); a.io(c.alive); a.io(c.founded);
-        ioYields(a, c.yields); a.io(c.foodSurplus); a.io(c.worked); a.io(c.droughtTurns);
+        ioYields(a, c.yields); a.io(c.foodSurplus); a.io(c.worked); a.io(c.droughtTurns); a.io(c.happy); a.io(c.unhappy); a.io(c.moodWas);
     }
     long long nl = (long long)g.log.size();
     a.num(nl);

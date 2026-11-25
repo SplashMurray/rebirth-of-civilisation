@@ -564,6 +564,7 @@ void GameUI::drawCityBanner(const City& c, int sx, int sy) {
     cv->textA(bx + pw + 6, by + 4, name, sz, rgb(0, 0, 0), AL_LEFT, true, 150);
     cv->text(bx + pw + 5, by + 3, name, sz, rgb(250, 250, 250), AL_LEFT, true);
     int yb = by + bh + 1;
+    if (c.owner == g.player && g.moodOf(c) != MOOD_CONTENT) drawMoodFace(bx + bw + sz / 2 + 6, by + bh / 2, sz / 2 + 1, g.moodOf(c));
     if (c.owner == g.player) {
         double pf = 0;
         if (c.buildKind != BK_NONE) pf = (double)c.prod / std::max(1, g.buildCost(c.owner, c.buildKind, c.buildId));

@@ -185,6 +185,7 @@ void Game::processCiv(int c) {
         processUnitsEndOfTurn(c);
         return;
     }
+    if (c >= FIRST_PRIMATE_CIV) wearinessTurn(c);
     int sci = 0, cult = 0, gold = 0;
     for (auto& ci : cities) {
         if (!ci.alive || ci.owner != c) continue;
@@ -212,6 +213,7 @@ void Game::processCiv(int c) {
 void Game::processCity(City& city) {
     int c = city.owner;
     computeCity(city);
+    reportMood(city);
     if (city.droughtTurns > 0) city.droughtTurns--;
     // growth
     city.food += city.foodSurplus;
@@ -617,8 +619,8 @@ void Game::checkVictory() {
     }
     // culture
     for (int c = FIRST_PRIMATE_CIV; c < (int)civs.size(); c++)
-        if (civs[c].alive && civs[c].policiesAdopted >= (int)g_policies.size()) {
-            win(c, "Cultural", "The " + civs[c].name + " have adopted every tradition. Their songs, stories and art define the new world.");
+        if (civs[c].alive && civs[c].policiesAdopted >= CULTURE_WIN_POLICIES) {
+            win(c, "Cultural", "The " + civs[c].name + " have adopted " + std::to_string(CULTURE_WIN_POLICIES) + " traditions. Their songs, stories and art define the new world.");
             return;
         }
     // time

@@ -217,6 +217,24 @@ int main(int argc, char** argv) {
                 std::fflush(stdout);
             }
         }
+        {
+            int moods[4] = {}, lux = 0, nciv = 0, pop = 0, ncity = 0, wear = 0;
+            for (int c = FIRST_PRIMATE_CIV; c < (int)g.civs.size(); c++) {
+                if (!g.civs[c].alive) continue;
+                nciv++;
+                lux += g.luxuryCount(c);
+                wear += g.civs[c].weariness;
+            }
+            for (auto& ci : g.cities)
+                if (ci.alive && ci.owner >= FIRST_PRIMATE_CIV) {
+                    moods[g.moodOf(ci) + 2]++;
+                    pop += ci.pop;
+                    ncity++;
+                    CHECK(ci.happy >= 0 && ci.unhappy >= 0, "negative mood parts");
+                }
+            std::printf("mood: unrest %d unhappy %d content %d celebrating %d; avg luxuries %.1f, avg city size %.1f, avg weariness %.0f\n", moods[0], moods[1],
+                        moods[2], moods[3], nciv ? (double)lux / nciv : 0, ncity ? (double)pop / ncity : 0, nciv ? (double)wear / nciv : 0);
+        }
         int sailed = 0;
         for (auto& cv : g.civs) sailed += cv.riverSailed;
         std::printf("river: ship-turns on rivers %ld, river tiles sailed %d\n", riverShips, sailed);

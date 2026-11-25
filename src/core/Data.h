@@ -38,7 +38,8 @@ struct TerrainDef {
 
 enum Resource : uint8_t {
     R_NONE, R_FRUIT, R_FISH, R_GAME, R_STONE, R_IRON, R_HORSES, R_OIL, R_SCRAP,
-    R_COPPER, R_TIN, R_COAL, R_URANIUM, R_GOLD, R_WHEAT, R_RICE, R_MAIZE, R_COUNT
+    R_COPPER, R_TIN, R_COAL, R_URANIUM, R_GOLD, R_WHEAT, R_RICE, R_MAIZE,
+    R_HONEY, R_CACAO, R_SPICES, R_GRAPES, R_SALT, R_PEARLS, R_FURS, R_GEMS, R_COUNT
 };
 enum ResourceKind { RK_BONUS = 0, RK_STRATEGIC = 1, RK_LUXURY = 2, RK_CROP = 3 };
 struct ResourceDef {
@@ -116,7 +117,7 @@ struct UnitDef {
 };
 
 // ---------------------------------------------------------------- buildings
-enum class BSpecial { None, Palace, FreeTech, RuinScience, RuinProd, RuinBonus, Victory, CombatBonus, HealBonus, GrowthBonus };
+enum class BSpecial { None, Palace, FreeTech, RuinScience, RuinProd, RuinBonus, Victory, CombatBonus, HealBonus, GrowthBonus, HappyAll };
 
 struct BuildingDef {
     std::string name;
@@ -130,6 +131,7 @@ struct BuildingDef {
     std::string desc;
     int techId = -1;
     std::vector<int> needs;  // strategic resources required to build it
+    int happy = 0;           // happiness in this city
 };
 
 // ---------------------------------------------------------------- techs
@@ -200,7 +202,7 @@ extern const int SPEED_COST[3];
 static const int NUM_ERAS = 9;
 
 // ---------------------------------------------------------------- traditions (policies)
-enum class PolicyEffect { Food, Prod, Sci, Culture, Gold, Combat, RuinBonus, SettlerCost, UnitCost, CityDefense, Borders, Heal, FlatSci, FlatCult };
+enum class PolicyEffect { Food, Prod, Sci, Culture, Gold, Combat, RuinBonus, SettlerCost, UnitCost, CityDefense, Borders, Heal, FlatSci, FlatCult, Happy, Weariness };
 struct PolicyDef {
     std::string name, desc;
     PolicyEffect eff;

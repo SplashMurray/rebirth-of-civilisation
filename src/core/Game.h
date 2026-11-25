@@ -9,7 +9,8 @@
 static const int CIV_HUMANS = 0;   // humanity: alive until the Fall, never playable
 static const int CIV_FERAL = 1;    // feral packs and rogue machines (barbarians)
 static const int FIRST_PRIMATE_CIV = 2;
-static const int PROLOGUE_TURNS = 6;  // the war happens at the end of turn 6 (2034)
+static const int PROLOGUE_TURNS = 6;
+static const int CULTURE_WIN_POLICIES = 16;  // traditions adopted for a Cultural victory (there are more to choose from)  // the war happens at the end of turn 6 (2034)
 static const int MAX_STRANDS = 2;      // evolutionary strands a species may commit to
 
 struct Tile {
@@ -112,6 +113,20 @@ struct City {
     int foodSurplus = 0;
     std::vector<int> worked;
     int droughtTurns = 0;   // drought: -33% food while > 0
+    int happy = 0, unhappy = 0;  // derived: citizens' mood (see Happiness.cpp)
+    int8_t moodWas = 0;     // mood last turn, to report changes
+};
+
+// City moods, from worst to best.
+enum CityMood { MOOD_UNREST = -2, MOOD_UNHAPPY = -1, MOOD_CONTENT = 0, MOOD_CELEBRATING = 1 };
+static const int CONTENT_BASE = 5;  // citizens content with nothing at all
+
+// Where a city's happiness and unhappiness come from.
+struct MoodParts {
+    int luxuries = 0, buildings = 0, wonders = 0, naturals = 0, traditions = 0;  // happiness
+    int crowding = 0, empire = 0, war = 0;                                      // unhappiness
+    int happy() const { return luxuries + buildings + wonders + naturals + traditions; }
+    int unhappy() const { return crowding + empire + war; }
 };
 
 // evolutionary pressure that lingers for a few turns after a disaster
@@ -160,7 +175,9 @@ struct Civ {
     int disastersSuffered = 0, warsDeclared = 0, falloutCleaned = 0, maxBand = 0, shipsSunk = 0;
     int unitsUpgraded = 0, unitsFerried = 0;
     int routesMade = 0, routesPlundered = 0, bestRoad = 0;
-    int naturalsFound = 0, riverSailed = 0;  // natural wonders seen, river tiles sailed
+    int naturalsFound = 0, riverSailed = 0;
+    int weariness = 0;       // war weariness: grows with war and losses, fades in peace
+    int mostCelebrating = 0, mostLuxuries = 0;  // natural wonders seen, river tiles sailed
     int lastDisaster = -100;
     // diplomacy: memories of how others treated us, and treaties
     std::vector<int> grievance;       // wrongs done to us by each civ (decays)
@@ -435,6 +452,15 @@ public:
     bool canEmbark(int c, int x, int y) const;
     bool isCoastal(int x, int y) const;  // next to water
     void aiNaval(Unit& u);
+    // ---- happiness and luxuries (Happiness.cpp)
+    std::vector<int> luxuriesOf(int c) const;   // distinct luxuries you own or are lent
+    int luxuryCount(int c) const { return (int)luxuriesOf(c).size(); }
+    MoodParts moodParts(const City& city) const;
+    int moodOf(const City& city) const;
+    static const char* moodName(int mood);
+    void wearinessTurn(int c);
+    void addWeariness(int c, int amount);
+    void reportMood(City& city);
     // ---- rivers and terrain features (Rivers.cpp)
     std::vector<NaturalSite> naturals;
     int dirTo(int fx, int fy, int tx, int ty) const;           // 0..5, or -1 if not neighbours

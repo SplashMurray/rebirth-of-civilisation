@@ -34,6 +34,7 @@ int Game::aiSiteScore(int c, int x, int y) const {
         int w = (dist(x, y, p.x, p.y) <= 1) ? 3 : 2;
         s += (y0.food * 3 + y0.prod * 2 + y0.gold + y0.sci * 2) * w / 2;
         if (t.res) s += 2;
+        if (t.res && g_resources[t.res].kind == RK_LUXURY && resourceVisible(c, p.x, p.y) && !hasResource(c, t.res)) s += 8;  // a new luxury
         if (t.fallout) s -= 2;
         if (t.ruin && warHappened) s += 3;
         if (t.terrain == T_COAST && dist(x, y, p.x, p.y) == 1) coast = true;
@@ -252,8 +253,20 @@ int Game::aiChoosePolicy(int c) {
             case PolicyEffect::Heal: w = war ? 6 : 1; break;
             case PolicyEffect::FlatSci: w = 1.6 * nc; break;
             case PolicyEffect::FlatCult: w = 1.0 * nc; break;
+            case PolicyEffect::Happy: w = 0; break;
+            case PolicyEffect::Weariness: w = 0; break;
         }
         w *= pol.value / 15.0 + 0.3;
+        if (pol.eff == PolicyEffect::Happy || pol.eff == PolicyEffect::Weariness) {  // what mood is each city in?
+            int sad = 0, tight = 0;
+            for (auto& ci : cities)
+                if (ci.alive && ci.owner == c) {
+                    if (ci.happy - ci.unhappy < 0) sad++;
+                    else if (ci.happy - ci.unhappy <= 1) tight++;
+                }
+            if (pol.eff == PolicyEffect::Happy) w = (2 + 3.0 * sad + 1.5 * tight) * (0.7 + 0.3 * pol.value);
+            else w = civs[c].weariness >= 25 ? 4 + civs[c].weariness / 10.0 : war ? 3 : 0.5;
+        }
         if (w > bestV) { bestV = w; best = p; }
     }
     return best;
@@ -405,6 +418,11 @@ void Game::aiCity(City& city) {
             v += (bd.pct.food * city.yields.food + bd.pct.prod * city.yields.prod + bd.pct.sci * city.yields.sci +
                   bd.pct.cult * city.yields.cult + bd.pct.gold * city.yields.gold) / 30.0;
             v += bd.defense * (atWarAny ? 1.5 : 0.4) * (wantWalls ? 2.5 : 1.0);
+            if (bd.happy || bd.special == BSpecial::HappyAll) {  // contentment matters most where the city is near its limit
+                int spare = city.happy - city.unhappy;
+                double hw = spare < 0 ? 9 : spare <= 1 ? 5 : spare <= 3 ? 2 : 0.6;
+                v += (bd.special == BSpecial::HappyAll ? std::max(1, numCities(c) / 2) : bd.happy) * hw;
+            }
             if (bd.special == BSpecial::RuinScience || bd.special == BSpecial::RuinProd) v += ruinTilesInTerritory(city) * 2.5;
             if (bd.special == BSpecial::FreeTech) v += 10;
             if (bd.wonder) v = v * 0.8 + (city.yields.prod >= 8 ? 4 : -100);

@@ -735,6 +735,13 @@ void Game::computeCity(City& city) {
     if (city.droughtTurns > 0) pct.food -= 33;
     int hb = civs[c].yieldBonusPct;
     pct.food += hb / 2; pct.prod += hb; pct.sci += hb;
+    // the citizens' mood
+    MoodParts mp = moodParts(city);
+    city.happy = mp.happy();
+    city.unhappy = mp.unhappy();
+    int mood = c >= FIRST_PRIMATE_CIV ? moodOf(city) : MOOD_CONTENT;
+    if (mood == MOOD_CELEBRATING) { pct.food += 10; pct.gold += 10; }
+    if (mood == MOOD_UNREST) { pct.prod -= 25; pct.sci -= 25; pct.cult -= 25; pct.gold -= 25; }
     total.food = applyPct(total.food, pct.food);
     total.prod = applyPct(total.prod, pct.prod);
     total.sci = applyPct(total.sci, pct.sci);
@@ -743,6 +750,7 @@ void Game::computeCity(City& city) {
     total.gold = hasGold(c) ? applyPct(total.gold, pct.gold) : 0;
     city.yields = total;
     city.foodSurplus = total.food - 2 * city.pop;
+    if (city.happy <= city.unhappy && c >= FIRST_PRIMATE_CIV && city.foodSurplus > 0) city.foodSurplus = 0;  // a new citizen needs happiness to spare
 }
 
 int Game::cityStrength(const City& city) const {
@@ -1382,6 +1390,7 @@ CombatResult Game::attackImpl(Unit& u, int tx, int ty) {
         if (city->hp <= 0) {
             if (!ranged && !res.attackerDied && u.owner != CIV_FERAL) {
                 res.cityCaptured = true;
+                addWeariness(city->owner, 12);
                 captureCity(*city, u.owner);
                 if (city->alive) { u.x = tx; u.y = ty; }
             } else {
@@ -1430,6 +1439,10 @@ CombatResult Game::attackImpl(Unit& u, int tx, int ty) {
         notify(def->owner, msg, tx, ty);
         int dx = tx, dy = ty;
         if (res.defenderDied && g_units[def->type].naval() && u.owner >= FIRST_PRIMATE_CIV) civs[u.owner].shipsSunk++;
+        if (u.owner >= FIRST_PRIMATE_CIV && def->owner >= FIRST_PRIMATE_CIV) {  // losses wear a people down
+            if (res.defenderDied) addWeariness(def->owner, 3);
+            if (res.attackerDied) addWeariness(u.owner, 3);
+        }
         if (res.defenderDied) killUnit(*def);
         if (res.attackerDied) killUnit(u);
         else if (res.defenderDied && !ranged) {

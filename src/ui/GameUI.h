@@ -201,6 +201,10 @@ private:
     void edgeFade(int sx, int sy, const int* xy, int d, float depth, Color c, int a);
     void drawTerrainRegion(int x0, int x1, int y0, int y1);
     void drawLiveWater(int x0, int x1, int y0, int y1);
+    // ---- happiness
+    Color moodColor(int mood) const;
+    void drawMoodFace(int x, int y, int r, int mood);
+    std::string moodTip(const City& c) const;
     // ---- rivers, lakes, terrain features and natural wonders (UIRivers.cpp)
     void drawRiver(int x, int y, int sx, int sy);
     void drawFeature(int x, int y, int sx, int sy);
