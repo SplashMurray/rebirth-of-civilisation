@@ -566,7 +566,7 @@ void Game::processEvolution(int c) {
 // ============================================================ traditions
 int Game::policyCost(int c) const {
     int n = civs[c].policiesAdopted;
-    return sc(40 + 60 * n + 24 * n * n);
+    return researchCost(40 + 60 * n + 24 * n * n);
 }
 bool Game::canAdopt(int c, int p) const {
     return !civs[c].policies[p] && hasTech(c, g_policies[p].techId) && civs[c].culture >= policyCost(c);
@@ -880,7 +880,8 @@ int Game::buildCost(int c, int kind, int id) const {
         if (d.cls == UnitClass::Settler) pct -= policyPct(c, PolicyEffect::SettlerCost);
         return std::max(5, sc(applyPct(d.cost, pct)));
     }
-    if (kind == BK_BUILDING) return sc(g_buildings[id].cost);
+    if (kind == BK_BUILDING)
+        return g_buildings[id].special == BSpecial::Victory ? researchCost(g_buildings[id].cost) : sc(g_buildings[id].cost);
     return 0;
 }
 
@@ -1066,6 +1067,19 @@ int Game::moveCost(const Unit& u, int fx, int fy, int tx, int ty) const {
     return cost;
 }
 
+Game::OccScope::OccScope(const Game& gm) : g(gm) {
+    if (g.occDepth++ > 0) return;  // already built by an outer search
+    g.occHead.assign(g.W * g.H, -1);
+    g.occNext.assign(g.units.size(), -1);
+    for (int i = (int)g.units.size() - 1; i >= 0; i--) {
+        const Unit& o = g.units[i];
+        if (!o.alive || !g.inMap(o.x, o.y)) continue;
+        int t = g.idx(o.x, o.y);
+        g.occNext[i] = g.occHead[t];
+        g.occHead[t] = i;
+    }
+}
+
 bool Game::canEnter(const Unit& u, int x, int y) const {
     if (const City* c = cityAt(x, y)) {
         if (c->owner != u.owner) return false;
@@ -1074,18 +1088,19 @@ bool Game::canEnter(const Unit& u, int x, int y) const {
     auto layer = [](const UnitDef& d) { return d.civilian() ? 0 : d.naval() ? 2 : 1; };
     int mine = layer(g_units[u.type]);
     bool boarding = !g_units[u.type].naval() && isWater(x, y) && transportAt(u.owner, x, y, u.id);
-    for (auto& o : units) {
-        if (!o.alive || o.x != x || o.y != y || o.id == u.id) continue;
-        if (o.owner == u.owner && (o.carrier >= 0 || boarding)) continue;
-        if (o.owner != u.owner) return false;
-        if (layer(g_units[o.type]) == mine) return false;
-    }
-    return true;
+    bool ok = true;
+    forUnitsAt(x, y, [&](const Unit& o) {
+        if (!ok || o.id == u.id) return;
+        if (o.owner == u.owner && (o.carrier >= 0 || boarding)) return;
+        if (o.owner != u.owner || layer(g_units[o.type]) == mine) ok = false;
+    });
+    return ok;
 }
 
 std::vector<Pt> Game::findPath(const Unit& u, int tx, int ty, bool ignoreUnits) const {
     std::vector<Pt> path;
     if (!inMap(tx, ty) || (tx == u.x && ty == u.y)) return path;
+    OccScope occ(*this);
     int N = W * H;
     std::vector<int> g(N, 1 << 29), from(N, -1);
     std::vector<uint8_t> closed(N, 0);
@@ -1115,8 +1130,7 @@ std::vector<Pt> Game::findPath(const Unit& u, int tx, int ty, bool ignoreUnits) 
             if (!ignoreUnits && !canEnter(u, nb[k].x, nb[k].y)) {
                 // allow walking through own friendly units except final tile
                 bool friendlyOnly = true;
-                for (auto& o : units)
-                    if (o.alive && o.x == nb[k].x && o.y == nb[k].y && o.owner != u.owner) friendlyOnly = false;
+                forUnitsAt(nb[k].x, nb[k].y, [&](const Unit& o) { if (o.owner != u.owner) friendlyOnly = false; });
                 const City* cc = cityAt(nb[k].x, nb[k].y);
                 if (cc && cc->owner != u.owner) friendlyOnly = false;
                 if (!friendlyOnly || ni == goal) continue;

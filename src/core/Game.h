@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "Data.h"
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -239,7 +240,11 @@ public:
     int maxTurns = 500;
     int sc(int v) const { return (int)((long long)v * costPct / 100); }
     int dur(int turns) const { return turns * speedPct / 100; }
-    int techCost(int t) const { return sc(g_techs[t].cost); }
+    // Bigger maps give each species more room and bigger empires, so (as in Civilization) research,
+    // traditions and the Rebirth Project cost more on them. Derived from the map size, not saved.
+    int mapCostPct() const { static const int P[] = {100, 130, 170}; return P[std::clamp(settings.mapSize, 0, 2)]; }
+    int researchCost(int v) const { return (int)((long long)sc(v) * mapCostPct() / 100); }
+    int techCost(int t) const { return researchCost(g_techs[t].cost); }
     int traitCost(int t, int k) const { return sc(g_traits[t].cost[k]); }
     int statWars = 0, statCaptures = 0, statRazes = 0, statNukes = 0;  // diagnostics only (not saved)
 
@@ -377,6 +382,22 @@ public:
     int maxMoves(const Unit& u) const;
     int moveCost(const Unit& u, int fx, int fy, int tx, int ty) const;  // -1 impassable
     bool canEnter(const Unit& u, int x, int y) const;
+    // A tile -> units index, built for the length of a path search (units cannot move meanwhile), so
+    // canEnter and transportAt need not scan every unit for every tile the search looks at.
+    mutable std::vector<int> occHead, occNext;
+    mutable int occDepth = 0;
+    struct OccScope {
+        const Game& g;
+        explicit OccScope(const Game& gm);
+        ~OccScope() { g.occDepth--; }
+    };
+    template <class F> void forUnitsAt(int x, int y, F f) const {
+        if (occDepth > 0) {
+            for (int i = occHead[idx(x, y)]; i >= 0; i = occNext[i]) f(units[i]);
+        } else {
+            for (auto& o : units) if (o.alive && o.x == x && o.y == y) f(o);
+        }
+    }
     bool canEmbark(int c, int x, int y) const;
     bool isCoastal(int x, int y) const;  // next to water
     void aiNaval(Unit& u);

@@ -269,11 +269,12 @@ void GameUI::renderSetup() {
         "only start wars they can win, gather armies with siege engines before attacking, and make peace when losing.",
         "Expert: as Hard, but sharper - bigger empires, tighter decisions, opportunistic wars and a determined race to Rebirth.\n"
         "No difficulty gives the computer free yields or units: it simply plays better."};
+    static const char* SIZE_TIPS[] = {"Small: 60 x 38 hexes, 4 species", "Standard: 74 x 46 hexes, 6 species", "Large: 84 x 54 hexes, 8 species"};
     int beginX = W - 260 - gx + 20, rowW = std::min(600, beginX - 16 - (gx + 110));
     int s3 = rowW / 3, s4 = rowW / 4;  // button pitch for 3 and 4 choices
     cv->text(gx, oy + 8, "Map size:", 16, C_TEXT, AL_LEFT, true);
     for (int i = 0; i < 3; i++)
-        button(gx + 110 + i * s3, oy, s3 - 10, 34, sizes[i], true, [this, i] { setupSize = i; }, "",
+        button(gx + 110 + i * s3, oy, s3 - 10, 34, sizes[i], true, [this, i] { setupSize = i; }, SIZE_TIPS[i],
                setupSize == i ? rgb(110, 90, 40) : C_PANEL2, 14);
     cv->text(gx, oy + 52, "Difficulty:", 16, C_TEXT, AL_LEFT, true);
     for (int i = 0; i < 4; i++)
@@ -748,16 +749,28 @@ void GameUI::renderMinimap() {
     cv->fillRoundRectGrad(mmX - 6, mmY - 6, mmW + 12, mmH + 12, 8, rgb(150, 124, 76), rgb(70, 54, 32));  // bronze frame
     cv->fillRect(mmX - 2, mmY - 2, mmW + 4, mmH + 4, rgb(10, 12, 16));
     int pw = std::max(1, (int)std::ceil(sc)), ph = std::max(1, (int)std::ceil(sc));
-    for (int y = 0; y < g.H; y++)
+    // each row is drawn as runs of one colour, so big maps stay cheap to draw every frame
+    for (int y = 0; y < g.H; y++) {
+        int runStart = -1;
+        Color runC{0, 0, 0};
+        auto flush = [&](int xEnd) {
+            if (runStart < 0) return;
+            int x0 = mmX + (int)((runStart + 0.5 * (y & 1)) * sc), x1 = mmX + (int)((xEnd - 1 + 0.5 * (y & 1)) * sc) + pw;
+            cv->fillRect(x0, mmY + (int)(y * sc), x1 - x0, ph, runC);
+            runStart = -1;
+        };
         for (int x = 0; x < g.W; x++) {
             int i = g.idx(x, y);
-            if (!me.explored[i]) continue;
+            if (!me.explored[i]) { flush(x); continue; }
             const Tile& t = g.tiles[i];
             Color c = t.owner >= 0 ? civColor(t.owner) : t.mountain ? rgb(120, 116, 110) : g_terrain[t.terrain].color;
             if (t.owner < 0 && t.fallout) c = blend(c, rgb(150, 168, 40), 0.4f);
             if (!me.visible[i]) c = darken(c, 0.6f);
-            cv->fillRect(mmX + (int)((x + 0.5 * (y & 1)) * sc), mmY + (int)(y * sc), pw, ph, c);
+            if (runStart >= 0 && (c.r != runC.r || c.g != runC.g || c.b != runC.b)) flush(x);
+            if (runStart < 0) { runStart = x; runC = c; }
         }
+        flush(g.W);
+    }
     for (auto& c : g.cities)
         if (c.alive && me.explored[g.idx(c.x, c.y)])
             cv->fillRect(mmX + (int)((c.x + 0.5 * (c.y & 1)) * sc) - 1, mmY + (int)(c.y * sc) - 1, 4, 4, rgb(255, 255, 255));

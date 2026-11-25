@@ -110,13 +110,15 @@ int Game::cargoSpace(const Unit& ship) const {
 }
 
 const Unit* Game::transportAt(int c, int x, int y, int exclude) const {
-    for (auto& s : units) {
-        if (!s.alive || s.owner != c || s.x != x || s.y != y || !g_units[s.type].naval() || g_units[s.type].cargo <= 0) continue;
+    const Unit* found = nullptr;
+    forUnitsAt(x, y, [&](const Unit& s) {
+        if (found || s.owner != c || !g_units[s.type].naval() || g_units[s.type].cargo <= 0) return;
         int n = 0;
-        for (auto& o : units) if (o.alive && o.carrier == s.id && o.id != exclude) n++;
-        if (n < g_units[s.type].cargo) return &s;
-    }
-    return nullptr;
+        if (occDepth > 0) forUnitsAt(x, y, [&](const Unit& o) { if (o.carrier == s.id && o.id != exclude) n++; });  // cargo rides on its ship's tile
+        else for (auto& o : units) if (o.alive && o.carrier == s.id && o.id != exclude) n++;
+        if (n < g_units[s.type].cargo) found = &s;
+    });
+    return found;
 }
 
 bool Game::boardShip(Unit& u) {

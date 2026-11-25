@@ -314,7 +314,7 @@ void Game::newGame(const GameSettings& s) {
     costPct = SPEED_COST[settings.speed];
     maxTurns = SPEED_TURNS[settings.speed];
     rng.seed(s.seed * 2654435761ull + 12345);
-    static const int SW[] = {44, 56, 70}, SH[] = {28, 36, 44}, NCIV[] = {4, 6, 8};
+    static const int SW[] = {60, 74, 84}, SH[] = {38, 46, 54}, NCIV[] = {4, 6, 8};  // about 570 tiles per species, like Civilization VI
     W = SW[s.mapSize];
     H = SH[s.mapSize];
     int nPrim = NCIV[s.mapSize];
