@@ -8,6 +8,7 @@ using UC = UnitClass;
 std::vector<TerrainDef> g_terrain;
 std::vector<ResourceDef> g_resources;
 std::vector<ImprovementDef> g_improvements;
+std::vector<RoadDef> g_roads;
 std::vector<RuinDef> g_ruins;
 std::vector<UnitDef> g_units;
 std::vector<BuildingDef> g_buildings;
@@ -110,6 +111,15 @@ void initData() {
         {"Maize", "Mz", 1, 0, 0, "", rgb(248, 190, 40), RK_CROP, "Farm: +2 Food"},
     };
 
+    // name, tech, Gatherer turns, movement cost (in MP), trade bonus % per road tile
+    g_roads = {
+        {"", "", 0, MP, 0},
+        {"Worn Track", "", 2, 8, 10},
+        {"Dirt Road", "Bartering", 3, 6, 20},
+        {"Cobblestone Road", "Construction", 4, 4, 32},
+        {"Paved Road", "Industrialisation", 4, 3, 45},
+        {"Tarmac Road", "Combustion", 5, 2, 60},
+    };
     g_improvements = {
         {"", 0, 0, 0, "", 0},
         {"Farm", 1, 0, 0, "Cultivation", 5},
@@ -202,6 +212,7 @@ void initData() {
     }
     for (auto& r : g_resources) r.revealTechId = needTech(r.revealTech);
     for (auto& im : g_improvements) im.techId = needTech(im.tech);
+    for (auto& r : g_roads) r.techId = needTech(r.tech);
     for (int i = 0; i < RUIN_TIERS; i++) g_ruinTierTech[i] = needTech(RUIN_TIER_TECH[i]);
 
     // ------------------------------------------------------------ primates
@@ -365,6 +376,9 @@ void initData() {
         {"Salvaged Battleship", "BB", 420, 50, 68, 3, 5, "Motorised Warfare", UC::Naval, "", -1,
          "The humans' greatest warship, restored. Its guns reach 3 tiles inland. Needs Oil."},
         {"Exo-Primates", "EP", 520, 90, 0, 0, 3, "Genetics", UC::Melee, "", -1, "Soldiers in powered exoskeletons."},
+        {"Caravan", "Cv", 50, 0, 0, 0, 2, "Currency", UC::Trader, "", -1,
+         "Sets up a trade route from the city it stands in to another city - yours or another species' - for 30 turns (more at slower speeds), then comes home. "
+         "Earns gold and science abroad, food and production at home. Roads make routes richer. Walks through closed borders, but embargoes and wars end its routes."},
         // hostile wildlife and leftovers of humanity (never buildable, primate == -2)
         {"Feral Dogs", "FD", 0, 7, 0, 0, 2, "", UC::Melee, "", -2, "Packs of former pets, gone wild."},
         {"Mutant Hounds", "MH", 0, 20, 0, 0, 3, "", UC::Melee, "", -2, "Radiation has made them huge."},
@@ -531,6 +545,9 @@ void initData() {
     ID.tCultivation = techIndex("Cultivation");
     ID.tForaging = techIndex("Foraging");
     ID.tLaw = techIndex("Tribal Law");
+    ID.tBanking = techIndex("Banking");
+    ID.tBartering = techIndex("Bartering");
+    ID.uCaravan = unitIndex("Caravan");
     ID.tDigging = techIndex("Digging");
     ID.tWoodcraft = techIndex("Woodcraft");
     ID.tIndustrial = techIndex("Industrialisation");

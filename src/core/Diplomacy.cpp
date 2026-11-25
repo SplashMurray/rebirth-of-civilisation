@@ -88,6 +88,7 @@ void Game::setEmbargo(int a, int b, bool on) {
             if (((ag.a == a && ag.b == b) || (ag.a == b && ag.b == a)) &&
                 (ag.kind == AG_RESOURCE || ag.kind == AG_GOLD_PER_TURN || ag.kind == AG_RESEARCH))
                 ag.until = turn;
+        cancelRoutesBetween(a, b, "the " + civs[a].name + " imposed an embargo on the " + civs[b].name);  // and the caravans turn back
         markResourcesDirty();
     } else {
         civs[b].goodwill[a] += 5;
@@ -141,7 +142,9 @@ int Game::opinion(int c, int o, std::vector<std::pair<std::string, int>>* why) c
     int trades = 0;
     for (auto& ag : agreements)
         if ((ag.kind == AG_RESOURCE || ag.kind == AG_GOLD_PER_TURN) && ag.until > turn && ((ag.a == c && ag.b == o) || (ag.a == o && ag.b == c))) trades++;
-    if (trades) add("Trading partners", std::min(9, trades * 3) * (pd && pd->name == "Capuchin" ? 2 : 1));
+    for (auto& r : routes)  // caravans between us
+        if (r.to >= 0 && r.to < (int)cities.size() && ((r.owner == c && cities[r.to].owner == o) || (r.owner == o && cities[r.to].owner == c))) trades++;
+    if (trades) add("Trading partners", std::min(12, trades * 3) * (pd && pd->name == "Capuchin" ? 2 : 1));
     bool common = false, hitsFriends = false;
     for (int x = FIRST_PRIMATE_CIV; x < (int)civs.size(); x++) {
         if (x == c || x == o || !civs[x].alive) continue;

@@ -361,6 +361,10 @@ void Game::aiCity(City& city) {
     else if (threat > 0 && !garrison) { kind = BK_UNIT; id = bestMilitary(false); }
     else if (mil < milWant) { kind = BK_UNIT; id = bestMilitary(mil % 3 == 2); }
     else if (workers < workWant && city.pop >= 2) { kind = BK_UNIT; id = uniqueFor(c, ID.uGatherer); }
+    else if (city.pop >= 3 && canBuild(city, BK_UNIT, uniqueFor(c, ID.uCaravan)) && rng.chance(sk == 0 ? 0.35 : sk == 1 ? 0.55 : 0.75)) {
+        kind = BK_UNIT;  // a caravan for a free trade route
+        id = uniqueFor(c, ID.uCaravan);
+    }
     else if (myCities + settlers < targetCities && settlers < settlerSlots && city.pop >= 2 && turn < dur(260) && canBuild(city, BK_UNIT, ID.uElder)) { kind = BK_UNIT; id = ID.uElder; }
     else if (isCoastal(city.x, city.y) && aiNeedsTransport(city) >= 0) {
         kind = BK_UNIT;
@@ -423,6 +427,10 @@ void Game::aiUnit(Unit& uref) {
     }
     if (d.naval()) {
         aiNaval(U());
+        return;
+    }
+    if (d.cls == UnitClass::Trader && U().carrier < 0 && U().ferryX < 0) {
+        aiTrader(U());
         return;
     }
     // crossing the water: keep going while the goal still makes sense
@@ -604,6 +612,32 @@ void Game::aiUnit(Unit& uref) {
                 if (!o.empty()) startBuild(U(), pickImp(o));
             }
             return;
+        }
+        // nothing to improve: build roads linking our cities and along our trade routes
+        {
+            const std::vector<uint8_t>& want = aiRoadWant(c);
+            if (want[idx(U().x, U().y)] && roadOption(U()) >= 0) { startBuild(U(), IMP_ROAD); return; }
+            int bd = 99, rx = -1, ry = -1;
+            for (int i = 0; i < W * H; i++) {
+                if (!want[i]) continue;
+                int x = i % W, y = i / W, dd = dist(U().x, U().y, x, y);
+                if (dd >= bd || dd > 12) continue;
+                Unit probe = U();
+                probe.x = x; probe.y = y;
+                if (roadOption(probe) < 0) continue;
+                bool taken = false;
+                for (auto& e : units)
+                    if (e.alive && e.id != uid && e.owner == c && g_units[e.type].civilian() &&
+                        ((e.x == x && e.y == y) || (e.order == ORD_GOTO && e.gx == x && e.gy == y))) { taken = true; break; }
+                if (taken) continue;
+                bd = dd; rx = x; ry = y;
+            }
+            if (rx >= 0) {
+                U().order = ORD_GOTO; U().gx = rx; U().gy = ry;
+                continueGoto(U());
+                if (U().alive && U().x == rx && U().y == ry && U().moves > 0 && roadOption(U()) >= 0) startBuild(U(), IMP_ROAD);
+                return;
+            }
         }
         U().order = ORD_SKIP;
         return;
@@ -918,4 +952,29 @@ bool Game::aiArmyUnit(Unit& uref) {
     if (capture || (U().hp - taken >= (sk >= 3 ? 30 : 20) && T.hp < cityMaxHP(T) * 3 / 4)) attack(U(), T.x, T.y);
     else U().order = ORD_FORTIFY;
     return true;
+}
+
+// Tiles civ c would like roads on: the way from each of its cities to the nearest other one, and its
+// overland trade routes. Worked out once a turn.
+const std::vector<uint8_t>& Game::aiRoadWant(int c) const {
+    if (roadWant.size() != civs.size()) {
+        roadWant.assign(civs.size(), {});
+        roadWantTurn.assign(civs.size(), -1);
+    }
+    std::vector<uint8_t>& w = roadWant[c];
+    if (roadWantTurn[c] == turn && (int)w.size() == W * H) return w;
+    roadWantTurn[c] = turn;
+    w.assign(W * H, 0);
+    for (auto& a : cities) {
+        if (!a.alive || a.owner != c) continue;
+        int best = -1, bd = 13;
+        for (auto& b : cities)
+            if (b.alive && b.owner == c && b.id != a.id && dist(a.x, a.y, b.x, b.y) < bd) { bd = dist(a.x, a.y, b.x, b.y); best = b.id; }
+        if (best < 0) continue;
+        for (int ti : tradePath(c, a.id, best, false)) w[ti] = 1;
+    }
+    for (auto& r : routes)
+        if (r.owner == c && !r.sea)
+            for (int ti : r.path) w[ti] = 1;
+    return w;
 }

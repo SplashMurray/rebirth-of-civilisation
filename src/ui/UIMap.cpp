@@ -223,6 +223,7 @@ void GameUI::drawTile(int x, int y, int sx, int sy, bool visible) {
             }
         }
     }
+    drawRoads(x, y, sx, sy);
     // relief
     if (t.mountain) {
         bool coldPeak = t.terrain == T_SNOW || t.terrain == T_TUNDRA;
@@ -621,6 +622,12 @@ void GameUI::drawUnitIcon(int type, int cx, int cy, int s, Color ic, Color accen
             poly({-0.7, 0.6, -0.7, -0.05, 0.0, -0.7, 0.7, -0.05, 0.7, 0.6}, ic);
             poly({-0.18, 0.6, -0.18, 0.1, 0.18, 0.1, 0.18, 0.6}, accent);
             break;
+        case UnitClass::Trader:  // a laden pack animal: a bundle tied over a back, with a coin
+            poly({-0.75, 0.1, -0.55, -0.45, 0.55, -0.45, 0.75, 0.1, 0.4, 0.3, -0.4, 0.3}, ic);
+            L(-0.55, 0.3, -0.6, 0.85, lw); L(0.5, 0.3, 0.55, 0.85, lw);
+            L(0.0, -0.45, 0.0, 0.3, std::max(1, lw / 2));
+            circ(0.55, -0.62, 0.22, accent);
+            break;
         case UnitClass::Worker:  // a hammer
             L(-0.55, 0.65, 0.25, -0.15, lw + 1);
             poly({0.0, -0.55, 0.35, -0.9, 0.75, -0.5, 0.4, -0.15}, ic);
@@ -784,7 +791,7 @@ void GameUI::drawPathPreview() {
 }
 
 static const Color MAP_BG = {8, 10, 14};
-static const uint64_t TERRAIN_STYLE = 2;  // bump to invalidate cached terrain when its drawing changes
+static const uint64_t TERRAIN_STYLE = 3;  // bump to invalidate cached terrain when its drawing changes
 
 // Draws the terrain of a block of tiles in the current coordinate system: ground, then what stands on it,
 // then fog of war, the soft edge of the unexplored world, and borders.
@@ -935,7 +942,8 @@ void GameUI::renderMap() {
                         const Tile& t = g.tiles[i];
                         mix((uint64_t)me.explored[i] | (uint64_t)me.visible[i] << 1 | (uint64_t)t.veg << 2 | (uint64_t)t.imp << 4 |
                             (uint64_t)t.fallout << 8 | (uint64_t)(uint8_t)t.owner << 12 | (uint64_t)t.res << 20 | (uint64_t)t.ruinDone << 28 |
-                            (uint64_t)t.terrain << 36 | (uint64_t)t.hills << 40 | (uint64_t)t.mountain << 41);
+                            (uint64_t)t.terrain << 36 | (uint64_t)t.hills << 40 | (uint64_t)t.mountain << 41 | (uint64_t)t.road << 42 |
+                            (uint64_t)(t.city >= 0 && g.cities[t.city].x == x && g.cities[t.city].y == y) << 46);
                     }
                 uint64_t id = ((uint64_t)(uint32_t)ci << 32) | (uint32_t)cj;
                 int px = (int)(ci * CH - camPX), py = (int)(cj * CH - camPY);
@@ -952,6 +960,7 @@ void GameUI::renderMap() {
         drawTerrainRegion(x0, x1, y0, y1);
     }
     drawLiveWater(x0, x1, y0, y1);
+    drawTradeRoutes();
     // selected band: what it can forage, and how picked-over the land around it is
     if (overlay == OV_NONE && sel() && g_units[sel()->type].cls == UnitClass::Band && sel()->owner == g.player) {
         const Unit& b = *sel();
@@ -1089,6 +1098,118 @@ void GameUI::renderMap() {
         for (int k = 0; k < 6; k++) cv->line(xy[k * 2], xy[k * 2 + 1], xy[(k + 1) % 6 * 2], xy[(k + 1) % 6 * 2 + 1], rgb(255, 255, 255), 1);
     }
     drawPathPreview();
+}
+
+// ============================================================ roads and trade routes
+// Each road tile draws half of every link to a neighbouring road tile; the two halves meet on the edge.
+void GameUI::drawRoads(int x, int y, int sx, int sy) {
+    Game& g = *game;
+    int here = g.roadLevelAt(x, y);
+    if (here <= 0 || hs < 10) return;
+    bool city = g.cityAt(x, y) != nullptr;
+    int links = 0;
+    for (int d = 0; d < 6; d++) {
+        Pt n;
+        if (!g.neighborDir(x, y, d, n) || g.isWater(n.x, n.y)) continue;
+        int lv = std::min(here, g.roadLevelAt(n.x, n.y));
+        if (lv <= 0) continue;
+        if (city && g.cityAt(n.x, n.y) && g.at(n.x, n.y).road == 0) continue;  // two cities side by side need a real road
+        if (city && g.at(n.x, n.y).road == 0) continue;
+        links++;
+        int nx, ny;
+        tileCenter(n.x, n.y, nx, ny);
+        int mx = (sx + nx) / 2, my = (sy + ny) / 2;
+        int w = lv == ROAD_TRACK ? std::max(2, hs / 9) : lv == ROAD_DIRT ? std::max(3, hs / 7) : std::max(3, hs / 6);
+        switch (lv) {
+            case ROAD_TRACK:  // a trail of trodden earth
+                cv->lineA(sx, sy, mx, my, rgb(120, 92, 58), w + 1, 110);
+                cv->lineA(sx, sy, mx, my, rgb(176, 146, 100), std::max(1, w - 1), 170);
+                break;
+            case ROAD_DIRT:
+                cv->lineA(sx, sy, mx, my, rgb(96, 70, 44), w + 2, 150);
+                cv->lineA(sx, sy, mx, my, rgb(170, 134, 88), w, 235);
+                break;
+            case ROAD_COBBLE:
+                cv->lineA(sx, sy, mx, my, rgb(70, 66, 60), w + 2, 200);
+                cv->lineA(sx, sy, mx, my, rgb(160, 154, 142), w, 255);
+                if (hs >= 26)
+                    for (int k = 1; k < 4; k++) {
+                        double a = k / 4.0;
+                        cv->fillCircle(sx + (int)((mx - sx) * a), sy + (int)((my - sy) * a), std::max(1, w / 3), rgb(118, 112, 104));
+                    }
+                break;
+            case ROAD_PAVED:
+                cv->lineA(sx, sy, mx, my, rgb(190, 186, 178), w + 2, 230);
+                cv->lineA(sx, sy, mx, my, rgb(112, 112, 116), w, 255);
+                break;
+            default:  // tarmac with a dashed centre line
+                cv->lineA(sx, sy, mx, my, rgb(30, 30, 34), w + 2, 230);
+                cv->lineA(sx, sy, mx, my, rgb(58, 60, 66), w, 255);
+                if (hs >= 22) cv->lineA(sx + (mx - sx) / 5, sy + (my - sy) / 5, sx + (mx - sx) * 3 / 5, sy + (my - sy) * 3 / 5, rgb(236, 206, 90), 1, 230);
+                break;
+        }
+    }
+    if (!links && !city) cv->fillCircle(sx, sy, std::max(2, hs / 10), here == ROAD_TRACK ? rgb(150, 120, 80) : rgb(150, 136, 110));
+}
+
+// Trade routes you run or receive, with caravans and cargo boats travelling along them.
+void GameUI::drawTradeRoutes() {
+    Game& g = *game;
+    const Civ& me = g.civs[g.player];
+    double t = animMs / 1000.0;
+    for (size_t ri = 0; ri < g.routes.size(); ri++) {
+        const TradeRoute& r = g.routes[ri];
+        bool mine = r.owner == g.player, toMe = r.to >= 0 && g.cities[r.to].owner == g.player;
+        if (!mine && !toMe) continue;
+        int n = std::min<int>((int)r.path.size(), 128);
+        if (n < 2) continue;
+        int xy[256];
+        bool seen = false;
+        for (int i = 0; i < n; i++) {
+            int ti = r.path[i];
+            tileCenter(ti % g.W, ti / g.W, xy[i * 2], xy[i * 2 + 1]);
+            if (me.explored[ti]) seen = true;
+        }
+        if (!seen) continue;
+        Color c = r.sea ? rgb(150, 210, 255) : rgb(250, 206, 110);
+        cv->polylineA(xy, n, rgb(0, 0, 0), 3, 50);
+        cv->polylineA(xy, n, c, 1, mine ? 170 : 100);
+        // the caravan going back and forth along the way
+        double speed = 1.2;  // tiles a second
+        double len = n - 1;
+        double p = std::fmod(t * speed + ri * 3.7, len * 2);
+        if (p > len) p = len * 2 - p;
+        int k = std::min(n - 2, (int)p);
+        double f = p - k;
+        int cx = xy[k * 2] + (int)((xy[k * 2 + 2] - xy[k * 2]) * f), cy = xy[k * 2 + 1] + (int)((xy[k * 2 + 3] - xy[k * 2 + 1]) * f);
+        int ti = r.path[std::min(n - 1, (int)std::lround(p))];
+        if (!me.visible[ti] || hs < 14) continue;
+        int s2 = std::max(4, hs / 6);
+        cv->glowEllipse(cx + 1, cy + s2, s2 * 3 / 2, s2 / 2, rgb(0, 0, 0), 110);
+        if (r.sea) {  // a little cargo boat
+            int hull[8] = {cx - s2 * 3 / 2, cy, cx + s2 * 3 / 2, cy, cx + s2, cy + s2 * 2 / 3, cx - s2, cy + s2 * 2 / 3};
+            cv->fillPoly(hull, 4, rgb(120, 84, 50));
+            int sail[6] = {cx, cy - s2 * 3 / 2, cx + s2, cy - 1, cx, cy - 1};
+            cv->fillPoly(sail, 3, rgb(240, 236, 220));
+            cv->line(cx, cy, cx, cy - s2 * 3 / 2, rgb(80, 60, 40), 1);
+        } else {  // a pack animal under its load
+            cv->fillEllipseA(cx, cy - s2 / 3, s2, s2 * 2 / 3, rgb(130, 96, 60), 255);
+            cv->fillCircle(cx + s2, cy - s2 * 2 / 3, s2 / 2, rgb(120, 88, 56));
+            cv->fillRect(cx - s2 * 2 / 3, cy - s2, s2 * 4 / 3, s2 * 2 / 3, civColor(r.owner));
+            for (int l = -1; l <= 1; l += 2) cv->line(cx + l * s2 / 2, cy, cx + l * s2 / 2, cy + s2 * 2 / 3, rgb(90, 64, 40), std::max(1, s2 / 4));
+        }
+    }
+    // the route the caravan screen is pointing at
+    if (overlay == OV_ROUTES && routeHover >= 0 && routeHover < (int)routeOpts.size()) {
+        const RouteOption& o = routeOpts[routeHover];
+        int n = std::min<int>((int)o.path.size(), 128);
+        if (n >= 2) {
+            int xy[256];
+            for (int i = 0; i < n; i++) tileCenter(o.path[i] % g.W, o.path[i] / g.W, xy[i * 2], xy[i * 2 + 1]);
+            cv->polylineA(xy, n, rgb(0, 0, 0), 7, 120);
+            cv->polylineA(xy, n, o.sea ? rgb(150, 210, 255) : rgb(255, 220, 120), 4, 255);
+        }
+    }
 }
 
 // ============================================================ motion and combat effects

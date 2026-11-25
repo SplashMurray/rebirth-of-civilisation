@@ -337,6 +337,7 @@ void GameUI::renderGame() {
         case OV_POLICY: renderPolicies(); break;
         case OV_DIPLO: renderDiplomacy(); break;
         case OV_TRADE: renderTrade(); break;
+        case OV_ROUTES: renderRoutes(); break;
         case OV_MENU: renderMenu(); break;
         case OV_HELP: renderHelp(); break;
         case OV_LOG: renderLog(); break;
@@ -440,6 +441,14 @@ void GameUI::renderTopBar() {
         item("Gold " + std::to_string(me.gold) + " (" + fmtPct(me.goldPerTurn) + ")", C_GOLD, "Gold in the treasury (per turn). Spend it to buy units and buildings in your cities.");
     else
         item(compact ? "Gold ?" : "Gold: unknown", rgb(130, 120, 90), "Your people do not yet understand money. Research Currency to unlock Gold income.");
+    if (g.tradeCapacity(g.player) > 0) {
+        int used = g.tradeUsed(g.player), cap = g.tradeCapacity(g.player);
+        item((compact ? "Trade " : "Trade routes ") + std::to_string(g.routesOf(g.player)) + "/" + std::to_string(cap), used < cap ? rgb(240, 200, 110) : rgb(200, 180, 140),
+             tradeTip(), [this] {
+                 for (auto& u : game->units)
+                     if (u.alive && u.owner == game->player && g_units[u.type].cls == UnitClass::Trader) { selectUnit(u.id, true); return; }
+             });
+    }
     int pc = g.policyCost(g.player);
     bool can = false;
     for (size_t p = 0; p < g_policies.size(); p++) if (g.canAdopt(g.player, (int)p)) can = true;
@@ -543,7 +552,14 @@ void GameUI::renderTileInfo() {
     if (t.veg == V_JUNGLE) terr += ", Jungle";
     if (g.resourceVisible(g.player, hoverX, hoverY)) terr += ", " + g_resources[t.res].name;
     if (t.imp) terr += ", " + g_improvements[t.imp].name;
+    if (t.road) terr += ", " + g_roads[t.road].name;
     lines.push_back({terr, C_TEXT});
+    for (auto& r : g.routes) {  // trade routes through here
+        if (r.owner != g.player && (r.to < 0 || g.cities[r.to].owner != g.player)) continue;
+        if (std::find(r.path.begin(), r.path.end(), g.idx(hoverX, hoverY)) == r.path.end()) continue;
+        lines.push_back({"Trade route: " + g.cities[r.from].name + " - " + g.cities[r.to].name + " (" + std::to_string(std::max(0, r.until - g.turn)) + " turns left)",
+                         rgb(240, 200, 110)});
+    }
     if (!t.mountain) lines.push_back({yieldsStr(g.tileYields(g.player, hoverX, hoverY)), C_DIM});
     if (g.resourceVisible(g.player, hoverX, hoverY)) {
         const ResourceDef& rd = g_resources[t.res];
@@ -623,7 +639,9 @@ void GameUI::renderUnitPanel() {
         int forage = g.bandForage(u);
         stats = "Band of " + std::to_string(u.band) + "   Forage " + std::to_string(forage) + " food, eats " + std::to_string(u.band) +
                 " (" + (forage - u.band >= 0 ? "+" : "") + std::to_string(forage - u.band) + ")";
-    } else stats = d.cls == UnitClass::Settler ? "Founds settlements" : "Builds improvements, excavates ruins";
+    } else if (d.cls == UnitClass::Trader) {
+        stats = "Trade routes in use " + std::to_string(g.routesOf(u.owner)) + " of " + std::to_string(g.tradeCapacity(u.owner));
+    } else stats = d.cls == UnitClass::Settler ? "Founds settlements" : "Builds improvements, roads; excavates ruins";
     if (d.naval() && d.cargo > 0) {
         std::string aboard;
         for (auto& o : g.units) if (o.alive && o.carrier == u.id) aboard += std::string(aboard.empty() ? "" : ", ") + g_units[o.type].name;
@@ -632,7 +650,7 @@ void GameUI::renderUnitPanel() {
     }
     if (u.carrier >= 0 && u.carrier < (int)g.units.size()) stats += "   Aboard " + g_units[g.units[u.carrier].type].name;
     cv->text(px + 62, py + 36, stats, 13, C_DIM);
-    cv->text(px + 62, py + 54, "Moves " + std::to_string(u.moves) + "/" + std::to_string(g.maxMoves(u)) + "    HP " + std::to_string(u.hp) + "    " +
+    cv->text(px + 62, py + 54, "Moves " + fmtMoves(u.moves) + "/" + fmtMoves(g.maxMoves(u)) + "    HP " + std::to_string(u.hp) + "    " +
              orderName(u.order) + (u.order == ORD_BUILD || u.order == ORD_EXCAVATE || u.order == ORD_DECON ? " (" + std::to_string(u.work) + " turns)" : ""),
              13, u.moves > 0 ? C_TEXT : C_DIM);
     bar(px + 62, py + 72, 200, 5, u.hp / 100.0, u.hp > 50 ? rgb(90, 210, 90) : C_RED);
@@ -687,7 +705,25 @@ void GameUI::renderUnitPanel() {
             }
             acts.push_back({"Excavate", false, nullptr, need.empty() ? "Nothing left to salvage here" : "Research " + need + " to salvage more from these ruins"});
         }
+        int ro = g.roadOption(u);
+        if (ro > 0) {
+            const RoadDef& rd = g_roads[ro];
+            acts.push_back({"Build " + rd.name, u.moves > 0, [this, uid] { game->startBuild(game->units[uid], IMP_ROAD); afterUnitAction(); },
+                            rd.name + " (" + std::to_string(g.workTurns(u, rd.turns)) + " turns): moving along it costs " + fmtMoves(rd.cost) +
+                                (ro == ROAD_TRACK ? " or two-thirds of the usual," : "") + " of a move between road tiles, and trade routes over it earn +" +
+                                std::to_string(rd.tradePct) + "%."});
+        } else if (g.at(u.x, u.y).road > 0 && g.at(u.x, u.y).road + 1 < ROAD_LEVELS && g.at(u.x, u.y).owner == u.owner) {
+            const RoadDef& nx = g_roads[g.at(u.x, u.y).road + 1];
+            acts.push_back({"Build " + nx.name, false, nullptr, "Research " + nx.tech + " to upgrade this road"});
+        }
         if (g.canDecon(u)) acts.push_back({"Decontaminate (X)", u.moves > 0, [this] { unitCommand('X'); }, "Reduce fallout on this tile by one level"});
+    }
+    if (d.cls == UnitClass::Trader) {
+        const City* here = g.cityAt(u.x, u.y);
+        bool inCity = here && here->owner == u.owner;
+        acts.push_back({"Trade Route...", inCity && u.moves > 0, [this, uid] { openRoutes(uid); },
+                        inCity ? "Choose a city for a caravan from " + here->name + " to trade with"
+                               : "Move the caravan into one of your cities: its routes start from the city it stands in"});
     }
     if (d.military()) {
         int to = g.upgradeTarget(u);
@@ -889,6 +925,15 @@ void GameUI::renderCity() {
     if (c.droughtTurns > 0) {
         cv->text(px + 16, y - 4, "DROUGHT: -33% Food for " + std::to_string(c.droughtTurns) + " more turns", 13, rgb(240, 160, 80), AL_LEFT, true);
         y += 16;
+    }
+    {
+        Yields ty = g.cityTradeYields(c);
+        int n = 0;
+        for (auto& r : g.routes) if ((r.from == c.id && r.owner == c.owner) || (r.to == c.id && r.owner != c.owner)) n++;
+        if (n > 0) {
+            cv->text(px + 16, y - 4, "Trade: " + std::to_string(n) + (n == 1 ? " route" :  " routes") + " bring " + tradeYieldStr(ty) + " a turn", 13, rgb(240, 200, 110), AL_LEFT, true);
+            y += 16;
+        }
     }
     // current production
     cv->fillRect(px + 10, y, pw - 20, 64, rgb(32, 38, 50));
@@ -1679,6 +1724,18 @@ void GameUI::renderHelp() {
         "borders to them in a deal (each side opens its own). With Tribal Law you can also embargo a civilisation from the Diplomacy screen: "
         "no gold, resources or research pacts pass between you until you lift it. Making peace brings a treaty that forbids "
         "war for a while. Breaking a friendship by war is a betrayal everyone remembers. Rivals send you proposals - and demands - of their own.\n"
+        "TRADE  With Currency your cities can train Caravans. Move one into a city of yours and choose Trade Route: it sets off for a city "
+        "of yours or of another species you have met - overland up to 15 tiles, or by sea between coastal cities (Rafts along the coast, "
+        "Navigation across the ocean). A route lasts 30 turns (longer at slower speeds), then the caravan comes home to be sent out again. Foreign routes earn gold (and "
+        "science if they know things you don't) and give them a share; routes between your own cities bring food and production. Roads along "
+        "the way make a route richer, the sea pays a bonus too, and trading partners like each other more. The number of routes is limited: one "
+        "with Currency, one more each with Navigation, Banking, Industrialisation and Computing, and one for every two Markets. "
+        "Caravans may cross closed borders. An embargo or a war ends every route between the two sides at once, and an enemy army or warship "
+        "standing on a route plunders it.\n"
+        "ROADS  Caravans wear a Worn Track along their routes. Gatherers build roads on your land or unclaimed land and upgrade them a level at a "
+        "time: Worn Track, Dirt Road (Bartering), Cobblestone Road (Construction), Paved Road (Industrialisation) and Tarmac Road (Combustion). "
+        "Moving between two road tiles costs two-thirds of the usual on a track, then a half, a third, a quarter and a sixth of a move. "
+        "Cities count as roads. Roads serve everyone - including invaders.\n"
         "NAVAL WARFARE  Coastal cities build ships: Dugout Canoes (Rafts), War Galleys (Bronze Working, needs Copper) and Archer Galleys "
         "(Archery) keep to coastal waters; Caravels (Navigation), Frigates (Gunpowder), Ironclads (Steam Power, Coal), Salvaged Destroyers "
         "(Combustion, Oil) and Salvaged Battleships (Motorised Warfare, Oil) cross the ocean. Ships move on water and dock in your own "
@@ -2127,6 +2184,7 @@ void GameUI::wheel(int x, int y, int delta) {
         else if (overlay == OV_LOG) logScroll -= delta * 3;
         else if (overlay == OV_HELP) helpScroll -= delta * 60;
         else if (overlay == OV_ACHIEVEMENTS) achScroll -= delta * 60;
+        else if (overlay == OV_ROUTES) routeScroll -= delta;
         else listScroll -= delta * 60;
         return;
     }

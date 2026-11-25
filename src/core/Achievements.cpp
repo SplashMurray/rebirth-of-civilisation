@@ -28,6 +28,9 @@ const std::vector<AchievementDef> g_achievements = {
     {"WONDERFUL", "Wonderful", "Complete a wonder.", "Civilisation"},
     {"WONDERS_OF_THE_NEW_WORLD", "Wonders of the New World", "Own 5 wonders at once.", "Civilisation"},
     {"OLD_WAYS", "The Old Ways", "Adopt 8 traditions.", "Civilisation"},
+    {"SILK_ROAD", "Silk Road", "Run 5 trade routes at once.", "Civilisation"},
+    {"ALL_ROADS", "All Roads Lead Home", "Build a Tarmac Road.", "Civilisation"},
+    {"HIGHWAY_ROBBERY", "Highway Robbery", "Plunder an enemy trade route.", "War"},
     // war
     {"GONE_BANANAS", "Gone Bananas", "Declare war.", "War"},
     {"SPOILS_OF_WAR", "Spoils of War", "Capture or raze a city.", "War"},
@@ -146,6 +149,9 @@ std::vector<std::string> checkAchievements(const Game& g, AchievementStore& st) 
     give("WONDERFUL", wonders >= 1);
     give("WONDERS_OF_THE_NEW_WORLD", wonders >= 5);
     give("OLD_WAYS", cv.policiesAdopted >= 8);
+    give("SILK_ROAD", g.routesOf(p) >= 5);
+    give("ALL_ROADS", cv.bestRoad >= ROAD_TARMAC);
+    give("HIGHWAY_ROBBERY", cv.routesPlundered > 0);
     give("GONE_BANANAS", cv.warsDeclared > 0);
     give("SPOILS_OF_WAR", cv.citiesCaptured > 0);
     give("WARLORD", cv.citiesCaptured >= 10);

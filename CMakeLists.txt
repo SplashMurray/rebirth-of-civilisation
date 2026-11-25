@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(RebirthOfCivilisation VERSION 0.9.0 LANGUAGES CXX)
+project(RebirthOfCivilisation VERSION 0.10.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -26,11 +26,13 @@ add_library(rebirth_game STATIC
   src/core/Naval.cpp
   src/core/Transport.cpp
   src/core/Diplomacy.cpp
+  src/core/Trade.cpp
   src/core/Achievements.cpp
   src/core/Save.cpp
   src/ui/GameUI.cpp
   src/ui/UIMap.cpp
   src/ui/UIArt.cpp
+  src/ui/UITrade.cpp
 )
 target_include_directories(rebirth_game PUBLIC src)
 if(MSVC)

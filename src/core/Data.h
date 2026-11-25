@@ -40,6 +40,20 @@ struct ImprovementDef {
     int techId = -1;
 };
 
+// Roads, from a path worn by caravans to modern tarmac. Gatherers build and upgrade them one level at a time.
+enum RoadLevel : uint8_t { ROAD_NONE, ROAD_TRACK, ROAD_DIRT, ROAD_COBBLE, ROAD_PAVED, ROAD_TARMAC, ROAD_LEVELS };
+struct RoadDef {
+    std::string name;
+    std::string tech;  // needed to build this level ("" = anyone)
+    int turns;         // Gatherer work to reach this level
+    int cost;          // movement cost along it, in movement points (MP per move)
+    int tradePct;      // trade route bonus per tile of this road
+    int techId = -1;
+};
+extern std::vector<RoadDef> g_roads;
+const int IMP_ROAD = 100;  // a Gatherer's build order for the next road level
+const int MP = 12;         // movement points per move: roads cost fractions of a move
+
 // Remnants of humanity. Before the Fall they are living human structures.
 enum RuinType : uint8_t { RUIN_NONE, RUIN_CITY, RUIN_TOWN, RUIN_MILITARY, RUIN_LAB, RUIN_POWER, RUIN_COUNT };
 struct RuinDef {
@@ -55,7 +69,7 @@ extern const char* RUIN_TIER_NAME[RUIN_TIERS];
 extern int g_ruinTierTech[RUIN_TIERS];
 
 // ---------------------------------------------------------------- units
-enum class UnitClass { Settler, Worker, Recon, Melee, Ranged, Mounted, Siege, Armor, Band, Nuke, Naval };
+enum class UnitClass { Settler, Worker, Recon, Melee, Ranged, Mounted, Siege, Armor, Band, Nuke, Naval, Trader };
 
 struct UnitDef {
     std::string name, abbr;
@@ -71,7 +85,7 @@ struct UnitDef {
     bool ocean = false;      // ships: can leave the coast for the open ocean
     int cargo = 0;           // ships: land units it can carry
     int upgradeId = -1;      // the next unit in this unit's line (base units only)
-    bool civilian() const { return cls == UnitClass::Settler || cls == UnitClass::Worker || cls == UnitClass::Band; }
+    bool civilian() const { return cls == UnitClass::Settler || cls == UnitClass::Worker || cls == UnitClass::Band || cls == UnitClass::Trader; }
     bool military() const { return !civilian() && cls != UnitClass::Nuke; }
     bool ranged() const { return rstr > 0; }
     bool naval() const { return cls == UnitClass::Naval; }
@@ -228,11 +242,11 @@ std::string needsText(const std::vector<int>& needs);
 
 // commonly referenced ids (filled by initData)
 struct DataIds {
-    int uElder, uGatherer, uScout, uWarband, uTinkerer, uBand, uNuke;
+    int uElder, uGatherer, uScout, uWarband, uTinkerer, uBand, uNuke, uCaravan;
     int bPalace, bRebirth;
     int tCurrency, tRafts, tNavigation, tRadiology, tSalvaging, tDeciphering, tReverse, tComputing, tRebirth;
     int tCooking;
-    int tForaging, tFission, tLaw;
+    int tForaging, tFission, tLaw, tBanking, tBartering;
     int tCultivation, tDigging, tWoodcraft, tIndustrial, tChemistry;
 };
 extern DataIds ID;

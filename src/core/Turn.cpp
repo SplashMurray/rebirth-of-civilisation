@@ -58,6 +58,7 @@ void Game::declareWar(int a, int b) {
             if (b == player) notify(player, "The " + civs[a].name + " have betrayed your friendship!");
         }
         endAgreements(a, b);
+        cancelRoutesBetween(a, b, "war broke out between the " + civs[a].name + " and the " + civs[b].name);
     }
     if (b == player) popup(b, POP_WAR, "War!", civs[a].leader + " of the " + civs[a].name + " has declared war on you!");
     if (a == player) notify(a, "You declared war on the " + civs[b].name + ".");
@@ -156,6 +157,7 @@ void Game::endTurn() {
     for (int c = FIRST_PRIMATE_CIV; c < (int)civs.size(); c++)
         if (civs[c].alive && !civs[c].player) aiTurn(c);
     feralTurn();
+    tradeTurn();
     regrowForage();
     for (int c = 0; c < (int)civs.size(); c++)
         if (civs[c].alive && !civs[c].humans) processCiv(c);
@@ -359,7 +361,14 @@ void Game::processUnitsEndOfTurn(int c) {
         if (u.order == ORD_BUILD || u.order == ORD_DECON) {
             if (--u.work <= 0) {
                 Tile& t = at(u.x, u.y);
-                if (u.order == ORD_BUILD) {
+                if (u.order == ORD_BUILD && u.buildImp == IMP_ROAD) {
+                    int next = roadOption(u);
+                    if (next > 0) {
+                        t.road = (uint8_t)next;
+                        civs[c].bestRoad = std::max(civs[c].bestRoad, next);
+                        if (c == player) notify(c, g_roads[next].name + " completed.", u.x, u.y);
+                    }
+                } else if (u.order == ORD_BUILD) {
                     t.imp = (uint8_t)u.buildImp;
                     if (t.imp == IMP_FARM && t.veg == V_JUNGLE) t.veg = V_NONE;
                     notify(c, g_improvements[u.buildImp].name + " completed.", u.x, u.y);

@@ -26,6 +26,27 @@ struct Tile {
     int16_t site = -1;      // index into Game::sites
     uint8_t fallout = 0;    // 0..3
     uint8_t foraged = 0;    // 0..3: how picked-over the land is by roaming bands
+    uint8_t road = 0;       // RoadLevel
+};
+
+// A caravan's trade route: from one of the owner's cities to another city, for a set number of turns.
+struct TradeRoute {
+    int owner = -1, from = -1, to = -1;  // civ, origin city, destination city
+    int start = 0, until = 0;            // turns
+    bool sea = false;
+    std::vector<int> path;               // tile indices from origin to destination
+};
+
+// One possible destination for a caravan, with what the route would earn.
+struct RouteOption {
+    int city = -1;
+    bool sea = false;
+    bool ok = false;
+    std::string why;      // why not, when !ok
+    int length = 0;       // tiles
+    int roadPct = 0;      // bonus from roads (or the sea)
+    Yields origin, dest;  // per turn, before city modifiers
+    std::vector<int> path;
 };
 
 struct HumanSite {
@@ -127,6 +148,7 @@ struct Civ {
     int nukesLaunched = 0, timesNuked = 0, citiesCaptured = 0, citiesLost = 0, bandSplits = 0;
     int disastersSuffered = 0, warsDeclared = 0, falloutCleaned = 0, maxBand = 0, shipsSunk = 0;
     int unitsUpgraded = 0, unitsFerried = 0;
+    int routesMade = 0, routesPlundered = 0, bestRoad = 0;
     int lastDisaster = -100;
     // diplomacy: memories of how others treated us, and treaties
     std::vector<int> grievance;       // wrongs done to us by each civ (decays)
@@ -403,6 +425,28 @@ public:
     void aiNaval(Unit& u);
     // ---- diplomacy (Diplomacy.cpp)
     std::vector<Agreement> agreements;
+    // ---- trade and roads (Trade.cpp)
+    std::vector<TradeRoute> routes;
+    int roadLevelAt(int x, int y) const;               // cities count as roads
+    int bestRoad(int c) const;                         // the best road level civ c can build
+    int roadOption(const Unit& u) const;               // next road level a Gatherer could build here, or -1
+    int tradeCapacity(int c) const;                    // trade routes (and caravans) civ c may have
+    int tradeUsed(int c) const;                        // active routes plus caravans in the field
+    int routesOf(int c) const;
+    std::vector<RouteOption> tradeOptions(const Unit& u) const;
+    RouteOption routeOption(int c, int from, int to, bool sea) const;
+    bool establishRoute(Unit& u, int toCity, bool sea);
+    Yields routeYields(const TradeRoute& r, bool forOrigin) const;
+    Yields cityTradeYields(const City& city) const;   // all routes starting or ending here
+    bool routeValid(const TradeRoute& r, std::string* why = nullptr) const;
+    void endRoute(size_t i, bool comeHome, const std::string& why);
+    void tradeTurn();
+    void cancelRoutesBetween(int a, int b, const std::string& why);
+    void aiTrader(Unit& u);
+    std::vector<int> tradePath(int c, int from, int to, bool sea) const;
+    const std::vector<uint8_t>& aiRoadWant(int c) const;
+    mutable std::vector<std::vector<uint8_t>> roadWant;  // AI: road plans per civ (cache, not saved)
+    mutable std::vector<int> roadWantTurn;
     std::vector<Deal> offers;        // AI proposals waiting for the player's answer (not saved)
     int opinion(int c, int o, std::vector<std::pair<std::string, int>>* why = nullptr) const;  // c's view of o
     int attitude(int c, int o) const;  // -2 hostile, -1 unfriendly, 0 neutral, 1 friendly, 2 close

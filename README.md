@@ -137,8 +137,25 @@
   | Japanese Macaque | Hierarchist | Respects the powerful, looks down on the weak |
 
   Each civilisation's **opinion** of you is built from visible reasons - personality, fellow apes/monkeys, shared borders, wars, remembered wrongs, gifts, treaties, common enemies, warmongering, nuclear weapons, betrayals - and shown line by line on the Diplomacy screen, from Hostile to Close friends. The **trade screen** lets you bundle gold, gold per turn, resources (a shared strategic or luxury resource counts as the receiver's own for 30 turns), **open borders**, **research pacts** (+15% science each), **declarations of friendship**, **defensive pacts** (an attack on one brings in the other) and declarations of war on third parties; it shows live whether they would accept, and *What would it take?* adds the gold they want. **Borders** are open to everyone until a civilisation discovers **Tribal Law**; from then on they are closed by default, and in peacetime other armies may only enter if it opens its borders to them in a deal (each side opens its own, so it can be one-way). Tribal Law also lets you impose an **embargo**: no gold, gold per turn, resources or research pacts can pass between you and the embargoed civilisation, existing ones end at once, and they will resent it - until you lift it. Making peace brings a **peace treaty** forbidding war for a while; declaring war on a sworn friend is a **betrayal** everyone remembers. You can **denounce** rivals. The AI signs treaties with each other, denounces those it despises, avoids attacking friends, and sends you proposals - peace offers, pacts, resource swaps, requests to join its wars and, from strong aggressive neighbours, demands for tribute.
+* **Trade caravans.** With *Currency* your cities train **Caravans**. Move one into one of your cities and choose *Trade Route*: a list shows every city within reach - yours or another species' you have met - with what the route would earn, and the way it would go is drawn on the map. Caravans travel **overland** (up to 15 tiles) or **by sea** between coastal cities (along the coast with *Rafts*, across the ocean with *Navigation*). A route lasts 30 turns on Quick speed (45 on Standard, 68 on Epic), then the caravan comes home to be sent out again; you can watch caravans and cargo boats travelling along your routes.
+  * Routes to **other species** earn gold for your city - more for big, distant cities - plus science if they know things you don't, and give their city a third as much gold. Routes between **your own cities** bring food and production. Trading partners like each other more (the Capuchins especially).
+  * **Roads** along the way make a route richer (up to +60% on tarmac); the sea pays +25% (+40% with Navigation).
+  * You can run one route with Currency, one more each with Navigation, Banking, Industrialisation and Computing, and one for every two Markets.
+  * Caravans are civilians: they may cross **closed borders**, but enemies at war with you can kill them in the field. An **embargo** or a **war** ends every route between the two sides at once (the caravans turn back home) and no new ones can start; an enemy army or warship standing on a route **plunders** it for gold.
+  * The AI trains caravans, picks the most profitable routes (and prefers friends) and builds roads along them.
+* **Roads.** Caravans wear a **Worn Track** along their routes. Gatherers build roads on your land or unclaimed land and upgrade them one level at a time:
+
+  | Road | Needs | Gatherer turns | Move between road tiles | Trade bonus |
+  |---|---|---|---|---|
+  | Worn Track | - | 2 | two-thirds of the usual cost | +10% |
+  | Dirt Road | Bartering | 3 | 1/2 move | +20% |
+  | Cobblestone Road | Construction | 4 | 1/3 move | +32% |
+  | Paved Road | Industrialisation | 4 | 1/4 move | +45% |
+  | Tarmac Road | Combustion | 5 | 1/6 move | +60% |
+
+  Cities count as roads. Roads serve everyone - including invading armies. The AI links its cities with roads and upgrades them as it learns.
 * **Nuclear weapons, again.** *Nuclear Fission* lets a city build a **Nuclear Warhead** (needs Uranium). Warheads wait in your silos; click the warhead count on the top bar, pick any tile within 12 of one of your cities and confirm. Everything next to the blast is destroyed, cities are wrecked and lose buildings, fallout spreads, your victims declare war and others who know you may join them. Hard and Expert rivals will use them too - rarely.
-* **Achievements** - 40 of them, from *Spark of Genius* (discover Fire) to *Full Troop* (win with every primate), including the essential **Here We Go Again** for detonating a nuclear weapon. They belong to your profile rather than a saved game (`%APPDATA%\RebirthOfCivilisation\achievements.ini`), pop up as you earn them, and are listed under *Achievements* on the title screen and in the menu. Each has a stable API name (e.g. `HERE_WE_GO_AGAIN`) so a future Steam build can map them straight onto Steam achievements. Games where every civilisation is AI-controlled earn nothing.
+* **Achievements** - 43 of them, from *Spark of Genius* (discover Fire) to *Full Troop* (win with every primate), including the essential **Here We Go Again** for detonating a nuclear weapon. They belong to your profile rather than a saved game (`%APPDATA%\RebirthOfCivilisation\achievements.ini`), pop up as you earn them, and are listed under *Achievements* on the title screen and in the menu. Each has a stable API name (e.g. `HERE_WE_GO_AGAIN`) so a future Steam build can map them straight onto Steam achievements. Games where every civilisation is AI-controlled earn nothing.
 * **Difficulty means a smarter AI, not a cheating one.** Unlike *Civilization*, no level gives the computer extra yields, units or settlers - every species plays by the same rules as you. Difficulty sets how well the rivals play:
 
   | Level | How the rivals play |
@@ -219,6 +236,7 @@
 | ![Here We Go Again](docs/screenshots/18_here_we_go_again.png) | ![Achievements](docs/screenshots/17_achievements.png) |
 | ![A fleet in harbour](docs/screenshots/19_naval.png) | ![Diplomacy](docs/screenshots/20_diplomacy.png) |
 | ![Negotiating a deal](docs/screenshots/21_trade.png) | ![Combat effects](docs/screenshots/22_combat.png) |
+| ![Caravans and trade routes](docs/screenshots/24_trade_routes.png) | ![Roads](docs/screenshots/25_roads.png) |
 | ![Start](docs/screenshots/04_start_map.png) | ![The Fall](docs/screenshots/07_fall_popup.png) |
 | ![A drought](docs/screenshots/11c_disaster.png) | ![Late game](docs/screenshots/16_lategame.png) |
 | ![Excavating ruins](docs/screenshots/09_unit_panel.png) | ![Tech tree](docs/screenshots/10_tech_tree.png) |
@@ -266,6 +284,7 @@ src/core/        Rules engine - no platform code
   Naval.cpp        naval AI (ship rules live in Game.cpp: moveCost, canEnter, canAttack)
   Transport.cpp    unit upgrades, ships carrying land units, AI ferrying
   Diplomacy.cpp    opinions, treaties, deals and AI diplomacy
+  Trade.cpp        caravans, trade routes, roads
   Achievements.cpp achievement list, unlock checks and the profile file
   AI.cpp           computer opponents
   Save.cpp         save games
@@ -273,6 +292,7 @@ src/ui/          User interface, drawn through the small Canvas interface
   GameUI.cpp       screens, panels, popups, input
   UIMap.cpp        hex map rendering, unit motion and combat effects
   UIArt.cpp        primate portraits, the title scene, mushroom clouds
+  UITrade.cpp      the caravan's route chooser
 src/platform/win32/main_win32.cpp   Windows window, input and GDI+ renderer
 tests/           AI simulation tests, screenshot renderer, random-input stress test
 res/             Icon and Windows resources

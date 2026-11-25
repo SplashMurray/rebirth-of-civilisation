@@ -30,7 +30,7 @@ public:
 
     // ---- used by tests / screenshot tool
     enum Screen { SCR_TITLE, SCR_SETUP, SCR_GAME };
-    enum Overlay { OV_NONE, OV_CITY, OV_TECH, OV_POLICY, OV_DIPLO, OV_MENU, OV_HELP, OV_LOG, OV_EVO, OV_ACHIEVEMENTS, OV_TRADE };
+    enum Overlay { OV_NONE, OV_CITY, OV_TECH, OV_POLICY, OV_DIPLO, OV_MENU, OV_HELP, OV_LOG, OV_EVO, OV_ACHIEVEMENTS, OV_TRADE, OV_ROUTES };
     Screen screen = SCR_TITLE;
     Overlay overlay = OV_NONE;
     std::unique_ptr<Game> game;
@@ -101,6 +101,16 @@ private:
     void drawTrophy(int x, int y, int s, bool lit);
     void renderNukeTargeting();
     void renderBlast();
+    // ---- caravans: the route chooser, roads and routes on the map
+    int routeUnit = -1, routeHover = -1, routeScroll = 0;
+    std::vector<RouteOption> routeOpts;
+    void openRoutes(int unitId);
+    void renderRoutes();
+    void drawRoads(int x, int y, int sx, int sy);
+    void drawTradeRoutes();
+    std::string fmtMoves(int m) const;
+    std::string tradeTip() const;
+    std::string tradeYieldStr(const Yields& y) const;
     void skipNuke();
     // ---- unit motion and combat effects (interface only, never saved)
     struct Glide { int fx, fy, tx, ty, start, dur; };

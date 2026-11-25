@@ -5,7 +5,7 @@
 #include <sstream>
 
 namespace {
-const int SAVE_VERSION = 15;
+const int SAVE_VERSION = 16;
 
 struct Archive {
     bool writing;
@@ -106,7 +106,7 @@ void ioGame(Archive& a, Game& g) {
     if (!a.writing) g.tiles.assign((size_t)std::max(0LL, nt), Tile());
     for (auto& t : g.tiles) {
         a.io(t.terrain); a.io(t.veg); a.io(t.hills); a.io(t.mountain); a.io(t.res); a.io(t.imp);
-        a.io(t.owner); a.io(t.city); a.io(t.ruin); a.io(t.ruinDone); a.io(t.site); a.io(t.fallout); a.io(t.foraged);
+        a.io(t.owner); a.io(t.city); a.io(t.ruin); a.io(t.ruinDone); a.io(t.site); a.io(t.fallout); a.io(t.foraged); a.io(t.road);
     }
     long long ns = (long long)g.sites.size();
     a.num(ns);
@@ -130,6 +130,7 @@ void ioGame(Archive& a, Game& g) {
         a.io(c.grievance); a.io(c.goodwill); a.io(c.peaceUntil); a.io(c.denouncedUntil); a.io(c.lastOffer); a.io(c.embargo); a.io(c.dealsMade); a.io(c.backstabs);
         a.io(c.warheads); a.io(c.nukesLaunched); a.io(c.timesNuked); a.io(c.citiesCaptured); a.io(c.citiesLost); a.io(c.bandSplits);
         a.io(c.disastersSuffered); a.io(c.warsDeclared); a.io(c.falloutCleaned); a.io(c.maxBand); a.io(c.shipsSunk); a.io(c.unitsUpgraded); a.io(c.unitsFerried);
+        a.io(c.routesMade); a.io(c.routesPlundered); a.io(c.bestRoad);
     }
     long long nu = (long long)g.units.size();
     a.num(nu);
@@ -153,6 +154,10 @@ void ioGame(Archive& a, Game& g) {
     if (!a.writing) g.log.assign((size_t)std::max(0LL, nl), Notification());
     for (auto& n : g.log) { a.io(n.turn); a.io(n.text); a.io(n.x); a.io(n.y); }
     a.io(g.agreements);
+    long long nr = (long long)g.routes.size();
+    a.num(nr);
+    if (!a.writing) g.routes.assign((size_t)std::max(0LL, nr), TradeRoute());
+    for (auto& r : g.routes) { a.io(r.owner); a.io(r.from); a.io(r.to); a.io(r.start); a.io(r.until); a.io(r.sea); a.io(r.path); }
     if (!a.writing) g.offers.clear();
 }
 }  // namespace

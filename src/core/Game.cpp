@@ -680,6 +680,7 @@ void Game::computeCity(City& city) {
     total.sci += 1 + city.pop * 2 / 3;
     total.cult += 1;
     if (hasGold(c)) total.gold += city.pop / 3;
+    total += cityTradeYields(city);  // caravans
     Yields pct;
     int ruins = -1;
     for (size_t b = 0; b < g_buildings.size(); b++) {
@@ -853,6 +854,12 @@ bool Game::canBuild(const City& city, int kind, int id) const {
         if (!hasNeeds(c, g_units[id].needs)) return false;
         if (g_units[id].cls == UnitClass::Settler && city.pop < 2) return false;
         if (g_units[id].naval() && !isCoastal(city.x, city.y)) return false;
+        if (g_units[id].cls == UnitClass::Trader) {  // only as many caravans as trade routes allowed
+            int busy = tradeUsed(c);
+            for (auto& oc : cities)
+                if (oc.alive && oc.owner == c && oc.id != city.id && oc.buildKind == BK_UNIT && oc.buildId >= 0 && g_units[oc.buildId].cls == UnitClass::Trader) busy++;
+            if (busy >= tradeCapacity(c)) return false;
+        }
         return true;
     }
     if (kind == BK_BUILDING) {
@@ -1026,11 +1033,11 @@ std::vector<Unit*> Game::unitsAt(int x, int y) {
 }
 
 int Game::maxMoves(const Unit& u) const {
-    if (inMap(u.x, u.y) && isWater(u.x, u.y) && !g_units[u.type].naval()) return hasTech(u.owner, ID.tNavigation) ? 3 : 2;
+    if (inMap(u.x, u.y) && isWater(u.x, u.y) && !g_units[u.type].naval()) return (hasTech(u.owner, ID.tNavigation) ? 3 : 2) * MP;
     int m = g_units[u.type].moves;
     const PrimateDef* pd = primate(u.owner);
     if (pd && g_units[u.type].military()) m += pd->extraMoves;
-    return m;
+    return m * MP;
 }
 
 bool Game::canEmbark(int c, int x, int y) const {
@@ -1043,9 +1050,9 @@ int Game::moveCost(const Unit& u, int fx, int fy, int tx, int ty) const {
     const Tile& t = at(tx, ty);
     const UnitDef& ud = g_units[u.type];
     if (ud.naval()) {  // ships: water, or into one of our own coastal cities
-        if (isWater(tx, ty)) return t.terrain == T_OCEAN && !ud.ocean ? -1 : 1;
+        if (isWater(tx, ty)) return t.terrain == T_OCEAN && !ud.ocean ? -1 : MP;
         const City* ci = cityAt(tx, ty);
-        return ci && ci->owner == u.owner ? 1 : -1;
+        return ci && ci->owner == u.owner ? MP : -1;
     }
     if (t.mountain) return -1;
     if (!warHappened && t.site >= 0) return -1;  // living human settlements are off limits
@@ -1054,16 +1061,21 @@ int Game::moveCost(const Unit& u, int fx, int fy, int tx, int ty) const {
         !civs[u.owner].war[t.owner] && !bordersOpenTo(t.owner, u.owner) && at(fx, fy).owner != t.owner)
         return -1;
     bool toWater = isWater(tx, ty), fromWater = isWater(fx, fy);
-    if (toWater && ud.cls != UnitClass::Nuke && transportAt(u.owner, tx, ty, u.id)) return 1;  // going aboard one of our ships
+    if (toWater && ud.cls != UnitClass::Nuke && transportAt(u.owner, tx, ty, u.id)) return MP;  // going aboard one of our ships
     if (toWater && !canEmbark(u.owner, tx, ty)) return -1;
     if (toWater != fromWater) return 99;  // embark/disembark uses all movement
-    if (toWater) return 1;
+    if (toWater) return MP;
     int cost = 1;
     if (t.hills) cost++;
     if (t.veg != V_NONE) {
         const PrimateDef* pd = primate(u.owner);
         if (!(pd && pd->forestWalker)) cost++;
     }
+    cost *= MP;
+    // a road joining both tiles speeds the way: a worn track halves rough going, real roads ignore the terrain
+    int road = std::min(roadLevelAt(fx, fy), roadLevelAt(tx, ty));
+    if (road == ROAD_TRACK) cost = std::max(g_roads[ROAD_TRACK].cost, cost * 2 / 3);
+    else if (road > ROAD_TRACK) cost = std::min(cost, g_roads[road].cost);
     return cost;
 }
 
@@ -1107,9 +1119,9 @@ std::vector<Pt> Game::findPath(const Unit& u, int tx, int ty, bool ignoreUnits) 
     typedef std::pair<int, int> QE;
     std::priority_queue<QE, std::vector<QE>, std::greater<QE>> pq;
     int s = idx(u.x, u.y), goal = idx(tx, ty);
-    int mm = std::max(1, g_units[u.type].moves);
+    int mm = std::max(1, g_units[u.type].moves) * MP;
     g[s] = 0;
-    pq.push({dist(u.x, u.y, tx, ty), s});
+    pq.push({dist(u.x, u.y, tx, ty) * (MP / 2), s});
     int expanded = 0;
     while (!pq.empty()) {
         int cur = pq.top().second;
@@ -1117,7 +1129,7 @@ std::vector<Pt> Game::findPath(const Unit& u, int tx, int ty, bool ignoreUnits) 
         if (closed[cur]) continue;
         closed[cur] = 1;
         if (cur == goal) break;
-        if (++expanded > 6000) break;
+        if (++expanded > 9000) break;
         int cx = cur % W, cy = cur / W;
         Pt nb[6];
         int n = neighbors(cx, cy, nb);
@@ -1140,7 +1152,7 @@ std::vector<Pt> Game::findPath(const Unit& u, int tx, int ty, bool ignoreUnits) 
             if (ng < g[ni]) {
                 g[ni] = ng;
                 from[ni] = cur;
-                pq.push({ng + dist(nb[k].x, nb[k].y, tx, ty), ni});
+                pq.push({ng + dist(nb[k].x, nb[k].y, tx, ty) * (MP / 2), ni});  // a road-aware guess of the cost still to go
             }
         }
     }
@@ -1210,7 +1222,7 @@ bool Game::stepUnit(Unit& u, int nx, int ny) {
 void Game::continueGoto(Unit& u) {
     if (u.order != ORD_GOTO) return;
     int guard = 0;
-    while (u.moves > 0 && guard++ < 20) {
+    while (u.moves > 0 && guard++ < 40) {
         if (u.x == u.gx && u.y == u.gy) { u.order = ORD_NONE; return; }
         std::vector<Pt> p = findPath(u, u.gx, u.gy);
         if (p.empty()) { u.order = ORD_NONE; return; }
@@ -1397,7 +1409,7 @@ CombatResult Game::attackImpl(Unit& u, int tx, int ty) {
             // advance into the tile (capturing any civilian)
             u.attacked = true;
             int keep = u.moves;
-            u.moves = 1;
+            u.moves = MP;
             Unit tmp = u;
             if (moveCost(tmp, u.x, u.y, dx, dy) >= 0) stepUnit(u, dx, dy);
             u.moves = keep;
@@ -1472,7 +1484,12 @@ int Game::workTurns(const Unit& u, int base) const {
 void Game::startBuild(Unit& u, int imp) {
     u.order = ORD_BUILD;
     u.buildImp = imp;
-    u.work = workTurns(u, g_improvements[imp].turns);
+    if (imp == IMP_ROAD) {
+        int next = roadOption(u);
+        u.work = workTurns(u, g_roads[std::max(1, next)].turns);
+    } else {
+        u.work = workTurns(u, g_improvements[imp].turns);
+    }
     u.moves = 0;
 }
 void Game::startExcavate(Unit& u) {
