@@ -1,6 +1,9 @@
 // Rebirth of Civilisation - new game setup and world generation
 // SPDX-License-Identifier: MIT
 #include "Game.h"
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
 
 namespace {
 struct Noise {
@@ -206,52 +209,95 @@ void Game::placeHumanity() {
     }
 }
 
+// Starting spots: good land, away from the human cities, and as far from each other as the map allows,
+// so that no species finds a rival settling on its doorstep before it can settle itself.
 std::vector<Pt> Game::chooseStarts(int count) {
-    std::vector<Pt> starts;
-    int minD = (int)(std::sqrt((double)W * H / count) * 0.75);
-    for (int ci = 0; ci < count; ci++) {
-        int civIdx = FIRST_PRIMATE_CIV + ci;
-        const PrimateDef& pd = g_primates[civs[civIdx].primate];
-        Pt best = {-1, -1};
-        for (int relax = 0; relax < 8 && best.x < 0; relax++) {
-            int bestScore = -1;
-            int dStarts = std::max(4, minD - relax * 2);
-            int dCity = std::max(3, 7 - relax);
-            for (int y = 2; y < H - 2; y++)
-                for (int x = 2; x < W - 2; x++) {
-                    const Tile& t = at(x, y);
-                    if (isWater(x, y) || t.mountain || t.terrain == T_SNOW || t.site >= 0 || t.owner >= 0) continue;
-                    bool ok = true;
-                    for (auto& s : starts) if (dist(s.x, s.y, x, y) < dStarts) { ok = false; break; }
-                    if (!ok) continue;
-                    for (auto& s : sites)
-                        if (dist(s.x, s.y, x, y) < (s.type == RUIN_CITY ? dCity : 4)) { ok = false; break; }
-                    if (!ok) continue;
-                    int land = 0, sc = 0, bias = 0;
-                    for (auto& p : ring(x, y, 2)) {
-                        const Tile& tt = at(p.x, p.y);
-                        if (!isWater(p.x, p.y) && !tt.mountain) land++;
-                        Yields yy = tileYields(-1, p.x, p.y);
-                        sc += yy.food * 3 + yy.prod * 2;
-                        switch (pd.startBias) {
-                            case 0: if (tt.veg == V_JUNGLE) bias += 6; break;
-                            case 1: if (tt.veg == V_FOREST || tt.hills) bias += 6; break;
-                            case 2: if ((tt.terrain == T_PLAINS || tt.terrain == T_DESERT) && tt.veg == V_NONE) bias += 5; break;
-                            case 3: if (tt.terrain == T_COAST) bias += 6; break;
-                            case 4: if (tt.terrain == T_TUNDRA || tt.terrain == T_SNOW) bias += 6; break;
-                        }
-                    }
-                    if (land < 12) continue;
-                    if (t.terrain == T_DESERT || t.terrain == T_SNOW) sc -= 10;
-                    int total = sc + bias + rng.range(12);
-                    if (total > bestScore) { bestScore = total; best = {x, y}; }
+    struct Cand { Pt p; int quality; int bias[5]; };
+    std::vector<Cand> cands;
+    for (int relax = 0; relax < 4 && (int)cands.size() < count * 6; relax++) {
+        cands.clear();
+        int dCity = 7 - relax, minLand = 12 - relax * 2;
+        for (int y = 2; y < H - 2; y++)
+            for (int x = 2; x < W - 2; x++) {
+                const Tile& t = at(x, y);
+                if (isWater(x, y) || t.mountain || t.terrain == T_SNOW || t.site >= 0 || t.owner >= 0) continue;
+                bool ok = true;
+                for (auto& s : sites)
+                    if (dist(s.x, s.y, x, y) < (s.type == RUIN_CITY ? dCity : 4)) { ok = false; break; }
+                if (!ok) continue;
+                Cand c{{x, y}, 0, {0, 0, 0, 0, 0}};
+                int land = 0;
+                for (auto& p : ring(x, y, 2)) {
+                    const Tile& tt = at(p.x, p.y);
+                    if (!isWater(p.x, p.y) && !tt.mountain) land++;
+                    Yields yy = tileYields(-1, p.x, p.y);
+                    c.quality += yy.food * 3 + yy.prod * 2;
+                    if (tt.veg == V_JUNGLE) c.bias[0] += 6;
+                    if (tt.veg == V_FOREST || tt.hills) c.bias[1] += 6;
+                    if ((tt.terrain == T_PLAINS || tt.terrain == T_DESERT) && tt.veg == V_NONE) c.bias[2] += 5;
+                    if (tt.terrain == T_COAST) c.bias[3] += 6;
+                    if (tt.terrain == T_TUNDRA || tt.terrain == T_SNOW) c.bias[4] += 6;
                 }
-        }
-        if (best.x < 0) {  // desperate fallback
-            for (int tries = 0; tries < 10000; tries++) {
-                int x = rng.range(W), y = rng.range(H);
-                if (!isWater(x, y) && !at(x, y).mountain && at(x, y).site < 0) { best = {x, y}; break; }
+                if (land < minLand) continue;
+                int room = 0;  // land within reach: a start squeezed onto a peninsula is a poor one
+                for (auto& p : ring(x, y, 5)) if (!isWater(p.x, p.y) && !at(p.x, p.y).mountain) room++;
+                c.quality += room / 3;
+                if (t.terrain == T_DESERT) c.quality -= 10;
+                cands.push_back(c);
             }
+    }
+    std::vector<Pt> starts;
+    if ((int)cands.size() >= count) {
+        // Many tries of farthest-point placement from different first spots; keep the set whose closest
+        // pair is furthest apart (then the best land). Spacing beyond 'target' stops mattering.
+        int target = (int)(std::sqrt((double)W * H / count) * 1.1);
+        std::vector<int> bestSet;
+        int bestMin = -1, bestQ = INT32_MIN;
+        for (int run = 0; run < 48; run++) {
+            std::vector<int> set = {rng.range((int)cands.size())};
+            std::vector<int> nearest(cands.size(), 999);
+            while ((int)set.size() < count) {
+                const Cand& last = cands[set.back()];
+                int pick = -1, pickScore = INT32_MIN;
+                for (size_t i = 0; i < cands.size(); i++) {
+                    nearest[i] = std::min(nearest[i], dist(last.p.x, last.p.y, cands[i].p.x, cands[i].p.y));
+                    if (nearest[i] == 0) continue;
+                    int sc = std::min(nearest[i], target) * 40 + cands[i].quality + rng.range(8);
+                    if (sc > pickScore) { pickScore = sc; pick = (int)i; }
+                }
+                if (pick < 0) break;
+                set.push_back(pick);
+            }
+            if ((int)set.size() < count) continue;
+            int mn = 999, q = 0;
+            for (size_t i = 0; i < set.size(); i++) {
+                q += cands[set[i]].quality;
+                for (size_t j = i + 1; j < set.size(); j++)
+                    mn = std::min(mn, dist(cands[set[i]].p.x, cands[set[i]].p.y, cands[set[j]].p.x, cands[set[j]].p.y));
+            }
+            mn = std::min(mn, target);
+            if (mn > bestMin || (mn == bestMin && q > bestQ)) { bestMin = mn; bestQ = q; bestSet = set; }
+        }
+        // hand the spots out, each species taking the one that suits it best (the player chooses first)
+        std::vector<bool> taken(bestSet.size(), false);
+        for (int ci = 0; ci < count && !bestSet.empty(); ci++) {
+            const PrimateDef& pd = g_primates[civs[FIRST_PRIMATE_CIV + ci].primate];
+            int pick = -1, ps = INT32_MIN;
+            for (size_t k = 0; k < bestSet.size(); k++) {
+                if (taken[k]) continue;
+                const Cand& c = cands[bestSet[k]];
+                int sc = c.quality + c.bias[std::clamp(pd.startBias, 0, 4)];
+                if (sc > ps) { ps = sc; pick = (int)k; }
+            }
+            taken[pick] = true;
+            starts.push_back(cands[bestSet[pick]].p);
+        }
+    }
+    while ((int)starts.size() < count) {  // desperate fallback on tiny or broken maps
+        Pt best = {W / 2, H / 2};
+        for (int tries = 0; tries < 10000; tries++) {
+            int x = rng.range(W), y = rng.range(H);
+            if (!isWater(x, y) && !at(x, y).mountain && at(x, y).site < 0) { best = {x, y}; break; }
         }
         starts.push_back(best);
     }

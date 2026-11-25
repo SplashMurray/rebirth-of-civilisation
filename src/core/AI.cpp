@@ -14,6 +14,18 @@ int Game::aiSiteScore(int c, int x, int y) const {
     if (!warHappened)
         for (auto& s : sites) if (dist(s.x, s.y, x, y) <= 4) return -1;
     int s = 0;
+    // keep out of other species' way: don't settle on top of a rival band or crowd a rival city
+    for (auto& u : units) {
+        if (!u.alive || u.owner == c || u.owner < FIRST_PRIMATE_CIV || g_units[u.type].cls != UnitClass::Band) continue;
+        int d = dist(u.x, u.y, x, y);
+        if (d <= 2) return -1;
+        if (d <= 5) s -= 8 * (6 - d);
+    }
+    for (auto& ci : cities)
+        if (ci.alive && ci.owner != c) {
+            int d = dist(ci.x, ci.y, x, y);
+            if (d <= 5) s -= 6 * (6 - d);
+        }
     bool coast = false;
     for (auto& p : ring(x, y, 2)) {
         const Tile& t = at(p.x, p.y);

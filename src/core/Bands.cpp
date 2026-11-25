@@ -241,7 +241,8 @@ void Game::aiBand(Unit& uref) {
 
     // Settle as soon as the species can, at a decent spot nearby
     if (canSettle(c)) {
-        if (canFoundAt(c, U().x, U().y) && (aiSiteScore(c, U().x, U().y) >= 30 || numCities(c) == 0)) {
+        int hereScore = aiSiteScore(c, U().x, U().y);
+        if (canFoundAt(c, U().x, U().y) && (hereScore >= 30 || (numCities(c) == 0 && hereScore >= 0))) {
             int best = aiSiteScore(c, U().x, U().y);
             bool better = false;
             for (auto& p : ring(U().x, U().y, 2))
@@ -295,6 +296,12 @@ void Game::aiBand(Unit& uref) {
             for (auto& s : sites) if (dist(s.x, s.y, x, y) <= 2) d += 20;
         d += at(x, y).fallout * 40;
         if (U().hp < 60) d += at(x, y).fallout * 40;
+        // other species' bands range over their own lands: give them room
+        for (auto& e : units)
+            if (e.alive && e.owner != c && e.owner >= FIRST_PRIMATE_CIV && g_units[e.type].cls == UnitClass::Band) {
+                int de = dist(e.x, e.y, x, y);
+                if (de <= 3) d += 4 * (4 - de);
+            }
         return d;
     };
     Unit probe = U();
