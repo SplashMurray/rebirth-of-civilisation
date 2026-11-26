@@ -484,6 +484,7 @@ public:
     void aiNaval(Unit& u);
     // ---- Great Primates (Great.cpp)
     int cassandraTurn = -1;  // when the blue box fell (-1: not yet)
+    int cassandraPlan = -1;  // the turn it is due to fall, decided at the start (-1: not in this game)
     int cassandraX = -1, cassandraY = -1;
     enum GreatAct { GA_USE, GA_JOIN };
     int greatKind(const Unit& u) const;              // -1 if not a Great Primate

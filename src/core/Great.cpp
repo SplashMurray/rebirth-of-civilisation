@@ -239,11 +239,10 @@ bool Game::greatAct(Unit& u, int act) {
 }
 
 // ------------------------------------------------------------ the blue box
-// Once per game, at a random moment after the Fall, a blue box tumbles out of the sky near one of a
+// In about one game in five, at a random moment after the Fall, a blue box tumbles out of the sky near one of a
 // species' units. Out falls Cassandra, the last human; then the box fades away with a wheezing groan.
 void Game::cassandraCheck() {
-    if (cassandraTurn >= 0 || !warHappened || turn < dur(60) || turn > dur(420)) return;
-    if (!rng.chance(1.0 / dur(120))) return;
+    if (cassandraTurn >= 0 || cassandraPlan < 0 || !warHappened || turn < cassandraPlan) return;  // only in about one game in five
     std::vector<int> who;
     for (int c = FIRST_PRIMATE_CIV; c < (int)civs.size(); c++) if (isMajor(c) && civs[c].alive && numCities(c) > 0) who.push_back(c);
     if (who.empty()) return;

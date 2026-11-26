@@ -349,6 +349,7 @@ void Game::newGame(const GameSettings& s) {
     allyResTurn = -1;
     tutorialStep = s.tutorial ? 0 : -1;
     cassandraTurn = cassandraX = cassandraY = -1;
+    cassandraPlan = -1;
     std::vector<int> pool;
     for (int p = 0; p < (int)g_primates.size(); p++) if (p != s.primate) pool.push_back(p);
     for (size_t i = pool.size(); i > 1; i--) std::swap(pool[i - 1], pool[rng.range((int)i)]);
@@ -410,6 +411,8 @@ void Game::newGame(const GameSettings& s) {
         else ensureNear(*this, st, R_RICE, 4);
     }
     placeTribes(starts);
+    // the blue box: about one game in five, at a random turn well after the Fall
+    if (rng.chance(0.2)) cassandraPlan = dur(60) + rng.range(dur(300));
     markResourcesDirty();
     for (int i = 0; i < nPrim; i++) {
         int c = FIRST_PRIMATE_CIV + i;
