@@ -3,8 +3,6 @@
 // remarkable individuals. When enough have built up, a Great Primate is born in the capital. Each can
 // spend their gift at once (a burst of science, production, gold, culture, or a rallying cry), or settle
 // in a city for a lasting bonus there. Each new one of a kind takes more points than the last.
-//
-// And once in a while a blue box tumbles out of the sky...
 // SPDX-License-Identifier: MIT
 #include "Game.h"
 #include <algorithm>

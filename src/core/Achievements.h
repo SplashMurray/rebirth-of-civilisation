@@ -17,6 +17,7 @@ struct AchievementDef {
     const char* name;
     const char* desc;
     const char* group;  // for the achievements screen
+    bool secret = false;  // shown only as "???" until earned
 };
 
 extern const std::vector<AchievementDef> g_achievements;

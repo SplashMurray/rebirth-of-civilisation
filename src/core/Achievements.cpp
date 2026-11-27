@@ -22,7 +22,7 @@ const std::vector<AchievementDef> g_achievements = {
     {"ARCHAEOLOGIST", "Archaeologist", "Excavate 25 ruin layers in one game.", "Evolution and the Old World"},
     {"CLEAN_UP_CREW", "Clean-Up Crew", "Decontaminate fallout 10 times in one game.", "Evolution and the Old World"},
     {"HALL_OF_FAME", "Hall of Fame", "Have 5 Great Primates born to your people in one game.", "Evolution and the Old World"},
-    {"MOISTURISE_ME", "Moisturise Me", "Witness the fall of the Last Human from the sky.", "Evolution and the Old World"},
+    {"MOISTURISE_ME", "Moisturise Me", "Witness the fall of the Last Human from the sky.", "Evolution and the Old World", true},
     {"FRIENDS_IN_LOW_PLACES", "Friends in Low Places", "Be allied with 3 minor tribes at once.", "Evolution and the Old World"},
     {"GOOD_NEIGHBOURS", "Good Neighbours", "Complete 5 requests from minor tribes in one game.", "Evolution and the Old World"},
     {"SWEET_TOOTH", "Sweet Tooth", "Enjoy 6 different luxuries at once.", "Evolution and the Old World"},

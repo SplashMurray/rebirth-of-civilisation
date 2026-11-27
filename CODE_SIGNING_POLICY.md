@@ -14,7 +14,7 @@ Only the Windows game executable built from this repository:
 
 It is shipped inside `RebirthOfCivilisation-windows-x64.zip` on the [Releases page](https://github.com/SplashMurray/rebirth-of-civilisation/releases). The other files in the zip (`README.md`, `LICENSE`) are plain text and are not signed.
 
-The game contains no third-party code and no proprietary components. It uses only Windows system libraries (user32, gdi32, GDI+, ole32) and the C++ standard library supplied by the compiler.
+The game contains no proprietary components; its only third-party code is the public-domain stb_vorbis Ogg decoder (`third_party/`), compiled into the executable. It uses only Windows system libraries (user32, gdi32, GDI+, ole32) and the C++ standard library supplied by the compiler.
 
 ## How releases are built and signed
 

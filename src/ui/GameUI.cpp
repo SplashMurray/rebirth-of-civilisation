@@ -3054,8 +3054,9 @@ void GameUI::renderAchievements() {
             cv->fillRect(ex, yy, colW, rowH - 8, lit ? rgb(40, 44, 34) : rgb(32, 36, 44));
             if (lit) cv->rect(ex, yy, colW, rowH - 8, rgb(120, 100, 40), 1);
             drawTrophy(ex + 28, yy + (rowH - 8) / 2, 32, lit);
-            cv->text(ex + 54, yy + 7, ap->name, 15, lit ? C_TEXT : rgb(170, 176, 186), AL_LEFT, true);
-            std::string desc = ap->desc;
+            bool hide = ap->secret && !lit;  // a secret stays one until it is found
+            cv->text(ex + 54, yy + 7, hide ? "???" : ap->name, 15, lit ? C_TEXT : rgb(170, 176, 186), AL_LEFT, true);
+            std::string desc = hide ? "A secret. Keep playing..." : ap->desc;
             if (std::string(ap->id) == "FULL_TROOP")
                 desc += "  (" + std::to_string(ach.primatesWon.size()) + "/" + std::to_string(g_primates.size()) + ")";
             cv->text(ex + 54, yy + 29, desc, 12, C_DIM);
