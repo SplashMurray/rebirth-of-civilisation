@@ -1377,7 +1377,9 @@ void GameUI::renderCity() {
         cv->text(px + 20, y + 26, std::to_string(std::min(c.prod, cost)) + "/" + std::to_string(cost) + "  -  " + std::to_string(g.turnsToBuild(c)) + " turns", 13, C_DIM);
         bar(px + 20, y + 46, pw - 160, 8, (double)c.prod / cost, C_PROD);
         int bc = g.buyCost(c), fc = g.faithBuyCost(c);
-        bool both = g.hasGold(g.player) && bc > 0 && fc > 0;
+        bool zealHint = fc <= 0 && c.buildKind == BK_UNIT && g.civs[g.player].faithTotal > 0 && g_units[c.buildId].cls != UnitClass::Nuke &&
+                        g.civs[g.player].zeal < ZEAL_UNITS;
+        bool both = g.hasGold(g.player) && bc > 0 && (fc > 0 || zealHint);
         if (g.hasGold(g.player) && bc > 0) {
             bool afford = g.civs[g.player].gold >= bc;
             button(pw - 126, both ? y + 4 : y + 14, 106, both ? 27 : 36, "Buy " + std::to_string(bc) + "g", afford, [this] { City& cc = game->cities[selCity]; game->buy(cc); },
@@ -1387,7 +1389,15 @@ void GameUI::renderCity() {
             bool afford = g.civs[g.player].faith >= fc;
             button(pw - 126, both ? y + 34 : y + 14, 106, both ? 27 : 36, std::to_string(fc) + " Faith", afford,
                    [this] { City& cc = game->cities[selCity]; game->buyWithFaith(cc); },
-                   "Complete this building at the end of the turn with Faith: the devout give their labour.", rgb(110, 100, 60), 12);
+                   c.buildKind == BK_UNIT ? "Complete this unit at the end of the turn with Faith: your zeal (" + std::to_string(g.civs[g.player].zeal) +
+                                                ") raises soldiers of the faith. The more zealous, the cheaper."
+                                          : "Complete this building at the end of the turn with Faith: the devout give their labour.",
+                   rgb(110, 100, 60), 12);
+        } else if (zealHint) {
+            button(pw - 126, both ? y + 34 : y + 14, 106, both ? 27 : 36, "Faith: zeal " + std::to_string(ZEAL_UNITS), false, nullptr,
+                   "Faith buys units only for a zealous people: zeal " + std::to_string(ZEAL_UNITS) + " or more (yours is " + std::to_string(g.civs[g.player].zeal) +
+                       "). Zeal also costs Science - see Religion (H).",
+                   rgb(80, 76, 60), 11);
         }
     } else {
         cv->text(px + 20, y + 10, "Choose something to produce", 16, rgb(255, 190, 110), AL_LEFT, true);
@@ -2253,7 +2263,7 @@ void GameUI::renderHelp() {
         "choosing a follower belief for every city that follows it and a founder belief for your people; with Theology, enhance it with "
         "two more. Religions spread from city to city (within 10 tiles, stronger from holy cities, Temples and Cathedrals) and along trade "
         "routes; Missionaries, bought with Faith, preach in a city to win many followers at once. Faith also buys holy festivals (+2 "
-        "Happiness everywhere) and can finish buildings. But beware ZEAL: a people devoted too heavily to its faith resists ideas that "
+        "Happiness everywhere) and can finish buildings - and units too, for a people whose zeal is 40 or more. But beware ZEAL: a people devoted too heavily to its faith resists ideas that "
         "contradict it, as religion has resisted science through history and still does. Zeal is the share of Faith in your Faith and "
         "Science (Faith counted double), plus the zeal of your faith's beliefs (Devout Masses, Holy Warriors, Orthodoxy, Inquisition add to it; "
         "Monastic Scribes and Natural Philosophy take from it), less 10 for Free Thought. Above 25, each point costs 3/4 of a percent of "

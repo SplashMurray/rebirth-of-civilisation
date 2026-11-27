@@ -289,6 +289,7 @@ struct BeliefDef {
 };
 extern const BeliefDef g_beliefs[BL_COUNT];
 static const int MAX_RELIGIONS = 6;
+static const int ZEAL_UNITS = 40;  // zeal at which the faithful will also pay for units
 extern const char* RELIGION_NAMES[];
 extern const int NUM_RELIGION_NAMES;
 struct Religion {
@@ -584,7 +585,7 @@ public:
     bool canPreach(const Unit& u, std::string* why = nullptr) const;
     City* preachTarget(const Unit& u) const;
     bool preach(Unit& u);
-    int faithBuyCost(const City& city) const;  // Faith to finish the building a city is making (0: not possible)
+    int faithBuyCost(const City& city) const;  // Faith to finish what a city is making: buildings, and units with zeal 40+ (0: not possible)
     bool buyWithFaith(City& city);
     bool canHoldFestival(int c, std::string* why = nullptr) const;
     bool holdFestival(int c);

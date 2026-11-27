@@ -202,11 +202,22 @@ bool Game::preach(Unit& u) {
     return true;
 }
 
-// Faith can finish a building (not a wonder, nor a unit): the devout give their labour.
+// Faith can finish a building (not a wonder): the devout give their labour. A zealous people (zeal 40+) will pay
+// for units too - soldiers of the faith - and the more zealous, the cheaper (not nuclear warheads).
 int Game::faithBuyCost(const City& city) const {
-    if (city.buildKind != BK_BUILDING || g_buildings[city.buildId].wonder) return 0;
-    int remaining = std::max(0, buildCost(city.owner, BK_BUILDING, city.buildId) - city.prod);
-    return remaining > 0 ? remaining * 3 + 30 : 0;
+    if (city.buildKind == BK_BUILDING) {
+        if (g_buildings[city.buildId].wonder) return 0;
+        int remaining = std::max(0, buildCost(city.owner, BK_BUILDING, city.buildId) - city.prod);
+        return remaining > 0 ? remaining * 3 + 30 : 0;
+    }
+    if (city.buildKind == BK_UNIT) {
+        int z = civs[city.owner].zeal;
+        if (z < ZEAL_UNITS || g_units[city.buildId].cls == UnitClass::Nuke) return 0;
+        int remaining = std::max(0, buildCost(city.owner, BK_UNIT, city.buildId) - city.prod);
+        int pct = std::clamp(300 - (z - ZEAL_UNITS) * 5 / 2, 200, 300);
+        return remaining > 0 ? remaining * pct / 100 + 20 : 0;
+    }
+    return 0;
 }
 
 bool Game::buyWithFaith(City& city) {
@@ -214,7 +225,7 @@ bool Game::buyWithFaith(City& city) {
     Civ& cv = civs[city.owner];
     if (cost <= 0 || cv.faith < cost) return false;
     cv.faith -= cost;
-    city.prod = buildCost(city.owner, BK_BUILDING, city.buildId);
+    city.prod = buildCost(city.owner, city.buildKind, city.buildId);
     return true;
 }
 
@@ -411,10 +422,13 @@ void Game::aiReligion(int c) {
         if (slotsLeft && hasTech(c, techSymbols())) reserve = foundCost();
         if (cv.founded >= 0 && !religions[cv.founded].enhanced) reserve = std::max(reserve, enhanceCost());
         if (r >= 0) reserve += missionaryCost(c);
+        bool war = false;
+        for (int o = FIRST_PRIMATE_CIV; o < (int)civs.size(); o++) if (cv.war[o] && civs[o].alive && isMajor(o)) war = true;
         for (int guard = 0; guard < 3; guard++) {
             City* best = nullptr;
             for (auto& ci : cities)
                 if (ci.alive && ci.owner == c && faithBuyCost(ci) > 0 && cv.faith - faithBuyCost(ci) >= reserve &&
+                    (ci.buildKind == BK_BUILDING || (war && g_units[ci.buildId].military())) &&  // soldiers of the faith in wartime
                     (!best || faithBuyCost(ci) > faithBuyCost(*best)))
                     best = &ci;
             if (!best || !buyWithFaith(*best)) break;

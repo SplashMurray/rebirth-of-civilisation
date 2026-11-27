@@ -118,6 +118,23 @@ static void councilTests() {
     r.kind = RS_NONPROLIF; r.t1 = -1;
     g.council.active.push_back(r);
     for (auto& ci : g.cities) if (ci.alive) CHECK(!g.canBuild(ci, BK_UNIT, ID.uNuke), "no warheads under the treaty");
+    // faith buys units only for a zealous people, cheaper the more zealous
+    for (auto& ci : g.cities) {
+        if (!ci.alive || !g.isMajor(ci.owner)) continue;
+        ci.buildKind = BK_UNIT;
+        ci.buildId = ID.uWarband;
+        ci.prod = 0;
+        g.civs[ci.owner].zeal = ZEAL_UNITS - 1;
+        CHECK(g.faithBuyCost(ci) == 0, "no units for faith below zeal 40");
+        g.civs[ci.owner].zeal = ZEAL_UNITS;
+        int c40 = g.faithBuyCost(ci);
+        g.civs[ci.owner].zeal = 80;
+        int c80 = g.faithBuyCost(ci);
+        CHECK(c40 > 0 && c80 > 0 && c80 < c40, "faith buys units at zeal 40+, cheaper with more zeal");
+        g.civs[ci.owner].faith = c80;
+        CHECK(g.buyWithFaith(ci) && ci.prod >= g.buildCost(ci.owner, BK_UNIT, ID.uWarband) && g.civs[ci.owner].faith == 0, "buying a unit with faith");
+        break;
+    }
     std::printf("council tests passed\n");
 }
 

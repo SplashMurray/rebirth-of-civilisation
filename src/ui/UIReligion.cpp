@@ -63,7 +63,8 @@ std::string GameUI::zealTip(int c) {
     if (trad) t += "  Free Thought: " + std::to_string(trad) + "\n";
     t += "A people devoted too heavily to its faith resists ideas that contradict it - as religion has resisted science through "
          "history, and still does. Zeal above 25 costs 3/4 of a percent of Science per point (at most 50%). Fewer houses of worship, "
-         "more science, scholarly beliefs and the Free Thought tradition all temper it.";
+         "more science, scholarly beliefs and the Free Thought tradition all temper it.\nZeal has one reward: at " + std::to_string(ZEAL_UNITS) +
+         " or more the faithful will pay for units as well as buildings (on the city screen) - the more zealous, the cheaper.";
     return t;
 }
 
