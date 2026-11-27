@@ -274,7 +274,12 @@ struct GameSettings {
     bool allAI = false;  // simulation / test mode
     int speed = 1;       // 0 quick, 1 standard, 2 epic
     bool tutorial = false;  // guide a new player step by step
+    int mapType = 0;     // MapType
+    int seaLevel = 1;    // 0 low, 1 medium, 2 high
 };
+enum MapType { MT_CONTINENTS, MT_PANGAEA, MT_ARCHIPELAGO, MT_FRACTAL, MT_COUNT };
+extern const char* MAP_TYPE_NAMES[MT_COUNT];
+extern const char* SEA_LEVEL_NAMES[3];
 
 struct CombatResult {
     bool happened = false;

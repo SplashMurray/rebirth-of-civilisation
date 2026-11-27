@@ -26,6 +26,9 @@ struct Noise {
 };
 }  // namespace
 
+const char* MAP_TYPE_NAMES[MT_COUNT] = {"Continents", "Pangaea", "Archipelago", "Fractal"};
+const char* SEA_LEVEL_NAMES[3] = {"Low", "Medium", "High"};
+
 void Game::generateMap() {
     tiles.assign(W * H, Tile());
     Noise n1, n2, n3, moist, hillN;
@@ -35,19 +38,53 @@ void Game::generateMap() {
     moist.init(rng, W / 5 + 2, H / 5 + 2);
     hillN.init(rng, W / 3 + 2, H / 3 + 2);
     std::vector<double> elev(W * H);
+    int type = std::clamp(settings.mapType, 0, MT_COUNT - 1);
+    // how far from the map's edge land may reach (0 at the edge, 1 inside the margin)
+    auto edgeF = [&](int x, int y, double m) {
+        double ex = std::min(x, W - 1 - x) / (W * m), ey = std::min(y, H - 1 - y) / (H * m);
+        return std::min(1.0, std::min(ex, ey));
+    };
+    // Continents: the seams between landmasses wander from top to bottom
+    int nCont = settings.mapSize >= 2 ? 3 : 2;
+    Noise seam;
+    seam.init(rng, 4, H / 4 + 2);
     for (int y = 0; y < H; y++)
         for (int x = 0; x < W; x++) {
-            double e = 0.6 * n1.at(x / 7.0, y / 7.0) + 0.3 * n2.at(x / 3.0, y / 3.0) + 0.1 * n3.at(x / 2.0, y / 2.0);
-            double ex = std::min(x, W - 1 - x) / (W * 0.10);
-            double ey = std::min(y, H - 1 - y) / (H * 0.10);
-            double f = std::min(1.0, std::min(ex, ey));
-            e -= (1 - f) * 0.45;
+            double e;
+            switch (type) {
+                case MT_PANGAEA: {
+                    e = 0.55 * n1.at(x / 7.0, y / 7.0) + 0.3 * n2.at(x / 3.0, y / 3.0) + 0.15 * n3.at(x / 2.0, y / 2.0);
+                    double dx = (x - (W - 1) / 2.0) / (W * 0.5), dy = (y - (H - 1) / 2.0) / (H * 0.5);
+                    e -= std::sqrt(dx * dx + dy * dy) * 0.6;  // one landmass in the middle
+                    break;
+                }
+                case MT_ARCHIPELAGO:
+                    e = 0.2 * n1.at(x / 7.0, y / 7.0) + 0.5 * n2.at(x / 3.0, y / 3.0) + 0.3 * n3.at(x / 2.0, y / 2.0);
+                    e -= (1 - edgeF(x, y, 0.06)) * 0.45;
+                    break;
+                case MT_FRACTAL:
+                    e = 0.45 * n1.at(x / 7.0, y / 7.0) + 0.35 * n2.at(x / 3.0, y / 3.0) + 0.2 * n3.at(x / 2.0, y / 2.0);
+                    e -= (1 - edgeF(x, y, 0.07)) * 0.45;
+                    break;
+                default: {  // continents
+                    e = 0.6 * n1.at(x / 7.0, y / 7.0) + 0.3 * n2.at(x / 3.0, y / 3.0) + 0.1 * n3.at(x / 2.0, y / 2.0);
+                    e -= (1 - edgeF(x, y, 0.10)) * 0.45;
+                    for (int k = 1; k < nCont; k++) {
+                        double cx = W * (double)k / nCont + (seam.at(k * 1.3, y / 4.0) - 0.5) * W * 0.16;
+                        double d = (x - cx) / (W * 0.035);
+                        e -= 0.6 * std::exp(-d * d);
+                    }
+                    break;
+                }
+            }
             elev[idx(x, y)] = e;
         }
     std::vector<double> sorted = elev;
     std::sort(sorted.begin(), sorted.end());
-    double seaLevel = sorted[(size_t)(sorted.size() * 0.58)];
-    double mountLevel = sorted[(size_t)(sorted.size() * 0.975)];
+    static const double SEA_Q[3] = {0.50, 0.58, 0.66};
+    double seaQ = SEA_Q[std::clamp(settings.seaLevel, 0, 2)] + (type == MT_ARCHIPELAGO ? 0.06 : 0.0);
+    double seaLevel = sorted[(size_t)(sorted.size() * seaQ)];
+    double mountLevel = sorted[std::min(sorted.size() - 1, (size_t)(sorted.size() * (1.0 - (1.0 - seaQ) * 0.06)))];  // ~6% of the land
     for (int y = 0; y < H; y++)
         for (int x = 0; x < W; x++) {
             Tile& t = at(x, y);

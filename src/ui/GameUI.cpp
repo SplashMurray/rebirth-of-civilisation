@@ -251,7 +251,7 @@ void GameUI::renderSetup() {
     cv->text(W / 2, 24, "Choose Your Primate", 34, C_TEXT, AL_CENTER, true);
     cv->text(W / 2, 66, "Each primate has its own strengths. Humans are not playable - they will not survive 2034.", 15, C_DIM, AL_CENTER);
     int cols = 4, gap = 14;
-    int cw = std::min(330, (W - 80 - gap * (cols - 1)) / cols), ch = std::min(236, (H - 100 - 176) / 2);
+    int cw = std::min(330, (W - 80 - gap * (cols - 1)) / cols), ch = std::min(236, (H - 100 - 232) / 2);
     int gx = (W - (cw * cols + gap * (cols - 1))) / 2, gy = 100;
     for (int i = 0; i < (int)g_primates.size(); i++) {
         const PrimateDef& p = g_primates[i];
@@ -285,20 +285,35 @@ void GameUI::renderSetup() {
     static const char* SIZE_TIPS[] = {"Small: 60 x 38 hexes, 4 species", "Standard: 74 x 46 hexes, 6 species", "Large: 84 x 54 hexes, 8 species"};
     int beginX = W - 260 - gx + 20, rowW = std::min(600, beginX - 16 - (gx + 110));
     int s3 = rowW / 3, s4 = rowW / 4;  // button pitch for 3 and 4 choices
-    cv->text(gx, oy + 8, "Map size:", 16, C_TEXT, AL_LEFT, true);
+    const int RP = 38, BH = 30;  // row pitch, button height
+    cv->text(gx, oy + 6, "Map size:", 16, C_TEXT, AL_LEFT, true);
     for (int i = 0; i < 3; i++)
-        button(gx + 110 + i * s3, oy, s3 - 10, 34, sizes[i], true, [this, i] { setupSize = i; }, SIZE_TIPS[i],
+        button(gx + 110 + i * s3, oy, s3 - 10, BH, sizes[i], true, [this, i] { setupSize = i; }, SIZE_TIPS[i],
                setupSize == i ? rgb(110, 90, 40) : C_PANEL2, 14);
-    cv->text(gx, oy + 52, "Difficulty:", 16, C_TEXT, AL_LEFT, true);
+    cv->text(gx, oy + RP + 6, "Map type:", 16, C_TEXT, AL_LEFT, true);
+    static const char* TYPE_TIPS[MT_COUNT] = {
+        "Continents: two (three on large maps) great landmasses divided by ocean. Boats matter.",
+        "Pangaea: one huge landmass with a ring of sea. Neighbours are close - expect war by land.",
+        "Archipelago: many islands, large and small. Boats and navies decide everything.",
+        "Fractal: wild, unpredictable land - big and small landmasses of every shape."};
+    for (int i = 0; i < MT_COUNT; i++)
+        button(gx + 110 + i * s4, oy + RP, s4 - 8, BH, MAP_TYPE_NAMES[i], true, [this, i] { setupMapType = i; }, TYPE_TIPS[i],
+               setupMapType == i ? rgb(110, 90, 40) : C_PANEL2, 14);
+    cv->text(gx, oy + 2 * RP + 6, "Sea level:", 16, C_TEXT, AL_LEFT, true);
+    static const char* SEA_TIPS[3] = {"Low: more land (about half the world)", "Medium: about 42% land", "High: less land (about a third of the world)"};
+    for (int i = 0; i < 3; i++)
+        button(gx + 110 + i * s3, oy + 2 * RP, s3 - 10, BH, SEA_LEVEL_NAMES[i], true, [this, i] { setupSea = i; }, SEA_TIPS[i],
+               setupSea == i ? rgb(110, 90, 40) : C_PANEL2, 14);
+    cv->text(gx, oy + 3 * RP + 6, "Difficulty:", 16, C_TEXT, AL_LEFT, true);
     for (int i = 0; i < 4; i++)
-        button(gx + 110 + i * s4, oy + 44, s4 - 8, 34, diffs[i], true, [this, i] { setupDiff = i; }, DIFF_TIPS[i],
+        button(gx + 110 + i * s4, oy + 3 * RP, s4 - 8, BH, diffs[i], true, [this, i] { setupDiff = i; }, DIFF_TIPS[i],
                setupDiff == i ? rgb(110, 90, 40) : C_PANEL2, 14);
-    cv->text(gx, oy + 96, "Game speed:", 16, C_TEXT, AL_LEFT, true);
+    cv->text(gx, oy + 4 * RP + 6, "Game speed:", 16, C_TEXT, AL_LEFT, true);
     static const char* SPEED_TIPS[3] = {"Quick: 330 turns. Everything costs less; a shorter game.",
                                         "Standard: 500 turns, like Civilization VI's standard speed.",
                                         "Epic: 750 turns. Everything costs more; a long, slow game."};
     for (int i = 0; i < 3; i++)
-        button(gx + 110 + i * s3, oy + 88, s3 - 10, 34, std::string(SPEED_NAMES[i]) + " (" + std::to_string(SPEED_TURNS[i]) + " turns)", true,
+        button(gx + 110 + i * s3, oy + 4 * RP, s3 - 10, BH, std::string(SPEED_NAMES[i]) + " (" + std::to_string(SPEED_TURNS[i]) + " turns)", true,
                [this, i] { setupSpeed = i; }, SPEED_TIPS[i], setupSpeed == i ? rgb(110, 90, 40) : C_PANEL2, 14);
     // guidance: the tutorial and advisor tips
     button(beginX, oy + 84, 108, 34, std::string("Tutorial: ") + (setupTutorial ? "On" : "Off"), true, [this] { setupTutorial = !setupTutorial; },
@@ -312,6 +327,8 @@ void GameUI::renderSetup() {
         s.mapSize = setupSize;
         s.difficulty = setupDiff;
         s.speed = setupSpeed;
+        s.mapType = setupMapType;
+        s.seaLevel = setupSea;
         s.seed = (uint64_t)std::time(nullptr) ^ ((uint64_t)animMs << 20);
         startGame(s);
     }, "", rgb(60, 110, 60), 24);
