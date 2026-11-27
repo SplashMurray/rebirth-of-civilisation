@@ -24,8 +24,8 @@ void GameUI::renderCouncil() {
     button(px + pw - 40, py + 10, 28, 28, "X", true, [this] { overlay = OV_NONE; }, "Close (Esc)");
     if (!k.formed) {
         textBlock(px + 20, py + 56, pw - 40,
-                  "There is no World Council yet. It will be formed when the first people discovers Philosophy and asks why the humans destroyed "
-                  "themselves. It will meet every " + std::to_string(g.dur(30)) + " turns to vote on resolutions, and every second session it will "
+                  "There is no World Council yet. Once every living species has met every other, the first to discover Philosophy - asking why "
+                  "the humans destroyed themselves - will call them together. It will meet every " + std::to_string(g.dur(30)) + " turns to vote on resolutions, and every second session it will "
                   "elect a chair - who wins nothing by it, but gains real powers, and loses the right to stand again by abusing them.",
                   14, C_DIM, 4);
         return;

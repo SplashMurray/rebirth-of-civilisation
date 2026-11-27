@@ -1,6 +1,6 @@
 // Rebirth of Civilisation - the World Council
-// When the first people discovers Philosophy ("Why did they destroy themselves?") the great peoples form a World
-// Council, so that the mistakes of the humans are not made again. It meets every 45 turns at standard speed. Each
+// Once every living species has met every other, the first to discover Philosophy ("Why did they destroy
+// themselves?") calls the great peoples together to form a World Council, so that the mistakes of the humans are not made again. It meets every 45 turns at standard speed. Each
 // people has one delegate, plus one for every minor tribe allied to it.
 //
 // Every session votes on an agenda of two resolutions, put forward by the chair and by the next strongest delegation:
@@ -325,6 +325,10 @@ void Game::holdSession() {
 
 void Game::councilTurn() {
     if (!council.formed) {
+        // every living species must have met every other first: a world council needs the whole world
+        for (int a = FIRST_PRIMATE_CIV; a < (int)civs.size(); a++)
+            for (int b = FIRST_PRIMATE_CIV; b < (int)civs.size(); b++)
+                if (a != b && isMajor(a) && isMajor(b) && civs[a].alive && civs[b].alive && !civs[a].met[b]) return;
         for (int c = FIRST_PRIMATE_CIV; c < (int)civs.size(); c++) {
             if (!isMajor(c) || !civs[c].alive || !hasTech(c, techPhilosophy())) continue;
             council.formed = true;
