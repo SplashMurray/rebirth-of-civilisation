@@ -162,7 +162,7 @@ void ioGame(Archive& a, Game& g) {
     long long nl = (long long)g.log.size();
     a.num(nl);
     if (!a.writing) g.log.assign((size_t)std::max(0LL, nl), Notification());
-    for (auto& n : g.log) { a.io(n.turn); a.io(n.text); a.io(n.x); a.io(n.y); }
+    for (auto& n : g.log) { a.io(n.turn); a.io(n.text); a.io(n.x); a.io(n.y); if (!a.writing) n.cat = classifyNote(n.text); }
     a.io(g.agreements);
     long long nr = (long long)g.routes.size();
     a.num(nr);

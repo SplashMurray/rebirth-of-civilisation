@@ -1643,11 +1643,32 @@ void Game::excavateReward(int c, int x, int y, int tier) {
 }
 
 // ============================================================ messages
+// Sorts a message by what it is about, from the words in it.
+NoteCat classifyNote(const std::string& text) {
+    auto has = [&](const char* w) { return text.find(w) != std::string::npos; };
+    for (const char* w : {"trade route", "Trade route", "caravan", "Caravan", "Trade Mission", "embargo"})
+        if (has(w)) return NC_TRADE;
+    for (const char* w : {"attacked", "bombarded", "dealt ", "rallied", "radiation"})
+        if (has(w)) return NC_COMBAT;
+    for (const char* w : {"declared war", "Peace", "peace", "You have met", "allies", "allied", "influence", "signed", "Deal ", "deal with", "pact",
+                          "agreement", "open-borders", "Open borders", "has ended", "You gave", "friendship", "denounce",
+                          "ask for help", "tribe", "are no more", "wiped out", "joined their allies"})
+        if (has(w)) return NC_DIPLO;
+    for (const char* w : {"attack", "killed", "destroyed", "dealt", "captured", "sank", "defeated", "was lost", "plunder", "Plunder", "razed", "fell",
+                          "eruption", "rallied", "dies", "died"})
+        if (has(w)) return NC_COMBAT;
+    for (const char* w : {"completed", "has grown", "grew", "starving", "unhappy", "unrest", "celebrating", "content again", "Order has returned",
+                          "settled", "founded", "has trained", "is building", "has nothing", "Great", "born"})
+        if (has(w)) return NC_CITY;
+    return NC_WORLD;
+}
+
 void Game::notify(int c, const std::string& text, int x, int y) {
     if (c != player) return;
     Notification n;
     n.turn = turn;
     n.text = text;
+    n.cat = classifyNote(text);
     n.x = x; n.y = y;
     log.push_back(n);
     if (log.size() > 300) log.erase(log.begin(), log.begin() + 50);

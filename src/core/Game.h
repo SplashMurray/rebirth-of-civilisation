@@ -237,10 +237,14 @@ struct Deal {
     bool demand = false; // a tribute demand: refusing it angers them
 };
 
+// What a notification is about, so the player can choose which to see.
+enum NoteCat { NC_COMBAT, NC_DIPLO, NC_CITY, NC_TRADE, NC_WORLD, NC_COUNT };
+NoteCat classifyNote(const std::string& text);
 struct Notification {
     int turn = 0;
     std::string text;
     int x = -1, y = -1;
+    int cat = NC_WORLD;
 };
 
 enum PopupKind { POP_INFO, POP_NUKE, POP_INTRO, POP_TECH, POP_RUIN, POP_WAR, POP_VICTORY, POP_DEFEAT, POP_WONDER, POP_EVOLUTION, POP_DISASTER, POP_SETTLE, POP_DEAL, POP_NATURAL, POP_GREAT };

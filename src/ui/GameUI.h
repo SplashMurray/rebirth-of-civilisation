@@ -26,6 +26,7 @@ public:
     // reads this after each input event and rescales the canvas when it changes.
     int uiScalePct = 100;
     bool animOn = true;
+    int noteMask = 31, logMask = 31;  // notification categories shown on the map / in the log (saved in settings.ini)
     bool advisorTips = true;  // advisors speak up at the start of turns (saved in settings.ini)
     // ---- sound: the platform plugs in a backend; volumes 0..100 (saved in settings.ini)
     SoundSink silence;
@@ -37,7 +38,7 @@ public:
 
     // ---- used by tests / screenshot tool
     enum Screen { SCR_TITLE, SCR_SETUP, SCR_GAME };
-    enum Overlay { OV_NONE, OV_CITY, OV_TECH, OV_POLICY, OV_DIPLO, OV_MENU, OV_HELP, OV_LOG, OV_EVO, OV_ACHIEVEMENTS, OV_TRADE, OV_ROUTES, OV_TRIBES, OV_ADVISORS };
+    enum Overlay { OV_NONE, OV_CITY, OV_TECH, OV_POLICY, OV_DIPLO, OV_MENU, OV_HELP, OV_LOG, OV_EVO, OV_ACHIEVEMENTS, OV_TRADE, OV_ROUTES, OV_TRIBES, OV_ADVISORS, OV_EMPIRE };
     Screen screen = SCR_TITLE;
     Overlay overlay = OV_NONE;
     std::unique_ptr<Game> game;
@@ -104,6 +105,7 @@ private:
     int warArm = -1;     // war declaration on a friend waiting for confirmation
     int tribeWarArm = -1;  // war on a tribe waiting for confirmation
     int tribeScroll = 0;
+    int empireScroll = 0, empireSort = 1;  // empire overview: sort column + 1, negative = reversed
     Deal draft;          // the deal being negotiated on the trade screen
     void openTrade(int c, int preset = -1);
     void renderTrade();
@@ -245,6 +247,7 @@ private:
     void drawResourceScene(int x, int y, int sx, int sy);
     // ---- minor tribes
     void renderTribes();
+    void renderEmpire();
     void drawTribeBadge(int x, int y, int r, int tribeCiv);
     // ---- happiness
     Color moodColor(int mood) const;

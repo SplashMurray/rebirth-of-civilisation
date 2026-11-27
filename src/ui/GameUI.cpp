@@ -373,6 +373,7 @@ void GameUI::renderGame() {
         case OV_POLICY: renderPolicies(); break;
         case OV_DIPLO: renderDiplomacy(); break;
         case OV_TRIBES: renderTribes(); break;
+        case OV_EMPIRE: renderEmpire(); break;
         case OV_ADVISORS: renderAdvisors(); break;
         case OV_TRADE: renderTrade(); break;
         case OV_ROUTES: renderRoutes(); break;
@@ -413,6 +414,7 @@ void GameUI::renderTopBar() {
     rb("log", "Log", [this] { overlay = overlay == OV_LOG ? OV_NONE : OV_LOG; logScroll = 0; }, "Event log (L)");
     rb("advisors", compact ? "Adv" : "Advisors", [this] { overlay = overlay == OV_ADVISORS ? OV_NONE : OV_ADVISORS; }, "Your advisors' advice (A)");
     rb("evo", compact ? "Evo" : "Evolution", [this] { overlay = overlay == OV_EVO ? OV_NONE : OV_EVO; }, "Evolutionary traits and pressures (V)");
+    rb("empire", compact ? "Emp" : "Empire", [this] { overlay = overlay == OV_EMPIRE ? OV_NONE : OV_EMPIRE; empireScroll = 0; }, "Empire overview: all your cities (O)");
     rb("tribes", "Tribes", [this] { overlay = overlay == OV_TRIBES ? OV_NONE : OV_TRIBES; tribeWarArm = -1; }, "Minor tribes: influence, gifts, allies (I)");
     rb("diplo", compact ? "Diplo" : "Diplomacy", [this] { overlay = overlay == OV_DIPLO ? OV_NONE : OV_DIPLO; }, "Other civilisations (D)");
     rb("trad", compact ? "Trad" : "Traditions", [this] { overlay = overlay == OV_POLICY ? OV_NONE : OV_POLICY; }, "Adopt traditions with culture (P)");
@@ -578,20 +580,34 @@ void GameUI::renderTopBar() {
     }
 }
 
+static const char* noteCatName(int c) {
+    static const char* names[NC_COUNT] = {"Combat", "Diplomacy", "Cities", "Trade", "World"};
+    return c >= 0 && c < NC_COUNT ? names[c] : "World";
+}
+static Color noteCatColor(int c) {
+    switch (c) {
+        case NC_COMBAT: return rgb(220, 70, 60);
+        case NC_DIPLO: return rgb(120, 150, 240);
+        case NC_CITY: return rgb(110, 200, 110);
+        case NC_TRADE: return rgb(230, 190, 70);
+        default: return rgb(170, 140, 220);
+    }
+}
+
 void GameUI::renderNotifications() {
     Game& g = *game;
     int y = TOP + 8, shown = 0;
     for (int i = (int)g.log.size() - 1; i >= 0 && shown < 7; i--) {
         const Notification& n = g.log[i];
         if (n.turn < g.turn - 1) break;
+        if (!(noteMask & (1 << n.cat))) continue;
         auto lines = wrap(n.text, 290, 13);
         int h = (int)lines.size() * 16 + 8;
         int x = W - 318;
         Color bg = n.turn == g.turn ? rgb(34, 40, 52) : rgb(26, 30, 38);
         cv->fillRoundRectGrad(x + 2, y + 3, 310, h, 6, rgb(0, 0, 0), rgb(0, 0, 0), 70);
         cv->fillRoundRectGrad(x, y, 310, h, 6, lighten(bg, 0.06f), darken(bg, 0.8f), 238);
-        cv->fillRoundRectGrad(x, y, 5, h, 2, n.text.find("war") != std::string::npos || n.text.find("attack") != std::string::npos ? C_RED : C_GOLD,
-                              darken(n.text.find("war") != std::string::npos || n.text.find("attack") != std::string::npos ? C_RED : C_GOLD, 0.6f));
+        cv->fillRoundRectGrad(x, y, 5, h, 2, noteCatColor(n.cat), darken(noteCatColor(n.cat), 0.6f));
         int ly = y + 4;
         for (auto& l : lines) { cv->text(x + 10, ly, l, 13, n.turn == g.turn ? C_TEXT : C_DIM); ly += 16; }
         int nx = n.x, ny = n.y;
@@ -632,6 +648,7 @@ void GameUI::renderTileInfo() {
     if (over(0, H - 190, 420, 190) || over(W - 260, H - 260, 260, 260)) return;
     const Tile& t = g.at(hoverX, hoverY);
     std::vector<std::pair<std::string, Color>> lines;
+    int resLine = -1;  // this line gets the resource's icon
     std::string terr = t.feature == F_WONDER && t.natural >= 0 ? g_naturals[t.natural].name
                        : t.feature == F_LAKE ? std::string("Lake")
                        : t.feature == F_VOLCANO ? std::string("Volcano")
@@ -664,6 +681,7 @@ void GameUI::renderTileInfo() {
     if (g.resourceVisible(g.player, hoverX, hoverY)) {
         const ResourceDef& rd = g_resources[t.res];
         static const char* KIND[] = {"Bonus resource", "Strategic resource", "Luxury resource", "Crop"};
+        resLine = (int)lines.size();
         lines.push_back({std::string(KIND[rd.kind]) + ": " + rd.name + (rd.hint.empty() ? "" : ". " + rd.hint), rgb(230, 190, 120)});
         if (rd.kind == RK_LUXURY)
             lines.push_back({g.hasResource(g.player, t.res) ? std::string("You already enjoy this luxury: another source adds nothing, but you can trade it")
@@ -723,10 +741,16 @@ void GameUI::renderTileInfo() {
     cv->fillRoundRectGrad(x, y, w, h, 7, rgb(32, 38, 48), rgb(16, 19, 25), 240);
     cv->roundRect(x, y, w, h, 7, C_BORDER);
     int ly = y + 6;
-    for (auto& l : lines) {
+    for (size_t li = 0; li < lines.size(); li++) {
+        const auto& l = lines[li];
+        int tx = x + 8;
+        if ((int)li == resLine) {
+            drawResourceIcon(t.res, x + 16, ly + 8, 8);
+            tx += 20;
+        }
         std::string s = l.first;
-        while (s.size() > 4 && cv->textWidth(s, 13) > w - 16) s = s.substr(0, s.size() - 4) + "..";
-        cv->text(x + 8, ly, s, 13, l.second);
+        while (s.size() > 4 && cv->textWidth(s, 13) > w - 8 - (tx - x)) s = s.substr(0, s.size() - 4) + "..";
+        cv->text(tx, ly, s, 13, l.second);
         ly += 18;
     }
 }
@@ -1075,6 +1099,31 @@ void GameUI::renderCity() {
         if (n > 0) {
             cv->text(px + 16, y - 4, "Trade: " + std::to_string(n) + (n == 1 ? " route" :  " routes") + " bring " + tradeYieldStr(ty) + " a turn", 13, rgb(240, 200, 110), AL_LEFT, true);
             y += 16;
+        }
+    }
+    {  // resources inside the city's land, worked ones bright
+        std::vector<std::pair<int, int>> rs;  // resource, tile index
+        for (int ty = 0; ty < g.H; ty++)
+            for (int tx = 0; tx < g.W; tx++) {
+                const Tile& t = g.at(tx, ty);
+                if (t.city == c.id && t.res != R_NONE && g.resourceVisible(g.player, tx, ty)) rs.push_back({t.res, g.idx(tx, ty)});
+            }
+        if (!rs.empty()) {
+            std::stable_sort(rs.begin(), rs.end(), [](auto& a, auto& b) { return g_resources[a.first].kind < g_resources[b.first].kind; });
+            cv->text(px + 16, y - 2, "Resources:", 13, C_DIM);
+            int rx = px + 98;
+            for (auto& [res, ti] : rs) {
+                if (rx > pw - 20) break;
+                bool worked = std::find(c.worked.begin(), c.worked.end(), ti) != c.worked.end();
+                drawResourceIcon(res, rx, y + 6, 9);
+                if (!worked) cv->fillCircleA(rx, y + 6, 10, rgb(22, 27, 35), 120);
+                const ResourceDef& rd = g_resources[res];
+                static const char* KIND[] = {"Bonus resource", "Strategic resource", "Luxury resource", "Crop"};
+                hot(rx - 9, y - 3, 19, 19, nullptr, rd.name + " (" + KIND[rd.kind] + ")" + (worked ? " - worked by this city" : " - not worked at the moment") +
+                    (rd.hint.empty() ? "" : ". " + rd.hint));
+                rx += 23;
+            }
+            y += 20;
         }
     }
     // current production
@@ -1963,7 +2012,7 @@ void GameUI::renderHelp() {
         "Capture cities by reducing their HP to zero with a melee unit. Beware the feral packs that roam the wastelands.\n"
         "CONTROLS  Left-click: select.  Right-click: move / attack.  Drag or arrow keys: scroll.  Wheel or +/-: zoom.  Enter: end turn.  "
         "Space: skip unit.  Tab: next unit.  B: settle / found city.  G: split band.  R: war party.  F: fortify.  S: sleep.  E: excavate.  X: decontaminate.  M: move mode.  C: centre on unit.  "
-        "T: technologies.  V: evolution.  P: traditions.  D: diplomacy.  L: log.  Ctrl+S / Ctrl+L: save / load.  Ctrl + / Ctrl - / Ctrl 0: interface size.  Esc: menu / close.";
+        "T: technologies.  V: evolution.  P: traditions.  D: diplomacy.  I: tribes.  O: empire overview.  A: advisors.  L: log (filter messages by kind there).  Ctrl+S / Ctrl+L: save / load.  Ctrl + / Ctrl - / Ctrl 0: interface size.  Esc: menu / close.";
     int top = py + 56, viewH = ph - 70;
     Hot area{px, top, pw, viewH, nullptr, "", true};
     hots.push_back(area);
@@ -1983,21 +2032,44 @@ void GameUI::renderHelp() {
 
 void GameUI::renderLog() {
     Game& g = *game;
-    int pw = std::min(760, W - 40), ph = H - TOP - 40;
+    int pw = std::min(820, W - 40), ph = H - TOP - 40;
     int px = (W - pw) / 2, py = TOP + 14;
     panel(px, py, pw, ph);
     cv->text(px + 20, py + 14, "Event Log", 24, C_TEXT, AL_LEFT, true);
     button(px + pw - 40, py + 12, 28, 28, "X", true, [this] { overlay = OV_NONE; });
     Hot area{px, py, pw, ph, nullptr, "", true};
     hots.push_back(area);
-    int y = py + 56;
-    int maxLines = (ph - 70) / 18;
-    logScroll = std::clamp(logScroll, 0, std::max(0, (int)g.log.size() - maxLines));
-    for (int i = (int)g.log.size() - 1 - logScroll, n = 0; i >= 0 && n < maxLines; i--, n++) {
-        const Notification& no = g.log[i];
+    // category filters: what the log lists, and what pops up on the map
+    auto chips = [&](int y, const char* label, int& mask, const char* tipVerb) {
+        cv->text(px + 20, y + 5, label, 13, C_DIM);
+        int x = px + 130;
+        for (int c = 0; c < NC_COUNT; c++) {
+            bool on = mask & (1 << c);
+            int w = cv->textWidth(noteCatName(c), 12, true) + 30;
+            { Color bc = on ? darken(noteCatColor(c), 0.45f) : C_PANEL2; cv->fillRoundRectGrad(x, y, w, 24, 6, bc, bc, on ? 255 : 180); }
+            cv->fillRect(x + 6, y + 8, 8, 8, on ? noteCatColor(c) : darken(noteCatColor(c), 0.5f));
+            cv->text(x + 19, y + 5, noteCatName(c), 12, on ? C_TEXT : C_DIM, AL_LEFT, true);
+            int bit = 1 << c;
+            int* m = &mask;
+            hot(x, y, w, 24, [m, bit] { *m ^= bit; }, std::string(on ? "Hide " : "Show ") + noteCatName(c) + " messages " + tipVerb);
+            x += w + 6;
+        }
+    };
+    chips(py + 50, "Show in log:", logMask, "in this log");
+    chips(py + 80, "Pop up on map:", noteMask, "as messages on the map");
+    std::vector<int> rows;
+    for (int i = (int)g.log.size() - 1; i >= 0; i--)
+        if (logMask & (1 << g.log[i].cat)) rows.push_back(i);
+    int y = py + 116;
+    int maxLines = (ph - 130) / 18;
+    logScroll = std::clamp(logScroll, 0, std::max(0, (int)rows.size() - maxLines));
+    if (rows.empty()) cv->text(px + pw / 2, y + 20, "No messages in the chosen categories.", 13, C_DIM, AL_CENTER);
+    for (int r = logScroll, n = 0; r < (int)rows.size() && n < maxLines; r++, n++) {
+        const Notification& no = g.log[rows[r]];
+        cv->fillRect(px + 20, y + 3, 4, 12, noteCatColor(no.cat));
         std::string s = "T" + std::to_string(no.turn) + ": " + no.text;
-        while (s.size() > 4 && cv->textWidth(s, 13) > pw - 40) s = s.substr(0, s.size() - 4) + "..";
-        cv->text(px + 20, y, s, 13, no.turn == g.turn ? C_TEXT : C_DIM);
+        while (s.size() > 4 && cv->textWidth(s, 13) > pw - 50) s = s.substr(0, s.size() - 4) + "..";
+        cv->text(px + 30, y, s, 13, no.turn == g.turn ? C_TEXT : C_DIM);
         int nx = no.x, ny = no.y;
         if (nx >= 0) hot(px + 20, y, pw - 40, 18, [this, nx, ny] { centerOn(nx, ny); overlay = OV_NONE; });
         y += 18;
@@ -2385,6 +2457,7 @@ void GameUI::wheel(int x, int y, int delta) {
         else if (overlay == OV_HELP) helpScroll -= delta * 60;
         else if (overlay == OV_ACHIEVEMENTS) achScroll -= delta * 60;
         else if (overlay == OV_TRIBES) tribeScroll -= delta * 60;
+        else if (overlay == OV_EMPIRE) empireScroll -= delta * 48;
         else if (overlay == OV_ROUTES) routeScroll -= delta;
         else listScroll -= delta * 60;
         return;
@@ -2476,7 +2549,7 @@ void GameUI::key(int k, bool shift, bool ctrl) {
     if (overlay == OV_CITY && (k == 'T' || k == 'P' || k == 'D' || k == 'L' || k == 'V' || k == 'I' || k == 'A')) overlay = OV_NONE;
     if (overlay != OV_NONE && overlay != OV_CITY) {
         if ((k == 'T' && overlay == OV_TECH) || (k == 'P' && overlay == OV_POLICY) || (k == 'D' && overlay == OV_DIPLO) || (k == 'L' && overlay == OV_LOG) ||
-            (k == 'V' && overlay == OV_EVO) || (k == 'I' && overlay == OV_TRIBES) || (k == 'A' && overlay == OV_ADVISORS))
+            (k == 'V' && overlay == OV_EVO) || (k == 'I' && overlay == OV_TRIBES) || (k == 'O' && overlay == OV_EMPIRE) || (k == 'A' && overlay == OV_ADVISORS))
             overlay = OV_NONE;
         return;
     }
@@ -2487,6 +2560,7 @@ void GameUI::key(int k, bool shift, bool ctrl) {
         case 'L': overlay = OV_LOG; logScroll = 0; return;
         case 'V': overlay = OV_EVO; return;
         case 'I': overlay = OV_TRIBES; tribeWarArm = -1; return;
+        case 'O': overlay = OV_EMPIRE; empireScroll = 0; return;
         case 'A': overlay = OV_ADVISORS; return;
         case KEY_TAB: { int n = nextUnitNeedingOrders(selUnit); if (n >= 0) selectUnit(n, true); return; }
         case 'C': if (sel()) centerOn(sel()->x, sel()->y); return;
