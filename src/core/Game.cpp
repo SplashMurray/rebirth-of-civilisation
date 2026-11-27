@@ -695,6 +695,7 @@ void Game::computeCity(City& city) {
     for (int k = 0; k < (int)cand.size() && k < city.pop; k++) {
         total += cand[k].y;
         city.worked.push_back(cand[k].i);
+        if (tiles[cand[k].i].feature == F_WONDER) total.faith += 2;  // a natural wonder inspires awe
     }
     total += city.greatBonus;  // Great Primates who settled here
     // base yields from population
@@ -716,6 +717,23 @@ void Game::computeCity(City& city) {
         }
     }
     total.sci += policyPct(c, PolicyEffect::FlatSci);
+    // religion: the beliefs of the faith this city follows, and its founders' rewards in their capital
+    if (int r = city.religion; r >= 0 && r < (int)religions.size()) {
+        if (hasBelief(r, BL_GROVES)) total.food += 2;
+        static const int shrine = buildingIndex("Shrine"), temple = buildingIndex("Temple");
+        if (hasBelief(r, BL_BUILDERS) && city.has[shrine]) total.prod += 2;
+        if (hasBelief(r, BL_SONGS)) total.cult += 2;
+        if (hasBelief(r, BL_SCRIBES) && city.has[temple]) total.sci += 2;
+        if (hasBelief(r, BL_DEVOUT)) total.faith += 2;
+        if (religions[r].holyCity == city.id) total.faith += 2;
+    }
+    if (c >= FIRST_PRIMATE_CIV && city.capital && civs[c].founded >= 0) {
+        int f = civs[c].founded, n = religions[f].followers;
+        if (hasBelief(f, BL_TITHES)) total.gold += n;
+        if (hasBelief(f, BL_PILGRIMS)) total.faith += n;
+        if (hasBelief(f, BL_WORLD_CHURCH)) total.cult += n;
+        if (hasBelief(f, BL_NATURAL_PHIL)) total.sci += n;
+    }
     // evolutionary traits
     if (c >= FIRST_PRIMATE_CIV) {
         const TraitFx& f = civs[c].fx;
@@ -747,8 +765,12 @@ void Game::computeCity(City& city) {
     if (mood == MOOD_UNREST) { pct.prod -= 25; pct.sci -= 25; pct.cult -= 25; pct.gold -= 25; }
     total.food = applyPct(total.food, pct.food);
     total.prod = applyPct(total.prod, pct.prod);
-    total.sci = applyPct(total.sci, pct.sci);
-    if (c >= FIRST_PRIMATE_CIV && !hasTrait(c, TR_NEOCORTEX)) total.sci = 0;  // no deliberate learning yet
+    // zeal: a devout people resists ideas that contradict the faith (see Religion.cpp)
+    int zp = c >= FIRST_PRIMATE_CIV && c < (int)civs.size() ? civs[c].zealPenalty : 0;
+    city.sciRaw = applyPct(total.sci, pct.sci);
+    total.sci = applyPct(total.sci, pct.sci - zp);
+    if (c >= FIRST_PRIMATE_CIV && !hasTrait(c, TR_NEOCORTEX)) total.sci = city.sciRaw = 0;  // no deliberate learning yet
+    total.faith = std::max(0, total.faith);
     total.cult = applyPct(total.cult, pct.cult);
     total.gold = hasGold(c) ? applyPct(total.gold, pct.gold) : 0;
     city.yields = total;
@@ -1329,6 +1351,7 @@ int Game::unitStrength(const Unit& u, bool attacking, bool rangedAtk, int x, int
         pct += policyPct(u.owner, PolicyEffect::Combat);
         pct += civs[u.owner].fx.combat;
         if (ownsWonderSpecial(u.owner, BSpecial::CombatBonus)) pct += 10;
+        if (founderHas(u.owner, BL_HOLY_WARRIORS) && nearFaithful(u.owner, x, y)) pct += 10;
         if (u.rallyUntil >= turn) pct += 20;  // rallied by a Great Warleader
     }
     pct += promoStrengthPct(u, attacking, x, y);

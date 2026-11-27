@@ -26,9 +26,9 @@ inline Color darken(Color c, float f) { return rgb((int)(c.r * f), (int)(c.g * f
 inline Color lighten(Color c, float f) { return blend(c, rgb(255, 255, 255), f); }
 
 struct Yields {
-    int food = 0, prod = 0, sci = 0, cult = 0, gold = 0;
+    int food = 0, prod = 0, sci = 0, cult = 0, gold = 0, faith = 0;
     Yields& operator+=(const Yields& o) {
-        food += o.food; prod += o.prod; sci += o.sci; cult += o.cult; gold += o.gold;
+        food += o.food; prod += o.prod; sci += o.sci; cult += o.cult; gold += o.gold; faith += o.faith;
         return *this;
     }
 };

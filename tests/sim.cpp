@@ -48,6 +48,14 @@ static void invariants(Game& g) {
         CHECK(c.pop >= 1, "pop < 1");
         CHECK(g.at(c.x, c.y).city == c.id, "city tile not owned");
         if (!g.hasGold(c.owner)) CHECK(c.yields.gold == 0, "gold before currency");
+        CHECK(c.religion >= -1 && c.religion < (int)g.religions.size(), "city follows a religion that does not exist");
+    }
+    CHECK((int)g.religions.size() <= g.maxReligions(), "too many religions");
+    for (auto& u : g.units)
+        if (u.alive && u.type == ID.uMissionary) CHECK(u.religion >= 0 && u.religion < (int)g.religions.size(), "missionary without a faith");
+    for (int c = FIRST_PRIMATE_CIV; c < (int)g.civs.size(); c++) {
+        CHECK(g.civs[c].faith >= 0, "negative faith");
+        CHECK(g.civs[c].zealPenalty >= 0 && g.civs[c].zealPenalty <= 50, "zeal penalty out of range");
     }
     for (int c = FIRST_PRIMATE_CIV; c < (int)g.civs.size(); c++)
         if (!g.hasGold(c)) CHECK(g.civs[c].gold == 0, "civ has gold before currency");
@@ -260,6 +268,13 @@ int main(int argc, char** argv) {
             for (auto& ci : g.cities) if (ci.alive) settled += ci.greatBonus.sci + ci.greatBonus.prod + ci.greatBonus.gold + ci.greatBonus.cult;
             std::printf("great: thinkers %d artisans %d merchants %d storytellers %d warleaders %d; settled yields %d; blue box at turn %d\n", born[0], born[1],
                         born[2], born[3], born[4], settled, g.cassandraTurn);
+        }
+        {
+            int following = 0, cities = 0, maxPen = 0, miss = 0;
+            for (auto& ci : g.cities) if (ci.alive) { cities++; if (ci.religion >= 0) following++; }
+            for (int c = FIRST_PRIMATE_CIV; c < (int)g.civs.size(); c++)
+                if (g.isMajor(c)) { maxPen = std::max(maxPen, g.civs[c].zealPenalty); miss += g.civs[c].missionariesBought; }
+            std::printf("religion: %zu founded, %d of %d cities follow one, %d missionaries, highest zeal cost %d%%\n", g.religions.size(), following, cities, miss, maxPen);
         }
         int sailed = 0;
         for (auto& cv : g.civs) sailed += cv.riverSailed;

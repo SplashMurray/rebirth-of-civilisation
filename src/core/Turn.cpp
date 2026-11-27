@@ -195,6 +195,7 @@ void Game::endTurn() {
     feralTurn();
     tradeTurn();
     tribesTurn();
+    religionTurn();
     cassandraCheck();
     volcanoTurn();
     regrowForage();
@@ -223,11 +224,13 @@ void Game::processCiv(int c) {
         return;
     }
     if (isMajor(c)) wearinessTurn(c);
-    int sci = 0, cult = 0, gold = 0, prod = 0;
+    int sci = 0, cult = 0, gold = 0, prod = 0, faith = 0, sciRaw = 0;
     for (auto& ci : cities) {
         if (!ci.alive || ci.owner != c) continue;
         processCity(ci);
         if (!ci.alive || ci.owner != c) continue;
+        faith += ci.yields.faith;
+        sciRaw += ci.sciRaw;
         sci += ci.yields.sci;
         cult += ci.yields.cult;
         gold += ci.yields.gold;
@@ -241,6 +244,12 @@ void Game::processCiv(int c) {
     cv.culture += cult;
     cv.cultureTotal += cult;
     cv.gold += cv.goldPerTurn;
+    cv.faithPerTurn = faith;
+    cv.faith += faith;
+    cv.faithTotal += faith;
+    cv.sciRawPerTurn = sciRaw;
+    cv.zeal = isMajor(c) ? zealOf(c) : 0;
+    cv.zealPenalty = zealToPenalty(cv.zeal);
     if (cv.minor) {  // tribes neither evolve nor suffer the disasters of the great powers
         processUnitsEndOfTurn(c);
         return;
@@ -318,6 +327,7 @@ void Game::processCity(City& city) {
                         if (ud.military())
                             for (size_t b = 0; b < g_buildings.size(); b++)
                                 if (city.has[b] && g_buildings[b].special == BSpecial::Veterans) units.back().xp += 15;  // drilled recruits
+                        if (ud.military() && hasBelief(city.religion, BL_MONKS)) units.back().xp += 10;
                         notify(c, city.name + " has trained a " + ud.name + ".", city.x, city.y);
                         done = true;
                     } else {

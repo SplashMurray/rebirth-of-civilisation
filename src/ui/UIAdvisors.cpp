@@ -124,7 +124,19 @@ std::vector<GameUI::Advice> GameUI::gatherAdvice() {
             add(g.greatKind(u) == GK_WARLEADER ? 2 : g.greatKind(u) == GK_MERCHANT ? 3 : g.greatKind(u) == GK_THINKER || g.greatKind(u) == GK_LAST_HUMAN ? 1 : 0, 70,
                 u.name + " awaits your word: use their gift now, or settle them in a city.", [this, uid] { overlay = OV_NONE; selectUnit(uid, true); }, "Select");
         }
+    // faith: founding a religion, idle missionaries (the Elder of the Hearth)
+    if (g.canFoundReligion(p)) add(0, 80, "Our people's faith is strong enough to found a religion of our own, while there is still room for one.", open(OV_RELIGION), "Religion");
+    else if (g.canEnhanceReligion(p)) add(0, 45, "Our religion can be enhanced with two more beliefs.", open(OV_RELIGION), "Religion");
+    for (auto& u : g.units)
+        if (u.alive && u.owner == p && u.type == ID.uMissionary && u.order == ORD_NONE) {
+            int uid = u.id;
+            add(0, 55, "A Missionary waits. Lead it to a city that does not yet follow our faith and preach.", [this, uid] { overlay = OV_NONE; selectUnit(uid, true); }, "Select");
+            break;
+        }
     // ---- the Keeper of Knowledge: science and evolution
+    if (me.zealPenalty >= 10)
+        add(1, me.zealPenalty >= 25 ? 85 : 60, "Our people's zeal costs us " + std::to_string(me.zealPenalty) + "% of our Science: they resist ideas that contradict "
+            "their faith. Fewer new houses of worship, more science, scholarly beliefs or the Free Thought tradition would temper it.", open(OV_RELIGION), "Religion");
     bool canRes = false;
     for (size_t t = 0; t < g_techs.size(); t++) if (g.canResearch(p, (int)t)) canRes = true;
     if (!g.hasTrait(p, TR_NEOCORTEX))

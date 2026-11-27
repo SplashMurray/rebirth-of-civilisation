@@ -446,6 +446,7 @@ void GameUI::renderGame() {
         case OV_DIPLO: renderDiplomacy(); break;
         case OV_TRIBES: renderTribes(); break;
         case OV_EMPIRE: renderEmpire(); break;
+        case OV_RELIGION: renderReligion(); break;
         case OV_ADVISORS: renderAdvisors(); break;
         case OV_TRADE: renderTrade(); break;
         case OV_ROUTES: renderRoutes(); break;
@@ -486,6 +487,7 @@ void GameUI::renderTopBar() {
     rb("log", "Log", [this] { overlay = overlay == OV_LOG ? OV_NONE : OV_LOG; logScroll = 0; }, "Event log (L)");
     rb("advisors", compact ? "Adv" : "Advisors", [this] { overlay = overlay == OV_ADVISORS ? OV_NONE : OV_ADVISORS; }, "Your advisors' advice (A)");
     rb("evo", compact ? "Evo" : "Evolution", [this] { overlay = overlay == OV_EVO ? OV_NONE : OV_EVO; }, "Evolutionary traits and pressures (V)");
+    rb("religion", compact ? "Rel" : "Religion", [this] { overlay = overlay == OV_RELIGION ? OV_NONE : OV_RELIGION; }, "Faith and religions (H)");
     rb("empire", compact ? "Emp" : "Empire", [this] { overlay = overlay == OV_EMPIRE ? OV_NONE : OV_EMPIRE; empireScroll = 0; }, "Empire overview: all your cities (O)");
     rb("tribes", "Tribes", [this] { overlay = overlay == OV_TRIBES ? OV_NONE : OV_TRIBES; tribeWarArm = -1; }, "Minor tribes: influence, gifts, allies (I)");
     rb("diplo", compact ? "Diplo" : "Diplomacy", [this] { overlay = overlay == OV_DIPLO ? OV_NONE : OV_DIPLO; }, "Other civilisations (D)");
@@ -558,6 +560,16 @@ void GameUI::renderTopBar() {
         item("Gold " + std::to_string(me.gold) + " (" + fmtPct(me.goldPerTurn) + ")", C_GOLD, "Gold in the treasury (per turn). Spend it to buy units and buildings in your cities.");
     else
         item(compact ? "Gold ?" : "Gold: unknown", rgb(130, 120, 90), "Your people do not yet understand money. Research Currency to unlock Gold income.");
+    if (me.faithTotal > 0 || g.numCities(g.player) > 0) {
+        std::string fl = (compact ? "Faith " : "Faith ") + std::to_string(me.faith) + " (+" + std::to_string(me.faithPerTurn) + ")";
+        if (me.zealPenalty > 0) fl += compact ? " -" + std::to_string(me.zealPenalty) + "%" : "  Zeal -" + std::to_string(me.zealPenalty) + "% Sci";
+        item(fl, me.zealPenalty >= 20 ? rgb(240, 120, 90) : me.zealPenalty > 0 ? rgb(240, 190, 110) : rgb(250, 232, 180),
+             "Faith (per turn): founds religions, buys Missionaries, holy festivals and buildings. See Religion (H).\n" + zealTip(g.player),
+             [this] { overlay = OV_RELIGION; });
+        if (g.canFoundReligion(g.player))
+            item(compact ? "RELIGION!" : "FOUND A RELIGION", rgb(255, 236, 150), "You have the Faith to found a religion. Open the Religion screen (H).",
+                 [this] { overlay = OV_RELIGION; });
+    }
     if (g.tradeCapacity(g.player) > 0) {
         int used = g.tradeUsed(g.player), cap = g.tradeCapacity(g.player);
         item((compact ? "Trade " : "Trade routes ") + std::to_string(g.routesOf(g.player)) + "/" + std::to_string(cap), used < cap ? rgb(240, 200, 110) : rgb(200, 180, 140),
@@ -848,7 +860,7 @@ void GameUI::renderUnitPanel() {
     } else if (d.cls == UnitClass::Trader) {
         stats = "Trade routes in use " + std::to_string(g.routesOf(u.owner)) + " of " + std::to_string(g.tradeCapacity(u.owner));
     } else if (d.cls == UnitClass::Great) {
-        stats = d.name;
+        stats = u.type == ID.uMissionary && u.religion >= 0 ? "Missionary of " + g.religions[u.religion].name : d.name;
         hot(px + 62, py + 32, 340, 20, nullptr, d.desc);
     } else stats = d.cls == UnitClass::Settler ? "Founds settlements" : "Builds improvements, roads; excavates ruins";
     if (d.naval() && d.cargo > 0) {
@@ -936,7 +948,22 @@ void GameUI::renderUnitPanel() {
         }
         if (g.canDecon(u)) acts.push_back({"Decontaminate (X)", u.moves > 0, [this] { unitCommand('X'); }, "Reduce fallout on this tile by one level"});
     }
-    if (d.cls == UnitClass::Great) {
+    if (u.type == ID.uMissionary) {
+        std::string why;
+        bool ok = g.canPreach(u, &why);
+        City* t = ok ? g.preachTarget(u) : nullptr;
+        acts.push_back({"Preach", ok, [this, uid] {
+                            Unit& mu = game->units[uid];
+                            game->preach(mu);
+                            sfx(Sfx::Culture, 0.8f);
+                            selUnit = -1;
+                            afterUnitAction();
+                        },
+                        ok ? "Preach " + (u.religion >= 0 ? g.religions[u.religion].name : std::string("the faith")) + " in " + t->name +
+                                 ": wins many followers at once (the Missionary is used up)"
+                           : why});
+    }
+    if (d.cls == UnitClass::Great && g.greatKind(u) >= 0) {
         for (int act : {Game::GA_USE, Game::GA_JOIN}) {
             if (act == Game::GA_JOIN && (g.greatKind(u) == GK_WARLEADER || g.greatKind(u) == GK_LAST_HUMAN)) continue;
             std::string why;
@@ -1248,13 +1275,17 @@ void GameUI::renderCity() {
     int y = py + 70;
     struct YI { const char* n; int v; Color c; };
     YI ys[] = {{"Food", c.yields.food, C_FOOD}, {"Production", c.yields.prod, C_PROD}, {"Science", c.yields.sci, C_SCI},
-               {"Culture", c.yields.cult, C_CULT}, {"Gold", c.yields.gold, C_GOLD}};
+               {"Culture", c.yields.cult, C_CULT}, {"Gold", c.yields.gold, C_GOLD}, {"Faith", c.yields.faith, rgb(250, 232, 180)}};
     int x = px + 16;
     for (auto& yi : ys) {
         if (std::string(yi.n) == "Gold" && !g.hasGold(g.player)) continue;
         cv->text(x, y, std::to_string(yi.v), 20, yi.c, AL_LEFT, true);
         cv->text(x, y + 22, yi.n, 11, C_DIM);
-        x += 82;
+        if (std::string(yi.n) == "Science" && g.civs[g.player].zealPenalty > 0) {
+            cv->text(x + cv->textWidth(std::to_string(yi.v), 20, true) + 3, y + 6, "-" + std::to_string(g.civs[g.player].zealPenalty) + "%", 11, rgb(240, 150, 90), AL_LEFT, true);
+            hot(x - 2, y - 2, 68, 38, nullptr, zealTip(g.player));
+        }
+        x += 70;
     }
     y += 46;
     int need = g.growthThreshold(c.pop);
@@ -1275,6 +1306,26 @@ void GameUI::renderCity() {
         cv->text(px + 38, y - 4, ms, 13, moodColor(m), AL_LEFT, true);
         hot(px + 12, y - 6, mw + 34, 18, nullptr, moodTip(c));
         y += 18;
+    }
+    {  // its faith
+        std::string rs;
+        std::string tip = "Religions spread on their own from city to city (within 10 tiles, stronger from holy cities and those with Temples and "
+                          "Cathedrals) and along trade routes; Missionaries win many followers at once.";
+        if (c.religion >= 0) {
+            const Religion& rel = g.religions[c.religion];
+            rs = "Follows " + rel.name + (rel.holyCity == c.id ? " (its holy city)" : "");
+            tip = rel.name + ". Beliefs:\n";
+            for (int b : rel.beliefs) tip += std::string("  ") + g_beliefs[b].name + ": " + g_beliefs[b].desc + "\n";
+        } else if (!g.religions.empty()) rs = "Follows no religion yet";
+        if (!rs.empty()) {
+            std::string pr;
+            for (size_t r = 0; r < g.religions.size() && r < c.pressure.size(); r++)
+                if (c.pressure[r] > 0) pr += (pr.empty() ? "\nPressure: " : ", ") + g.religions[r].name + " " + std::to_string(c.pressure[r]);
+            if (c.religion >= 0) drawReligionSymbol(c.religion, px + 24, y + 3, 8);
+            cv->text(px + 38, y - 4, rs, 13, rgb(250, 232, 180), AL_LEFT, true);
+            hot(px + 12, y - 6, cv->textWidth(rs, 13, true) + 34, 18, nullptr, tip + pr);
+            y += 18;
+        }
     }
     if (c.droughtTurns > 0) {
         cv->text(px + 16, y - 4, "DROUGHT: -33% Food for " + std::to_string(c.droughtTurns) + " more turns", 13, rgb(240, 160, 80), AL_LEFT, true);
@@ -1322,11 +1373,18 @@ void GameUI::renderCity() {
         cv->text(px + 20, y + 6, "Producing: " + nm, 15, C_TEXT, AL_LEFT, true);
         cv->text(px + 20, y + 26, std::to_string(std::min(c.prod, cost)) + "/" + std::to_string(cost) + "  -  " + std::to_string(g.turnsToBuild(c)) + " turns", 13, C_DIM);
         bar(px + 20, y + 46, pw - 160, 8, (double)c.prod / cost, C_PROD);
-        int bc = g.buyCost(c);
+        int bc = g.buyCost(c), fc = g.faithBuyCost(c);
+        bool both = g.hasGold(g.player) && bc > 0 && fc > 0;
         if (g.hasGold(g.player) && bc > 0) {
             bool afford = g.civs[g.player].gold >= bc;
-            button(pw - 126, y + 14, 106, 36, "Buy " + std::to_string(bc) + "g", afford, [this] { City& cc = game->cities[selCity]; game->buy(cc); },
+            button(pw - 126, both ? y + 4 : y + 14, 106, both ? 27 : 36, "Buy " + std::to_string(bc) + "g", afford, [this] { City& cc = game->cities[selCity]; game->buy(cc); },
                    "Complete this item at the end of the turn for gold.", rgb(110, 90, 30), 13);
+        }
+        if (fc > 0) {
+            bool afford = g.civs[g.player].faith >= fc;
+            button(pw - 126, both ? y + 34 : y + 14, 106, both ? 27 : 36, std::to_string(fc) + " Faith", afford,
+                   [this] { City& cc = game->cities[selCity]; game->buyWithFaith(cc); },
+                   "Complete this building at the end of the turn with Faith: the devout give their labour.", rgb(110, 100, 60), 12);
         }
     } else {
         cv->text(px + 20, y + 10, "Choose something to produce", 16, rgb(255, 190, 110), AL_LEFT, true);
@@ -2181,6 +2239,16 @@ void GameUI::renderHelp() {
         "influence with a tribe), Great Tale (Culture and +2 Happiness in every city for a while) or Rally Troops (nearby troops heal and "
         "fight at +20%) - or Settle in City for a lasting +3 Science, Production or Culture or +4 Gold there. Great Primates can share a "
         "tile with any of your units.\n"
+        "RELIGION (H)  Shrines (+2 Faith), Temples (+4), Cathedrals (+6), natural wonders your cities work and holy cities give Faith. With "
+        "Symbols and enough Faith you may found one of a few religions (the world has room for about half as many as there are peoples), "
+        "choosing a follower belief for every city that follows it and a founder belief for your people; with Theology, enhance it with "
+        "two more. Religions spread from city to city (within 10 tiles, stronger from holy cities, Temples and Cathedrals) and along trade "
+        "routes; Missionaries, bought with Faith, preach in a city to win many followers at once. Faith also buys holy festivals (+2 "
+        "Happiness everywhere) and can finish buildings. But beware ZEAL: a people devoted too heavily to its faith resists ideas that "
+        "contradict it, as religion has resisted science through history and still does. Zeal is the share of Faith in your Faith and "
+        "Science (Faith counted double), plus the zeal of your faith's beliefs (Devout Masses, Holy Warriors, Orthodoxy, Inquisition add to it; "
+        "Monastic Scribes and Natural Philosophy take from it), less 10 for Free Thought. Above 25, each point costs 3/4 of a percent of "
+        "your Science, up to half.\n"
         "TUTORIAL AND ADVISORS  Choose Tutorial on the title screen (or switch it on when setting up a game) for a guided first game; "
         "it points at what to do and moves on when you have done it, and Skip tutorial turns it off. Your four advisors (Advisors, or A) "
         "suggest what to do next, most urgent first, with a button that takes you there; with advisor tips on they also speak up at the "
@@ -2209,7 +2277,7 @@ void GameUI::renderHelp() {
         "Capture cities by reducing their HP to zero with a melee unit. Beware the feral packs that roam the wastelands. Battles give units experience; each level brings a promotion of your choice (Z, or the Promote button) - a gold ring around a unit means one is waiting.\n"
         "CONTROLS  Left-click: select.  Right-click: move / attack.  Drag or arrow keys: scroll.  Wheel or +/-: zoom.  Enter: end turn.  "
         "Space: skip unit.  Tab: next unit.  B: settle / found city.  G: split band.  R: war party.  F: fortify.  S: sleep.  E: excavate.  X: decontaminate.  M: move mode.  C: centre on unit.  Z: promote.  "
-        "T: technologies.  V: evolution.  P: traditions.  D: diplomacy.  I: tribes.  O: empire overview.  A: advisors.  L: log (filter messages by kind there).  Ctrl+S / Ctrl+L: save / load.  Ctrl + / Ctrl - / Ctrl 0: interface size.  Esc: menu / close.";
+        "T: technologies.  V: evolution.  P: traditions.  D: diplomacy.  I: tribes.  H: religion.  O: empire overview.  A: advisors.  L: log (filter messages by kind there).  Ctrl+S / Ctrl+L: save / load.  Ctrl + / Ctrl - / Ctrl 0: interface size.  Esc: menu / close.";
     int top = py + 56, viewH = ph - 70;
     Hot area{px, top, pw, viewH, nullptr, "", true};
     hots.push_back(area);
@@ -2780,7 +2848,7 @@ void GameUI::key(int k, bool shift, bool ctrl) {
     if (overlay == OV_CITY && (k == 'T' || k == 'P' || k == 'D' || k == 'L' || k == 'V' || k == 'I' || k == 'A')) overlay = OV_NONE;
     if (overlay != OV_NONE && overlay != OV_CITY) {
         if ((k == 'T' && overlay == OV_TECH) || (k == 'P' && overlay == OV_POLICY) || (k == 'D' && overlay == OV_DIPLO) || (k == 'L' && overlay == OV_LOG) ||
-            (k == 'V' && overlay == OV_EVO) || (k == 'I' && overlay == OV_TRIBES) || (k == 'O' && overlay == OV_EMPIRE) || (k == 'A' && overlay == OV_ADVISORS))
+            (k == 'V' && overlay == OV_EVO) || (k == 'I' && overlay == OV_TRIBES) || (k == 'O' && overlay == OV_EMPIRE) || (k == 'H' && overlay == OV_RELIGION) || (k == 'A' && overlay == OV_ADVISORS))
             overlay = OV_NONE;
         return;
     }
@@ -2792,6 +2860,7 @@ void GameUI::key(int k, bool shift, bool ctrl) {
         case 'V': overlay = OV_EVO; return;
         case 'I': overlay = OV_TRIBES; tribeWarArm = -1; return;
         case 'O': overlay = OV_EMPIRE; empireScroll = 0; return;
+        case 'H': overlay = OV_RELIGION; return;
         case 'A': overlay = OV_ADVISORS; return;
         case KEY_TAB: { int n = nextUnitNeedingOrders(selUnit); if (n >= 0) selectUnit(n, true); return; }
         case 'C': if (sel()) centerOn(sel()->x, sel()->y); return;

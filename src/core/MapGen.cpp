@@ -425,6 +425,7 @@ void Game::newGame(const GameSettings& s) {
     tutorialStep = s.tutorial ? 0 : -1;
     cassandraTurn = cassandraX = cassandraY = -1;
     cassandraPlan = -1;
+    religions.clear();
     std::vector<int> pool;
     for (int p = 0; p < (int)g_primates.size(); p++)
         if (p != s.primate && std::find(s.hotseat.begin(), s.hotseat.end(), p) == s.hotseat.end()) pool.push_back(p);

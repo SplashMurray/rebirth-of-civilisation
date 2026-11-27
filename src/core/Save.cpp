@@ -5,7 +5,7 @@
 #include <sstream>
 
 namespace {
-const int SAVE_VERSION = 25;
+const int SAVE_VERSION = 26;
 
 struct Archive {
     bool writing;
@@ -92,7 +92,7 @@ struct Archive {
     }
 };
 
-void ioYields(Archive& a, Yields& y) { a.io(y.food); a.io(y.prod); a.io(y.sci); a.io(y.cult); a.io(y.gold); }
+void ioYields(Archive& a, Yields& y) { a.io(y.food); a.io(y.prod); a.io(y.sci); a.io(y.cult); a.io(y.gold); a.io(y.faith); }
 
 void ioGame(Archive& a, Game& g) {
     a.io(g.W); a.io(g.H); a.io(g.turn); a.io(g.player);
@@ -140,6 +140,8 @@ void ioGame(Archive& a, Game& g) {
         a.io(c.questDone); a.io(c.lastUnitGift); a.io(c.firstMet); a.io(c.tribeFoodCapital); a.io(c.tribeFoodAll); a.io(c.questsCompleted); a.io(c.mostAllies);
         for (int k = 0; k < GK_COUNT; k++) { a.io(c.greatPts[k]); a.io(c.greatBorn[k]); }
         a.io(c.festivalUntil); a.io(c.preservation); a.io(c.metCassandra); a.io(c.greatEarned);
+        a.io(c.faith); a.io(c.faithPerTurn); a.io(c.faithTotal); a.io(c.sciRawPerTurn); a.io(c.zeal); a.io(c.zealPenalty); a.io(c.founded);
+        a.io(c.missionariesBought); a.io(c.festivalsHeld);
     }
     if (!a.writing) g.allyResTurn = -1;
     long long nu = (long long)g.units.size();
@@ -148,7 +150,7 @@ void ioGame(Archive& a, Game& g) {
     for (auto& u : g.units) {
         a.io(u.id); a.io(u.type); a.io(u.owner); a.io(u.x); a.io(u.y); a.io(u.hp); a.io(u.moves);
         a.io(u.order); a.io(u.gx); a.io(u.gy); a.io(u.work); a.io(u.buildImp); a.io(u.fortTurns);
-        a.io(u.acted); a.io(u.attacked); a.io(u.alive); a.io(u.band); a.io(u.bandFood); a.io(u.name); a.io(u.rallyUntil); a.io(u.xp); a.io(u.promos); a.io(u.carrier); a.io(u.ferryX); a.io(u.ferryY);
+        a.io(u.acted); a.io(u.attacked); a.io(u.alive); a.io(u.band); a.io(u.bandFood); a.io(u.name); a.io(u.rallyUntil); a.io(u.xp); a.io(u.promos); a.io(u.carrier); a.io(u.ferryX); a.io(u.ferryY); a.io(u.religion);
     }
     long long ncity = (long long)g.cities.size();
     a.num(ncity);
@@ -158,7 +160,12 @@ void ioGame(Archive& a, Game& g) {
         a.io(c.x); a.io(c.y); a.io(c.pop); a.io(c.food); a.io(c.prod); a.io(c.buildKind); a.io(c.buildId);
         a.io(c.has); a.io(c.borderCulture); a.io(c.claims); a.io(c.hp); a.io(c.alive); a.io(c.founded);
         ioYields(a, c.yields); a.io(c.foodSurplus); a.io(c.worked); a.io(c.droughtTurns); a.io(c.happy); a.io(c.unhappy); a.io(c.moodWas); ioYields(a, c.greatBonus);
+        a.io(c.religion); a.io(c.pressure);
     }
+    long long nrel = (long long)g.religions.size();
+    a.num(nrel);
+    if (!a.writing) g.religions.assign((size_t)std::max(0LL, nrel), Religion());
+    for (auto& r : g.religions) { a.io(r.name); a.io(r.founder); a.io(r.holyCity); a.io(r.founded); a.io(r.nameIdx); a.io(r.enhanced); a.io(r.beliefs); a.io(r.followers); }
     long long nl = (long long)g.log.size();
     a.num(nl);
     if (!a.writing) g.log.assign((size_t)std::max(0LL, nl), Notification());

@@ -93,6 +93,7 @@ struct Unit {
     int rallyUntil = -1;  // rallied by a Great Warleader: +20% strength through this turn
     int xp = 0;           // experience from battle (see Promotions.cpp)
     uint32_t promos = 0;  // promotions taken (bit per PromoId)
+    int religion = -1;    // a Missionary's faith
 };
 
 enum PromoId { PR_SHOCK1, PR_SHOCK2, PR_GUARD1, PR_GUARD2, PR_WOODSMAN, PR_HIGHLANDER, PR_RAIDER, PR_MEDIC, PR_SWIFT, PR_SIGHT, PR_SEALEGS, PR_COUNT };
@@ -129,6 +130,9 @@ struct City {
     Yields greatBonus;      // Great Primates who settled here
     int happy = 0, unhappy = 0;  // derived: citizens' mood (see Happiness.cpp)
     int8_t moodWas = 0;     // mood last turn, to report changes
+    int religion = -1;      // the faith most of its people follow (see Religion.cpp)
+    int sciRaw = 0;         // derived: science before the cost of zeal
+    std::vector<int> pressure;  // per religion: how strongly it is pressing on this city
 };
 
 // City moods, from worst to best.
@@ -137,9 +141,9 @@ static const int CONTENT_BASE = 5;  // citizens content with nothing at all
 
 // Where a city's happiness and unhappiness come from.
 struct MoodParts {
-    int luxuries = 0, buildings = 0, wonders = 0, naturals = 0, traditions = 0, festival = 0;  // happiness
-    int crowding = 0, empire = 0, war = 0;                                                    // unhappiness
-    int happy() const { return luxuries + buildings + wonders + naturals + traditions + festival; }
+    int luxuries = 0, buildings = 0, wonders = 0, naturals = 0, traditions = 0, festival = 0, faith = 0;  // happiness
+    int crowding = 0, empire = 0, war = 0;                                                               // unhappiness
+    int happy() const { return luxuries + buildings + wonders + naturals + traditions + festival + faith; }
     int unhappy() const { return crowding + empire + war; }
 };
 
@@ -221,6 +225,40 @@ struct Civ {
     bool preservation = false;      // the Last Human's memories: excavations yield half as much again
     bool metCassandra = false;
     int greatEarned = 0;
+    // faith (see Religion.cpp)
+    int faith = 0, faithPerTurn = 0, faithTotal = 0;
+    int sciRawPerTurn = 0;    // science before the cost of zeal (derived)
+    int zeal = 0;             // how strongly the people's faith resists new ideas (derived)
+    int zealPenalty = 0;      // % of science lost to it (derived)
+    int founded = -1;         // the religion this civ founded
+    int missionariesBought = 0, festivalsHeld = 0;
+};
+
+// ---- religion
+enum BeliefId {
+    // follower beliefs: every city following the religion, whoever rules it
+    BL_PRAYER, BL_GROVES, BL_BUILDERS, BL_SONGS, BL_SCRIBES, BL_DEVOUT, BL_MONKS,
+    // founder beliefs: the people who founded it
+    BL_TITHES, BL_PILGRIMS, BL_WORLD_CHURCH, BL_HOLY_WARRIORS, BL_ORTHODOXY, BL_INQUISITION, BL_NATURAL_PHIL,
+    BL_COUNT
+};
+struct BeliefDef {
+    const char* name;
+    bool founder;  // founder belief (else follower)
+    int zeal;      // how much it adds to (or takes from) its followers' zeal
+    const char* desc;
+};
+extern const BeliefDef g_beliefs[BL_COUNT];
+static const int MAX_RELIGIONS = 6;
+extern const char* RELIGION_NAMES[];
+extern const int NUM_RELIGION_NAMES;
+struct Religion {
+    std::string name;
+    int founder = -1, holyCity = -1, founded = 0;
+    int nameIdx = 0;          // also picks its colour and symbol
+    bool enhanced = false;
+    std::vector<int> beliefs;
+    int followers = 0;        // cities following it (derived each turn)
 };
 
 // Influence thresholds with a minor tribe.
@@ -486,6 +524,39 @@ public:
     int turnsToGrow(const City& city) const;
     int ruinTilesInTerritory(const City& city) const;
     void captureCity(City& city, int newOwner);
+
+    // ---- religion (Religion.cpp)
+    std::vector<Religion> religions;
+    int maxReligions() const;
+    int foundCost() const;
+    int enhanceCost() const;
+    int missionaryCost(int c) const;
+    int festivalCost(int c) const;
+    bool canFoundReligion(int c, std::string* why = nullptr) const;
+    bool canEnhanceReligion(int c, std::string* why = nullptr) const;
+    bool beliefTaken(int b) const;
+    bool hasBelief(int r, int b) const;
+    bool founderHas(int c, int b) const;  // does c's own religion have this (founder) belief?
+    int stateReligion(int c) const;       // the faith of c's capital
+    int holyCityReligion(const City& ci) const;  // the religion whose holy city this is, or -1
+    bool foundReligion(int c, int nameIdx, int follower, int founderBelief);
+    bool enhanceReligion(int c, int follower, int founderBelief);
+    bool buyMissionary(int c, std::string* why = nullptr);
+    bool canPreach(const Unit& u, std::string* why = nullptr) const;
+    City* preachTarget(const Unit& u) const;
+    bool preach(Unit& u);
+    int faithBuyCost(const City& city) const;  // Faith to finish the building a city is making (0: not possible)
+    bool buyWithFaith(City& city);
+    bool canHoldFestival(int c, std::string* why = nullptr) const;
+    bool holdFestival(int c);
+    void religionTurn();
+    void convertCity(City& ci, int r, bool announce);
+    int zealOf(int c, int* share = nullptr, int* beliefs = nullptr, int* traditions = nullptr) const;
+    static int zealToPenalty(int zeal);
+    int religionPressure(const City& from, const City& to, int r) const;  // pressure a city sends another each turn
+    bool nearFaithful(int c, int x, int y) const;  // Holy Warriors: within 2 tiles of a city following c's religion
+    void aiReligion(int c);
+    int aiPickBelief(int c, bool founder) const;
 
     // ---- units
     int spawnUnit(int c, int type, int x, int y);

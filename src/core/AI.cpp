@@ -290,6 +290,7 @@ void Game::aiTurn(int c) {
     aiDiplomacy(c);
     aiTribes(c);
     aiGreat(c);
+    aiReligion(c);
     aiPacts(c);
     aiOffers(c);
     for (size_t i = 0; i < cities.size(); i++)
@@ -441,6 +442,14 @@ void Game::aiCity(City& city) {
             v += (bd.pct.food * city.yields.food + bd.pct.prod * city.yields.prod + bd.pct.sci * city.yields.sci +
                   bd.pct.cult * city.yields.cult + bd.pct.gold * city.yields.gold) / 30.0;
             v += bd.defense * (atWarAny ? 1.5 : 0.4) * (wantWalls ? 2.5 : 1.0);
+            if (bd.flat.faith > 0) {  // faith: dear to the pious - but a clever people watches what zeal costs its science
+                int piety = pd ? pd->piety : 5;
+                double fw = 0.5 + piety * 0.15;
+                if (sk >= 1 && cv.zealPenalty >= 8 && piety < 8) fw *= 0.2;
+                else if (sk >= 2 && cv.zeal >= 20 && piety < 6) fw *= 0.5;
+                if (cv.founded < 0 && (int)religions.size() >= maxReligions() && piety < 6) fw *= 0.6;
+                v += bd.flat.faith * fw;
+            }
             if (bd.happy || bd.special == BSpecial::HappyAll) {  // contentment matters most where the city is near its limit
                 int spare = city.happy - city.unhappy;
                 double hw = spare < 0 ? 9 : spare <= 1 ? 5 : spare <= 3 ? 2 : 0.6;

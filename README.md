@@ -39,6 +39,8 @@
 * **Sound and music.** Music changes with your story: a sombre theme on the title screen, drums and flutes in the wandering age, fuller pieces as civilisation grows, battle music while you are fighting a war, a lament for the Fall and a fanfare for victory - crossfading as the mood changes. Every fight sounds the part (swords, spears, bows, slings, muskets, catapults and cannon, impacts, falling cities and sinking ships), as do footsteps and hooves, ships, gatherers at work, new technologies, evolution, cities, trade, wars, disasters and the bombs. Ambient sound follows what is on screen: surf by the sea, birds and jungle in the forests, wind over snow, mountains and fallout. The industrial and modern eras get music of their own, as do modern wars. Every species has its own voice - chimpanzee pant-hoots, gorilla grunts, baboon barks, capuchin chatter, gibbon song and macaque coos - heard when you select your troops, when they charge into battle, when a city is founded, when you choose a primate and when you talk to a rival. Music, sound effects and ambience each have a volume control (in the menu; music and effects also on the title screen). Sources: most music and all effects come from the open-source game [0 A.D.](https://play0ad.com/) by Wildfire Games ([CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/)); the industrial, modern and modern-war music is public domain from [FreePD.com](https://freepd.com/); the primate calls are field and research recordings from Wikimedia Commons and Freesound ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) and CC0) - full credits in [assets/audio/CREDITS.txt](assets/audio/CREDITS.txt).
   * **Animations** can be turned off in the menu for slow computers. The terrain is cached in chunks, so scrolling the map stays smooth.
 * **Hex map**, randomly generated, with grassland, plains, desert, tundra, snow, coast and ocean, plus forest, jungle, hills, mountains, resources, rivers, lakes and terrain features. Small (60 × 38), Standard (74 × 46) and Large (84 × 54) sizes with 4, 6 or 8 primate civilisations: about 570 tiles per species, the same room each as in Civilization VI.
+* **Religion and zeal.** Shrines, Temples, Cathedrals, natural wonders and holy cities give **Faith**. With Symbols and enough Faith a people can found one of a few religions (about half as many as there are peoples), choosing a follower belief - for every city that follows it, whoever rules it - and a founder belief for themselves; with Theology they can enhance it with two more. Religions spread by themselves from city to city (within 10 tiles, strongest from holy cities and cities with Temples and Cathedrals) and along trade routes, and **Missionaries** bought with Faith preach in a city to win many followers at once. Faith also buys holy festivals (+2 Happiness everywhere) and can finish buildings. The Religion screen (`H`) shows your faith, your religion and every religion in the world; cities show their faith's symbol.
+  But devotion has a price. A people that leans too heavily on its faith resists ideas that contradict it - as religion has resisted science through history, and still does - and pays for it in **zeal**: the share of Faith in its Faith and Science (Faith counted double), plus the zeal of its faith's beliefs (Devout Masses +10, Warrior Monks +5, Holy Warriors +10, Orthodoxy +15, Inquisition +25; Monastic Scribes -10, Natural Philosophy -15), less 10 for the Free Thought tradition. Above 25, every point of zeal costs 3/4 of a percent of Science, up to half. The computer players weigh it too: pious peoples like the Gibbons accept it for the power of their faith, worldly ones like the Orangutans avoid dogmatic beliefs and stop building temples once zeal starts to bite.
 * **Great Primates.** A people's Science, Production, Gold and trade routes, Culture and victories in battle build up points towards **Great Thinkers, Artisans, Merchants, Storytellers and Warleaders**, each born in your capital with a name of their own (each new one of a kind takes more points than the last; progress is shown on the Advisors screen). Spend their gift at once - a burst of Science (*Share Insight*), Production towards a city's work (*Masterwork*, not the Rebirth Project), a trade mission to another people's city for Gold and goodwill (much influence with a tribe), a Great Tale for Culture and a season of festivals (+2 Happiness everywhere), or a rallying cry that heals nearby troops and has them fight at +20% - or settle them in a city for a lasting +3 Science, Production or Culture or +4 Gold there.
 * **Tutorial.** *Tutorial* on the title screen (or the Tutorial switch when setting up a game) starts a guided first game: 20 steps from selecting your Roaming Band, moving, foraging and ending turns, through the Fall, evolution and research, to settling your first city, choosing production, improving the land, happiness, traditions, neighbours and tribes, ruins and trade, advisors and how to win. Each step points at the control or unit concerned and moves on by itself once you have done what it asks (or press Next); progress is saved with the game, and you can skip it at any time.
 * **Advisors.** Four advisors - the Elder of the Hearth (growth and cities), the Keeper of Knowledge (science and evolution), the War Chief (war and defence) and the Far-Traveller (neighbours, tribes and trade) - read the state of your people and suggest what to do next, most urgent first, each with a button that takes you there: idle cities, starvation and unrest, unchosen research or evolution, traditions to adopt, ruins to dig, enemies at the gates, undefended cities, upgrades, tribe requests and gifts, idle caravans, spare luxuries to trade, and rivals close to victory. Open them with `A`; with advisor tips on (a switch on the setup and Advisors screens, saved in your settings), the most urgent new matter also pops up at the start of a turn.
@@ -239,7 +241,7 @@
 | `B` `F` `S` `E` `X` `M` | Settle / found city, fortify, sleep, excavate ruins, decontaminate, move mode |
 | `G` / `R` | Split band / raise a war party from a band |
 | `U` / `K` / `Z` | Upgrade unit / board or leave a ship in a harbour / promote |
-| `T` `V` `P` `D` `I` `O` `A` `L` | Technology tree / evolution / traditions / diplomacy / minor tribes / empire overview / advisors / event log |
+| `T` `V` `P` `D` `I` `H` `O` `A` `L` | Technology tree / evolution / traditions / diplomacy / minor tribes / religion / empire overview / advisors / event log |
 | `Ctrl+S` / `Ctrl+L` | Save / load |
 | `Ctrl +` / `Ctrl -` / `Ctrl 0` | Interface size bigger / smaller / reset (also in the menu and on the title screen) |
 | `F1` | How to play |
@@ -261,7 +263,7 @@
 | ![Every resource](docs/screenshots/32_resources.png) | ![The tutorial](docs/screenshots/33_tutorial.png) |
 | ![Advisors](docs/screenshots/34_advisors.png) | |
 | ![Empire overview](docs/screenshots/36_empire.png) | ![Message filters](docs/screenshots/37_log_filter.png) |
-| ![Hotseat setup](docs/screenshots/40_hotseat_setup.png) | |
+| ![Hotseat setup](docs/screenshots/40_hotseat_setup.png) | ![Religion](docs/screenshots/41_religion.png) |
 | ![Promotions](docs/screenshots/38_promotions.png) | |
 | ![Start](docs/screenshots/04_start_map.png) | ![The Fall](docs/screenshots/07_fall_popup.png) |
 | ![A drought](docs/screenshots/11c_disaster.png) | ![Late game](docs/screenshots/16_lategame.png) |
@@ -316,6 +318,7 @@ src/core/        Rules engine - no platform code
   Tribes.cpp       minor tribes: influence, allies, quests, their AI
   Promotions.cpp   unit experience and promotions
   Great.cpp        Great Primates
+  Religion.cpp     faith, religions and beliefs, spreading, missionaries, zeal
   Achievements.cpp achievement list, unlock checks and the profile file
   AI.cpp           computer opponents
   Save.cpp         save games
@@ -328,7 +331,8 @@ src/ui/          User interface, drawn through the small Canvas interface
   UIResources.cpp  resource icons and how resources look on the map
   UITutorial.cpp   the step-by-step tutorial
   UIAdvisors.cpp   the four advisors and their tips
-  UIEmpire.cpp     the empire overview
+  UIEmpire.cpp     the empire overview and the hotseat handover screen
+  UIReligion.cpp   the Religion screen and religion symbols
   UISound.cpp      which sounds, music and ambience play when
 src/audio/Mixer.cpp  portable software mixer (effects, ambient loops, streamed Ogg music)
 src/platform/win32/main_win32.cpp   Windows window, input and GDI+ renderer

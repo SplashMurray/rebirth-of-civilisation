@@ -466,6 +466,9 @@ void initData() {
          "settle in a city for +3 Culture."},
         {"Great Warleader", "GW", 0, 0, 0, 0, 3, "", UC::Great, "", -2,
          "A legendary commander. Rallies the troops around them: full health and +20% strength for a while."},
+        {"Missionary", "Mi", 0, 0, 0, 0, 3, "", UC::Great, "", -2,
+         "Bought with Faith. Preaches the faith in a city (its own or another people's, if not at war with them), "
+         "winning many followers there at once. Used up when it preaches."},
         {"The Last Human", "LH", 0, 0, 0, 0, 2, "", UC::Great, "", -2,
          "Cassandra, the last human, who fell from a blue box in the sky. She remembers the old world - and insists she is, technically, "
          "a primate."},
@@ -488,18 +491,19 @@ void initData() {
         {"Palisade", 50, "Digging", Y(0, 0, 0, 0, 0), Y(0, 0, 0, 0, 0), 4, 50, false, BSpecial::None, ""},
         {"Training Ground", 60, "Spearcraft", Y(0, 0, 0, 0, 0), Y(0, 0, 0, 0, 0), 0, 0, false, BSpecial::Veterans,
          "Military units trained here start with 15 experience: a promotion at once"},
-        {"Shrine", 60, "Symbols", Y(0, 0, 0, 3, 0), Y(0, 0, 0, 0, 0), 0, 0, false, BSpecial::None, ""},
+        {"Shrine", 60, "Symbols", Y(0, 0, 0, 2, 0), Y(0, 0, 0, 0, 0), 0, 0, false, BSpecial::None, ""},
         {"Salvage Yard", 70, "Salvaging", Y(0, 1, 0, 0, 0), Y(0, 10, 0, 0, 0), 0, 0, false, BSpecial::RuinProd, "+1 Production per ruin in territory"},
         {"Knowledge Hut", 75, "Writing", Y(0, 0, 3, 0, 0), Y(0, 0, 10, 0, 0), 0, 0, false, BSpecial::None, ""},
         {"Stone Walls", 80, "Masonry", Y(0, 0, 0, 0, 0), Y(0, 0, 0, 0, 0), 8, 75, false, BSpecial::None, ""},
         {"Market", 90, "Currency", Y(0, 0, 0, 0, 2), Y(0, 0, 0, 0, 25), 0, 0, false, BSpecial::None, ""},
         {"Archive of Humanity", 120, "Deciphering", Y(0, 0, 3, 1, 0), Y(0, 0, 0, 0, 0), 0, 0, false, BSpecial::RuinScience, "+2 Science per ruin in territory"},
         {"Aqueduct", 120, "Construction", Y(2, 0, 0, 0, 0), Y(15, 0, 0, 0, 0), 0, 0, false, BSpecial::None, ""},
-        {"Temple", 110, "Theology", Y(0, 0, 0, 4, 0), Y(0, 0, 0, 0, 0), 0, 0, false, BSpecial::None, ""},
+        {"Temple", 110, "Theology", Y(0, 0, 0, 3, 0), Y(0, 0, 0, 0, 0), 0, 0, false, BSpecial::None, ""},
         {"University", 180, "Education", Y(0, 0, 4, 0, 0), Y(0, 0, 25, 0, 0), 0, 0, false, BSpecial::None, ""},
         {"Printing House", 200, "Printing", Y(0, 0, 2, 3, 0), Y(0, 0, 10, 10, 0), 0, 0, false, BSpecial::None, ""},
         {"Bank", 170, "Banking", Y(0, 0, 0, 0, 3), Y(0, 0, 0, 0, 25), 0, 0, false, BSpecial::None, ""},
         {"Hospital", 220, "Radiology", Y(3, 0, 0, 0, 0), Y(0, 0, 0, 0, 0), 0, 0, false, BSpecial::HealBonus, "Units in or next to the city heal fully"},
+        {"Cathedral", 200, "Mechanics", Y(0, 0, 0, 3, 0), Y(0, 0, 0, 0, 0), 0, 0, false, BSpecial::None, "Vaulted halls raised to the sky"},
         {"Arena", 140, "Construction", Y(0, 0, 0, 1, 0), Y(0, 0, 0, 0, 0), 0, 0, false, BSpecial::None, "Games and contests"},
         {"Steam Workshop", 200, "Steam Power", Y(0, 3, 0, 0, 0), Y(0, 15, 0, 0, 0), 0, 0, false, BSpecial::None, ""},
         {"Bastion", 260, "Rifling", Y(0, 0, 0, 0, 0), Y(0, 0, 0, 0, 0), 14, 100, false, BSpecial::None, ""},
@@ -520,7 +524,7 @@ void initData() {
     };
     for (auto& b : g_buildings) b.techId = needTech(b.tech);
     // happiness from buildings
-    for (auto& hb : std::vector<std::pair<const char*, int>>{{"Totem", 1}, {"Shrine", 1}, {"Market", 1}, {"Temple", 2}, {"Arena", 3},
+    for (auto& hb : std::vector<std::pair<const char*, int>>{{"Totem", 1}, {"Shrine", 1}, {"Market", 1}, {"Temple", 2}, {"Cathedral", 2}, {"Arena", 3},
                                                              {"Hospital", 1}, {"Stadium", 3}, {"Broadcast Tower", 2}, {"Nest Hall", 1}})
         g_buildings[buildingIndex(hb.first)].happy = hb.second;
     // strategic resource requirements (unique units inherit those of the unit they replace)
@@ -600,6 +604,10 @@ void initData() {
         {"Open Archives", "+25% Science", PolicyEffect::Sci, 25, "Computing"},
     };
     for (auto& p : g_policies) p.techId = needTech(p.tech);
+    // faith from the houses of worship
+    g_buildings[buildingIndex("Shrine")].flat.faith = 2;
+    g_buildings[buildingIndex("Temple")].flat.faith = 4;
+    g_buildings[buildingIndex("Cathedral")].flat.faith = 6;
 
     // evolutionary aptitude: social and vocal species evolve language faster
     static const int EVO[] = {10, 20, 10, 0, 0, 10, 25, 0};
@@ -629,6 +637,11 @@ void initData() {
     persona("Capuchin", "Trader", "Will deal with anyone. Values fair trades highly and grows fond of good trading partners.", 4, 5, 8, 3, 5, false);
     persona("Gibbon", "Faithful Partner", "Chooses one close partner and stays loyal for life. Distant with everyone else.", 0, 10, 4, 5, 9, true);
     persona("Japanese Macaque", "Hierarchist", "Ranks everyone by strength and status. Respects the powerful; looks down on the weak.", 0, 6, 5, 5, 5, false);
+    // piety: how much each people cares for faith, and how much science it will give up for it
+    for (auto& pp : std::vector<std::pair<const char*, int>>{{"Chimpanzee", 4}, {"Bonobo", 7}, {"Orangutan", 2}, {"Gorilla", 5}, {"Baboon", 6},
+                                                             {"Capuchin", 3}, {"Gibbon", 8}, {"Japanese Macaque", 6}})
+        for (auto& p : g_primates) if (p.name == pp.first) p.piety = pp.second;
+    ID.uMissionary = unitIndex("Missionary");
     ID.uNuke = unitIndex("Nuclear Warhead");
     ID.tFission = techIndex("Nuclear Fission");
     ID.uGatherer = unitIndex("Gatherer");

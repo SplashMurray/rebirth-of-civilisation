@@ -572,6 +572,8 @@ void GameUI::drawCityBanner(const City& c, int sx, int sy) {
             yb += 5;
         }
     }
+    if (c.religion >= 0 && g.civs[g.player].explored[g.idx(c.x, c.y)])  // its faith
+        drawReligionSymbol(c.religion, g.isMinor(c.owner) ? bx + bw + sz / 2 + 4 : bx - sz / 2 - 3, by + bh / 2, sz / 2 + 1);
     if (c.owner == g.player && g.moodOf(c) != MOOD_CONTENT) drawMoodFace(bx + bw + sz / 2 + 6, by + bh / 2, sz / 2 + 1, g.moodOf(c));
     if (c.owner == g.player) {
         double pf = 0;
@@ -602,6 +604,13 @@ void GameUI::drawUnitIcon(int type, int cx, int cy, int s, Color ic, Color accen
     };
     auto circ = [&](double fx, double fy, double r, Color col) { int a, b; P(fx, fy, a, b); cv->fillCircle(a, b, std::max(1, (int)(r * s)), col); };
     if (d.cls == UnitClass::Great) {
+        if (type == ID.uMissionary) {  // a hooded preacher with a staff
+            circ(-0.1, -0.5, 0.24, ic);
+            poly({-0.32, -0.62, 0.12, -0.62, 0.45, 0.85, -0.65, 0.85}, ic);
+            L(0.55, -0.85, 0.55, 0.9, lw);
+            circ(0.55, -0.85, 0.16, accent);
+            return;
+        }
         if (type == ID.uGreat[GK_LAST_HUMAN]) {  // a person - an upright, hairless one
             circ(0, -0.52, 0.24, ic);
             poly({-0.12, -0.28, 0.12, -0.28, 0.55, 0.8, -0.55, 0.8}, ic);

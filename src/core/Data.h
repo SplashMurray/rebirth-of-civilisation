@@ -242,6 +242,7 @@ struct PrimateDef {
     int territorial = 5;     // resents neighbours pressing on its lands
     int pactLove = 5;        // keen on pacts and alliances
     bool ape = true;         // great/lesser ape (true) or monkey (false): kin feeling
+    int piety = 5;           // 0..10: how much the AI cares for faith (and tolerates its cost to science)
 };
 
 // ---------------------------------------------------------------- tables
@@ -290,6 +291,7 @@ std::string needsText(const std::vector<int>& needs);
 
 // commonly referenced ids (filled by initData)
 struct DataIds {
+    int uMissionary = -1;
     int uElder, uGatherer, uScout, uWarband, uTinkerer, uBand, uNuke, uCaravan;
     int uGreat[GK_COUNT + 1] = {};  // the Great Primates, and the Last Human
     int bPalace, bRebirth;

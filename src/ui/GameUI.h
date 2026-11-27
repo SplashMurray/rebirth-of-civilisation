@@ -38,7 +38,7 @@ public:
 
     // ---- used by tests / screenshot tool
     enum Screen { SCR_TITLE, SCR_SETUP, SCR_GAME };
-    enum Overlay { OV_NONE, OV_CITY, OV_TECH, OV_POLICY, OV_DIPLO, OV_MENU, OV_HELP, OV_LOG, OV_EVO, OV_ACHIEVEMENTS, OV_TRADE, OV_ROUTES, OV_TRIBES, OV_ADVISORS, OV_EMPIRE };
+    enum Overlay { OV_NONE, OV_CITY, OV_TECH, OV_POLICY, OV_DIPLO, OV_MENU, OV_HELP, OV_LOG, OV_EVO, OV_ACHIEVEMENTS, OV_TRADE, OV_ROUTES, OV_TRIBES, OV_ADVISORS, OV_EMPIRE, OV_RELIGION };
     Screen screen = SCR_TITLE;
     Overlay overlay = OV_NONE;
     std::unique_ptr<Game> game;
@@ -255,6 +255,11 @@ private:
     // ---- minor tribes
     void renderTribes();
     void renderEmpire();
+    void renderReligion();
+    void drawReligionSymbol(int r, int cx, int cy, int rad);
+    Color religionColor(int r) const;
+    std::string zealTip(int c);
+    int relPickName = -1, relPickFollower = -1, relPickFounder = -1;  // Religion screen choices
     void renderPromote();
     void drawPromoBadge(int p, int cx, int cy, int r);
     std::string promoSummary(const Unit& u) const;
