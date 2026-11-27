@@ -2242,7 +2242,7 @@ void GameUI::renderHelp() {
         "influence with a tribe), Great Tale (Culture and +2 Happiness in every city for a while) or Rally Troops (nearby troops heal and "
         "fight at +20%) - or Settle in City for a lasting +3 Science, Production or Culture or +4 Gold there. Great Primates can share a "
         "tile with any of your units.\n"
-        "WORLD COUNCIL (N)  Formed once every living species has met every other and one of them knows Philosophy; meets every 45 turns (standard speed). Each people has a "
+        "WORLD COUNCIL (N)  Called together by a people that knows Philosophy and has met every other living species - or, failing that, by the first with Mass Media; meets every 45 turns (standard speed). Each people has a "
         "delegate, plus one per allied tribe. Each session votes on two resolutions (the chair proposes one) - treaties, sanctions, calls for "
         "peace - and every second session elects a chair. Being chair never wins the game, but gives 2 more delegates, a place on the agenda, "
         "+10% Culture and +1 Happiness everywhere, and four powers (each once a term): Mediate Peace, Council Levy, Emergency Sanctions, "

@@ -1,6 +1,7 @@
 // Rebirth of Civilisation - the World Council
-// Once every living species has met every other, the first to discover Philosophy ("Why did they destroy
-// themselves?") calls the great peoples together to form a World Council, so that the mistakes of the humans are not made again. It meets every 45 turns at standard speed. Each
+// A people that knows Philosophy ("Why did they destroy themselves?") and has met every other living species calls
+// the great peoples together to form a World Council - or, if none can, the first with Mass Media does, over the
+// airwaves, so that the mistakes of the humans are not made again. It meets every 45 turns at standard speed. Each
 // people has one delegate, plus one for every minor tribe allied to it.
 //
 // Every session votes on an agenda of two resolutions, put forward by the chair and by the next strongest delegation:
@@ -31,6 +32,7 @@ const ResolutionDef g_resolutions[RS_COUNT] = {
 const char* CHAIR_POWER_NAMES[CP_COUNT] = {"Mediate Peace", "Council Levy", "Emergency Sanctions", "Censure"};
 
 static int techPhilosophy() { static int t = techIndex("Philosophy"); return t; }
+static int techMassMedia() { static int t = techIndex("Mass Media"); return t; }
 
 // ------------------------------------------------------------ queries
 int Game::delegates(int c, bool election) const {
@@ -325,12 +327,21 @@ void Game::holdSession() {
 
 void Game::councilTurn() {
     if (!council.formed) {
-        // every living species must have met every other first: a world council needs the whole world
-        for (int a = FIRST_PRIMATE_CIV; a < (int)civs.size(); a++)
-            for (int b = FIRST_PRIMATE_CIV; b < (int)civs.size(); b++)
-                if (a != b && isMajor(a) && isMajor(b) && civs[a].alive && civs[b].alive && !civs[a].met[b]) return;
-        for (int c = FIRST_PRIMATE_CIV; c < (int)civs.size(); c++) {
+        // who can call the world together: a people with Philosophy that has met every other living species -
+        // or, failing that, the first with Mass Media, whose broadcasts reach peoples it has never met
+        int caller = -1;
+        bool radio = false;
+        for (int c = FIRST_PRIMATE_CIV; c < (int)civs.size() && caller < 0; c++) {
             if (!isMajor(c) || !civs[c].alive || !hasTech(c, techPhilosophy())) continue;
+            bool all = true;
+            for (int o = FIRST_PRIMATE_CIV; o < (int)civs.size(); o++)
+                if (o != c && isMajor(o) && civs[o].alive && !civs[c].met[o]) all = false;
+            if (all) caller = c;
+        }
+        for (int c = FIRST_PRIMATE_CIV; c < (int)civs.size() && caller < 0; c++)
+            if (isMajor(c) && civs[c].alive && hasTech(c, techMassMedia())) { caller = c; radio = true; }
+        if (caller >= 0) {
+            int c = caller;
             council.formed = true;
             council.founded = turn;
             council.founder = c;
@@ -340,14 +351,14 @@ void Game::councilTurn() {
             prepareAgenda();
             for (int v : viewers())
                 popup(v, POP_INFO, "The World Council",
-                      "Asking why the humans destroyed themselves, the " + civs[c].name + " have called the great peoples together. "
+                      (radio ? "Over the airwaves, the " + civs[c].name + " have called every people of the world together - even those they have never met. "
+                             : "Asking why the humans destroyed themselves, the " + civs[c].name + " have called the great peoples together. ") +
                       "The World Council is formed, so that their mistakes are never made again.\n\n"
                       "It meets every " + std::to_string(dur(30)) + " turns, first on turn " + std::to_string(council.nextSession) +
                       ". Each people has one delegate, and one more for every minor tribe allied to it. Every session votes on two "
                       "resolutions, and every second session elects a chair: two more delegates, a place on every agenda, prestige at home "
                       "and four powers to use once a term. Being chair wins nothing by itself - and a chair who abuses those powers may not "
                       "stand again.\n\nSee the Council screen (N).");
-            break;
         }
         return;
     }

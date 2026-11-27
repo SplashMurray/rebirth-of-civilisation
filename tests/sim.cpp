@@ -75,10 +75,17 @@ static void councilTests() {
     for (int c = FIRST_PRIMATE_CIV; c < (int)g.civs.size(); c++) if (g.isMajor(c)) majors.push_back(c);
     for (int a : majors) for (int b : majors) g.civs[a].met[b] = 1;
     g.civs[majors[0]].techs[techIndex("Philosophy")] = 1;
-    g.civs[majors[1]].met[majors[2]] = g.civs[majors[2]].met[majors[1]] = 0;
+    g.civs[majors[0]].met[majors[2]] = g.civs[majors[2]].met[majors[0]] = 0;
+    g.civs[majors[3]].techs[techIndex("Philosophy")] = 1;
+    g.civs[majors[3]].met[majors[4]] = g.civs[majors[4]].met[majors[3]] = 0;
     g.councilTurn();
-    CHECK(!g.council.formed, "no council until every species has met every other");
-    g.civs[majors[1]].met[majors[2]] = g.civs[majors[2]].met[majors[1]] = 1;
+    CHECK(!g.council.formed, "no council while no people with Philosophy has met all the others");
+    g.civs[majors[5]].techs[techIndex("Mass Media")] = 1;
+    g.councilTurn();
+    CHECK(g.council.formed && g.council.founder == majors[5], "Mass Media should call the council");
+    g.council = Council();
+    g.civs[majors[5]].techs[techIndex("Mass Media")] = 0;
+    g.civs[majors[0]].met[majors[2]] = g.civs[majors[2]].met[majors[0]] = 1;  // now a Philosopher has met everyone
     g.councilTurn();
     CHECK(g.council.formed && g.council.founder == majors[0], "council should form with Philosophy");
     int chair = majors[1];
