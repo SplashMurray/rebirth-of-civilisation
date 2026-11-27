@@ -156,6 +156,7 @@ private:
     void renderFx();
     void startBlast(int x, int y);
     int disbandArm = -1;
+    int promoteFor = -1;  // unit whose promotion chooser is open
     std::string toast;
     int toastMs = 0;
     int mmX = 0, mmY = 0, mmW = 0, mmH = 0;  // minimap rect
@@ -248,6 +249,9 @@ private:
     // ---- minor tribes
     void renderTribes();
     void renderEmpire();
+    void renderPromote();
+    void drawPromoBadge(int p, int cx, int cy, int r);
+    std::string promoSummary(const Unit& u) const;
     void drawTribeBadge(int x, int y, int r, int tribeCiv);
     // ---- happiness
     Color moodColor(int mood) const;

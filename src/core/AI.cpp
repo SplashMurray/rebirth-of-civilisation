@@ -286,6 +286,7 @@ void Game::aiTurn(int c) {
         aiNukes(c);
     }
     aiUpgrades(c);
+    aiPromote(c);
     aiDiplomacy(c);
     aiTribes(c);
     aiGreat(c);
@@ -447,6 +448,8 @@ void Game::aiCity(City& city) {
             }
             if (bd.special == BSpecial::RuinScience || bd.special == BSpecial::RuinProd) v += ruinTilesInTerritory(city) * 2.5;
             if (bd.special == BSpecial::FreeTech) v += 10;
+            if (bd.special == BSpecial::Veterans)  // drilled troops matter to warlike peoples and to busy, productive cities
+                v += (atWarAny ? 3 : pd && pd->aggression >= 6 ? 1.2 : 0.3) * (city.yields.prod >= 10 ? 1.0 : 0.3);
             if (bd.wonder) v = v * 0.8 + (city.yields.prod >= 8 ? 4 : -100);
             double noise = sk == 0 ? 1.0 : sk == 1 ? 0.4 : sk == 2 ? 0.16 : 0.06;
             v = v * 100.0 / (bd.cost + 30) * (1.0 - noise / 2 + noise * rng.unit());

@@ -91,7 +91,18 @@ struct Unit {
     int bandFood = 0;   // Roaming Band: food store towards the next member
     std::string name;   // Great Primates have names
     int rallyUntil = -1;  // rallied by a Great Warleader: +20% strength through this turn
+    int xp = 0;           // experience from battle (see Promotions.cpp)
+    uint32_t promos = 0;  // promotions taken (bit per PromoId)
 };
+
+enum PromoId { PR_SHOCK1, PR_SHOCK2, PR_GUARD1, PR_GUARD2, PR_WOODSMAN, PR_HIGHLANDER, PR_RAIDER, PR_MEDIC, PR_SWIFT, PR_SIGHT, PR_SEALEGS, PR_COUNT };
+struct PromotionDef {
+    std::string name, desc;
+    int req;        // promotion needed first (-1 none, -2 any one)
+    int classMask;  // bit per UnitClass that may take it
+};
+extern std::vector<PromotionDef> g_promotions;
+inline bool hasPromo(const Unit& u, int p) { return (u.promos >> p) & 1u; }
 
 enum BuildKind { BK_NONE = 0, BK_UNIT = 1, BK_BUILDING = 2 };
 
@@ -176,7 +187,7 @@ struct Civ {
     // lifetime counters (achievements, statistics)
     int nukesLaunched = 0, timesNuked = 0, citiesCaptured = 0, citiesLost = 0, bandSplits = 0;
     int disastersSuffered = 0, warsDeclared = 0, falloutCleaned = 0, maxBand = 0, shipsSunk = 0;
-    int unitsUpgraded = 0, unitsFerried = 0;
+    int unitsUpgraded = 0, unitsFerried = 0, promotions = 0;
     int routesMade = 0, routesPlundered = 0, bestRoad = 0;
     int naturalsFound = 0, riverSailed = 0;
     int weariness = 0;       // war weariness: grows with war and losses, fades in peace
@@ -617,6 +628,16 @@ public:
     bool boardShip(Unit& u);     // in a harbour city: go aboard the docked ship
     bool leaveShip(Unit& u);     // in a harbour city: step ashore
     void aiUpgrades(int c);
+    // experience and promotions (Promotions.cpp)
+    static int unitLevel(const Unit& u);
+    static int xpForLevel(int level);
+    bool promotionAllowed(const Unit& u, int p) const;
+    bool canPromote(const Unit& u) const;
+    bool promote(Unit& u, int p);
+    void gainXP(Unit& u, int amount, bool vsFeral);
+    int promoStrengthPct(const Unit& u, bool attacking, int x, int y) const;
+    double cityAttackMult(const Unit& u) const;
+    void aiPromote(int c);
     bool aiFerry(Unit& u, int gx, int gy);  // AI: get a land unit to a goal across the water
     void aiTransportShip(Unit& u);          // AI: a ship with cargo space acting as a ferry
     bool aiFerryJob(const Unit& ship) const;

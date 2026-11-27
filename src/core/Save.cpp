@@ -5,7 +5,7 @@
 #include <sstream>
 
 namespace {
-const int SAVE_VERSION = 23;
+const int SAVE_VERSION = 24;
 
 struct Archive {
     bool writing;
@@ -134,7 +134,7 @@ void ioGame(Archive& a, Game& g) {
         a.io(c.tempPressures); a.io(c.lastDisaster); a.io(c.aiSkill);
         a.io(c.grievance); a.io(c.goodwill); a.io(c.peaceUntil); a.io(c.denouncedUntil); a.io(c.lastOffer); a.io(c.embargo); a.io(c.dealsMade); a.io(c.backstabs);
         a.io(c.warheads); a.io(c.nukesLaunched); a.io(c.timesNuked); a.io(c.citiesCaptured); a.io(c.citiesLost); a.io(c.bandSplits);
-        a.io(c.disastersSuffered); a.io(c.warsDeclared); a.io(c.falloutCleaned); a.io(c.maxBand); a.io(c.shipsSunk); a.io(c.unitsUpgraded); a.io(c.unitsFerried);
+        a.io(c.disastersSuffered); a.io(c.warsDeclared); a.io(c.falloutCleaned); a.io(c.maxBand); a.io(c.shipsSunk); a.io(c.unitsUpgraded); a.io(c.unitsFerried); a.io(c.promotions);
         a.io(c.routesMade); a.io(c.routesPlundered); a.io(c.bestRoad); a.io(c.naturalsFound); a.io(c.riverSailed); a.io(c.weariness); a.io(c.mostCelebrating); a.io(c.mostLuxuries);
         a.io(c.minor); a.io(c.tribe); a.io(c.influence); a.io(c.ally); a.io(c.allySince); a.io(c.questKind); a.io(c.questTarget); a.io(c.questUntil);
         a.io(c.questDone); a.io(c.lastUnitGift); a.io(c.firstMet); a.io(c.tribeFoodCapital); a.io(c.tribeFoodAll); a.io(c.questsCompleted); a.io(c.mostAllies);
@@ -148,7 +148,7 @@ void ioGame(Archive& a, Game& g) {
     for (auto& u : g.units) {
         a.io(u.id); a.io(u.type); a.io(u.owner); a.io(u.x); a.io(u.y); a.io(u.hp); a.io(u.moves);
         a.io(u.order); a.io(u.gx); a.io(u.gy); a.io(u.work); a.io(u.buildImp); a.io(u.fortTurns);
-        a.io(u.acted); a.io(u.attacked); a.io(u.alive); a.io(u.band); a.io(u.bandFood); a.io(u.name); a.io(u.rallyUntil); a.io(u.carrier); a.io(u.ferryX); a.io(u.ferryY);
+        a.io(u.acted); a.io(u.attacked); a.io(u.alive); a.io(u.band); a.io(u.bandFood); a.io(u.name); a.io(u.rallyUntil); a.io(u.xp); a.io(u.promos); a.io(u.carrier); a.io(u.ferryX); a.io(u.ferryY);
     }
     long long ncity = (long long)g.cities.size();
     a.num(ncity);

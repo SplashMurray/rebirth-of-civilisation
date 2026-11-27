@@ -342,6 +342,7 @@ void Game::aiMinorTurn(int c) {
     Civ& cv = civs[c];
     if (cv.capital < 0 || !cities[cv.capital].alive || cities[cv.capital].owner != c) return;
     City& home = cities[cv.capital];
+    aiPromote(c);
     int mil = 0, threat = 0;
     for (auto& u : units) {
         if (!u.alive) continue;

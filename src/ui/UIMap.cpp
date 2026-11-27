@@ -761,6 +761,23 @@ void GameUI::drawUnitToken(const Unit& u, int sx, int sy, int r) {
         Color hc = u.hp > 50 ? rgb(90, 210, 90) : u.hp > 25 ? rgb(230, 190, 50) : rgb(220, 60, 50);
         cv->fillRoundRectGrad(hx, hy, std::max(2, hw * u.hp / 100), 4, 2, lighten(hc, 0.3f), darken(hc, 0.7f));
     }
+    if (d.military() && r >= 9 && game) {  // experience: gold chevrons for each level, a glowing ring when a promotion waits
+        int lv = Game::unitLevel(u);
+        if (u.owner == game->player && game->canPromote(u)) {
+            cv->circle(sx, sy, r + 4, rgb(255, 214, 90), 2);
+            cv->fillCircle(sx - r, sy + r - 2, std::max(4, r / 3), rgb(255, 214, 90));
+            cv->text(sx - r, sy + r - 2 - std::max(8, r / 2) / 2 - 1, "+", std::max(8, r / 2), rgb(60, 40, 10), AL_CENTER, true);
+        } else if (lv > 0) {
+            int cw = std::max(3, r / 3), n = std::min(lv, 3), bx = sx - r - 1, by = sy + r - 2;
+            for (int k = 0; k < n; k++) {
+                int yy = by - k * 3;
+                cv->line(bx - cw, yy, bx, yy - cw * 2 / 3, rgb(20, 16, 8), 3);
+                cv->line(bx, yy - cw * 2 / 3, bx + cw, yy, rgb(20, 16, 8), 3);
+                cv->line(bx - cw, yy, bx, yy - cw * 2 / 3, rgb(255, 210, 90), 1);
+                cv->line(bx, yy - cw * 2 / 3, bx + cw, yy, rgb(255, 210, 90), 1);
+            }
+        }
+    }
     if (u.band > 0 && r >= 9) {  // band size badge
         int ms = std::max(9, r * 6 / 10);
         cv->fillCircle(sx - r, sy - r, ms * 6 / 10 + 2, rgb(20, 20, 24));

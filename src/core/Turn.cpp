@@ -155,6 +155,8 @@ void Game::beginTurn(int c) {
                     int h = buildingIndex("Hospital");
                     if (h >= 0 && hc.has[h]) heal = 100;
                 }
+            for (auto& m : units)  // a medic tends the unit and its neighbours
+                if (m.alive && m.owner == c && hasPromo(m, PR_MEDIC) && dist(m.x, m.y, u.x, u.y) <= 1) { heal += 10; break; }
             u.hp = std::min(100, u.hp + heal);
         }
         // bands tend their sick and wounded even while on the move
@@ -313,6 +315,9 @@ void Game::processCity(City& city) {
                         if (ud.cls == UnitClass::Settler) city.pop--;
                         spawnUnit(c, city.buildId, spot.x, spot.y);
                         units.back().moves = 0;
+                        if (ud.military())
+                            for (size_t b = 0; b < g_buildings.size(); b++)
+                                if (city.has[b] && g_buildings[b].special == BSpecial::Veterans) units.back().xp += 15;  // drilled recruits
                         notify(c, city.name + " has trained a " + ud.name + ".", city.x, city.y);
                         done = true;
                     } else {

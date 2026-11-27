@@ -64,6 +64,14 @@ std::vector<GameUI::Advice> GameUI::gatherAdvice() {
     auto showCity = [this](int id) { return [this, id] { openCity(id); }; };
     auto showTile = [this](int x, int y) { return [this, x, y] { overlay = OV_NONE; centerOn(x, y); }; };
     auto open = [this](Overlay o) { return [this, o] { overlay = o; }; };
+    {  // veterans waiting for their promotion
+        int n = 0, first = -1;
+        for (auto& u : g.units)
+            if (u.alive && u.owner == g.player && g.canPromote(u)) { n++; if (first < 0) first = u.id; }
+        if (n > 0)
+            add(2, 40, n == 1 ? "One of our warriors has earned a promotion." : std::to_string(n) + " of our warriors have earned promotions.",
+                [this, first] { overlay = OV_NONE; selectUnit(first, true); promoteFor = first; }, "Promote");
+    }
     std::vector<const City*> mine;
     for (auto& c : g.cities) if (c.alive && c.owner == p) mine.push_back(&c);
     const Unit* band = nullptr;

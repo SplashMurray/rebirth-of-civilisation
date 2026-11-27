@@ -117,7 +117,7 @@ struct UnitDef {
 };
 
 // ---------------------------------------------------------------- buildings
-enum class BSpecial { None, Palace, FreeTech, RuinScience, RuinProd, RuinBonus, Victory, CombatBonus, HealBonus, GrowthBonus, HappyAll };
+enum class BSpecial { None, Palace, FreeTech, RuinScience, RuinProd, RuinBonus, Victory, CombatBonus, HealBonus, GrowthBonus, HappyAll, Veterans };
 
 struct BuildingDef {
     std::string name;

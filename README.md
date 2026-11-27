@@ -42,6 +42,7 @@
 * **Great Primates.** A people's Science, Production, Gold and trade routes, Culture and victories in battle build up points towards **Great Thinkers, Artisans, Merchants, Storytellers and Warleaders**, each born in your capital with a name of their own (each new one of a kind takes more points than the last; progress is shown on the Advisors screen). Spend their gift at once - a burst of Science (*Share Insight*), Production towards a city's work (*Masterwork*, not the Rebirth Project), a trade mission to another people's city for Gold and goodwill (much influence with a tribe), a Great Tale for Culture and a season of festivals (+2 Happiness everywhere), or a rallying cry that heals nearby troops and has them fight at +20% - or settle them in a city for a lasting +3 Science, Production or Culture or +4 Gold there.
 * **Tutorial.** *Tutorial* on the title screen (or the Tutorial switch when setting up a game) starts a guided first game: 20 steps from selecting your Roaming Band, moving, foraging and ending turns, through the Fall, evolution and research, to settling your first city, choosing production, improving the land, happiness, traditions, neighbours and tribes, ruins and trade, advisors and how to win. Each step points at the control or unit concerned and moves on by itself once you have done what it asks (or press Next); progress is saved with the game, and you can skip it at any time.
 * **Advisors.** Four advisors - the Elder of the Hearth (growth and cities), the Keeper of Knowledge (science and evolution), the War Chief (war and defence) and the Far-Traveller (neighbours, tribes and trade) - read the state of your people and suggest what to do next, most urgent first, each with a button that takes you there: idle cities, starvation and unrest, unchosen research or evolution, traditions to adopt, ruins to dig, enemies at the gates, undefended cities, upgrades, tribe requests and gifts, idle caravans, spare luxuries to trade, and rivals close to victory. Open them with `A`; with advisor tips on (a switch on the setup and Advisors screens, saved in your settings), the most urgent new matter also pops up at the start of a turn.
+* **Experience and promotions.** Military units earn experience in battle - for attacking, for surviving an attack and most of all for winning (fights with wild beasts teach at most 30). Levels come at 10, 30, 60, 100 and 150 experience, and each brings a promotion of your choice: **Shock** I and II (+15% attacking each), **Guard** I and II (+15% defending each), **Woodsman** (+25% from forest or jungle), **Highlander** (+25% from hills), **City Raider** (+25% against cities), **Medic** (the unit and its neighbours heal 10 more a turn), **Swift** (+1 move), **Keen Eyes** (+1 sight) and **Sea Legs** (+20% at sea), depending on the kind of unit. Taking one restores 25 HP. Gold chevrons on a unit show its level; a gold ring means a promotion is waiting (`Z`). A **Training Ground** (Spearcraft) gives new units 15 experience - a promotion at once. Promotions survive upgrades, and the AI promotes its own veterans.
 * **Empire overview.** One table of all your cities (`O`, or *Empire* on the top bar): size, mood, food and turns to grow, production and what each city is making (with a progress bar and turns left), Science, Gold, Culture, trade routes, defence and garrison, with totals. Click a heading to sort by it, a row to open the city.
 * **Message filters.** Every message has a kind - Combat, Diplomacy, Cities, Trade or World - shown by the colour of its stripe. On the Event Log (`L`) you choose which kinds the log lists and which pop up on the map; your choice is saved in your settings.
 * **Resource icons everywhere.** Hovering over a tile shows its resource's icon beside its name, and the city screen lists the resources in the city's land (worked ones bright).
@@ -233,7 +234,7 @@
 | `Space` / `Tab` | Skip the unit / go to the next unit |
 | `B` `F` `S` `E` `X` `M` | Settle / found city, fortify, sleep, excavate ruins, decontaminate, move mode |
 | `G` / `R` | Split band / raise a war party from a band |
-| `U` / `K` | Upgrade unit / board or leave a ship in a harbour |
+| `U` / `K` / `Z` | Upgrade unit / board or leave a ship in a harbour / promote |
 | `T` `V` `P` `D` `I` `O` `A` `L` | Technology tree / evolution / traditions / diplomacy / minor tribes / empire overview / advisors / event log |
 | `Ctrl+S` / `Ctrl+L` | Save / load |
 | `Ctrl +` / `Ctrl -` / `Ctrl 0` | Interface size bigger / smaller / reset (also in the menu and on the title screen) |
@@ -256,6 +257,7 @@
 | ![Every resource](docs/screenshots/32_resources.png) | ![The tutorial](docs/screenshots/33_tutorial.png) |
 | ![Advisors](docs/screenshots/34_advisors.png) | |
 | ![Empire overview](docs/screenshots/36_empire.png) | ![Message filters](docs/screenshots/37_log_filter.png) |
+| ![Promotions](docs/screenshots/38_promotions.png) | |
 | ![Start](docs/screenshots/04_start_map.png) | ![The Fall](docs/screenshots/07_fall_popup.png) |
 | ![A drought](docs/screenshots/11c_disaster.png) | ![Late game](docs/screenshots/16_lategame.png) |
 | ![Excavating ruins](docs/screenshots/09_unit_panel.png) | ![Tech tree](docs/screenshots/10_tech_tree.png) |
@@ -307,6 +309,7 @@ src/core/        Rules engine - no platform code
   Rivers.cpp       rivers, lakes, terrain features, natural wonders, volcanoes
   Happiness.cpp    city moods, luxuries, war weariness
   Tribes.cpp       minor tribes: influence, allies, quests, their AI
+  Promotions.cpp   unit experience and promotions
   Great.cpp        Great Primates
   Achievements.cpp achievement list, unlock checks and the profile file
   AI.cpp           computer opponents

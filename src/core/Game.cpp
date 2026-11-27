@@ -1073,6 +1073,7 @@ int Game::maxMoves(const Unit& u) const {
     int m = g_units[u.type].moves;
     const PrimateDef* pd = primate(u.owner);
     if (pd && g_units[u.type].military()) m += pd->extraMoves;
+    if (hasPromo(u, PR_SWIFT)) m++;
     return m * MP;
 }
 
@@ -1330,6 +1331,7 @@ int Game::unitStrength(const Unit& u, bool attacking, bool rangedAtk, int x, int
         if (ownsWonderSpecial(u.owner, BSpecial::CombatBonus)) pct += 10;
         if (u.rallyUntil >= turn) pct += 20;  // rallied by a Great Warleader
     }
+    pct += promoStrengthPct(u, attacking, x, y);
     if (!attacking && !water) {
         const Tile& t = at(x, y);
         if (t.hills) pct += 25;
@@ -1384,6 +1386,7 @@ CombatResult Game::attackImpl(Unit& u, int tx, int ty) {
         meet(u.owner, city->owner);
         double A = unitStrength(u, true, ranged, u.x, u.y);
         A *= d.cls == UnitClass::Siege ? 3.0 : 1.5;  // cities are built to be besieged
+        A *= cityAttackMult(u);
         double D = cityStrength(*city);
         res.dmgToDef = combatDamage(A, D);
         city->hp -= res.dmgToDef;
@@ -1395,6 +1398,7 @@ CombatResult Game::attackImpl(Unit& u, int tx, int ty) {
             if (city->hp <= 0) { u.hp = 1; }
             else { res.attackerDied = true; }
         }
+        if (!res.attackerDied) gainXP(u, ranged ? 3 : 4, false);
         std::string msg = an + " attacked " + city->name + " (-" + std::to_string(res.dmgToDef) + " HP)";
         if (res.attackerDied) msg += " and was destroyed";
         if (city->hp <= 0) {
@@ -1448,6 +1452,10 @@ CombatResult Game::attackImpl(Unit& u, int tx, int ty) {
         notify(u.owner, msg, tx, ty);
         notify(def->owner, msg, tx, ty);
         int dx = tx, dy = ty;
+        if (g_units[def->type].military()) {  // experience: the attacker learns more, a win teaches most
+            if (!res.attackerDied) gainXP(u, (ranged ? 3 : 5) + (res.defenderDied ? 2 : 0), def->owner == CIV_FERAL);
+            if (!res.defenderDied) gainXP(*def, (ranged ? 2 : 4) + (res.attackerDied ? 2 : 0), u.owner == CIV_FERAL);
+        }
         if (res.defenderDied && g_units[def->type].naval() && u.owner >= FIRST_PRIMATE_CIV) civs[u.owner].shipsSunk++;
         if (res.defenderDied && def->owner == CIV_FERAL) feralKilled(u.owner, *def);  // the tribes are grateful
         if (res.defenderDied) addGreatPoints(u.owner, GK_WARLEADER, def->owner == CIV_FERAL ? 2 : 6);  // victories make Great Warleaders
@@ -1479,6 +1487,7 @@ CombatResult Game::attackImpl(Unit& u, int tx, int ty) {
 int Game::sightRange(const Unit& u) const {
     int r = 2;
     if (g_units[u.type].cls == UnitClass::Recon) r++;
+    if (hasPromo(u, PR_SIGHT)) r++;
     if (inMap(u.x, u.y) && at(u.x, u.y).hills) r++;
     return r;
 }

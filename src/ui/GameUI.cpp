@@ -363,6 +363,7 @@ void GameUI::renderGame() {
     if (overlay != OV_CITY) {
         renderNotifications();
         renderUnitPanel();
+        renderPromote();
         renderTileInfo();
     }
     renderMinimap();
@@ -626,7 +627,7 @@ std::string GameUI::combatPreview(const Unit& u, int tx, int ty) {
     std::string target;
     if (const City* c = g.cityAt(tx, ty)) {
         D = g.cityStrength(*c);
-        A *= d.cls == UnitClass::Siege ? 3.0 : 1.5;
+        A *= (d.cls == UnitClass::Siege ? 3.0 : 1.5) * g.cityAttackMult(u);
         target = c->name;
     } else {
         Unit* m = g.militaryAt(tx, ty);
@@ -791,6 +792,15 @@ void GameUI::renderUnitPanel() {
              orderName(u.order) + (u.order == ORD_BUILD || u.order == ORD_EXCAVATE || u.order == ORD_DECON ? " (" + std::to_string(u.work) + " turns)" : ""),
              13, u.moves > 0 ? C_TEXT : C_DIM);
     bar(px + 62, py + 72, 200, 5, u.hp / 100.0, u.hp > 50 ? rgb(90, 210, 90) : C_RED);
+    if (d.military()) {
+        int lv = Game::unitLevel(u), prev = Game::xpForLevel(lv), next = Game::xpForLevel(lv + 1);
+        bool ready = g.canPromote(u);
+        bar(px + 270, py + 72, 140, 5, ready ? 1.0 : std::clamp((double)(u.xp - prev) / std::max(1, next - prev), 0.0, 1.0), ready ? C_GOLD : rgb(200, 170, 90));
+        std::string lvs = "Level " + std::to_string(lv) + "   XP " + std::to_string(u.xp) + "/" + std::to_string(next);
+        cv->text(px + 270, py + 56, lvs, 12, ready ? C_GOLD : C_DIM, AL_LEFT, ready);
+        hot(px + 262, py + 52, 156, 30, nullptr, "Experience from battle: attacking, surviving attacks and winning. Each level brings a promotion. "
+            "Fights with wild beasts teach at most 30.\n" + promoSummary(u));
+    }
     if (d.cls == UnitClass::Band) {
         int need = g.bandGrowth(u.band);
         bool full = u.band >= Game::BAND_MAX;
@@ -877,6 +887,9 @@ void GameUI::renderUnitPanel() {
                         inCity ? "Choose a city for a caravan from " + here->name + " to trade with"
                                : "Move the caravan into one of your cities: its routes start from the city it stands in"});
     }
+    if (d.military() && g.canPromote(u))
+        acts.push_back({"Promote! (Z)", true, [this, uid] { promoteFor = promoteFor == uid ? -1 : uid; },
+                        "This unit has earned a promotion: choose one"});
     if (d.military()) {
         int to = g.upgradeTarget(u);
         if (to >= 0) {
@@ -920,6 +933,110 @@ void GameUI::renderUnitPanel() {
         if (by + bh > H - 2) break;
         button(bx, by, w, bh, a.label, a.en, a.fn, a.tip, C_PANEL2, 12);
         bx += w + 4;
+    }
+}
+
+std::string GameUI::promoSummary(const Unit& u) const {
+    std::string s;
+    for (int p = 0; p < PR_COUNT; p++)
+        if (hasPromo(u, p)) s += (s.empty() ? "" : "\n") + g_promotions[p].name + ": " + g_promotions[p].desc;
+    return s.empty() ? "No promotions yet." : "Promotions:\n" + s;
+}
+
+// The chooser that opens above the unit panel when a unit has earned a promotion.
+void GameUI::renderPromote() {
+    Game& g = *game;
+    Unit* up = sel();
+    if (promoteFor < 0 || !up || up->id != promoteFor || up->owner != g.player || !g.canPromote(*up)) { promoteFor = -1; return; }
+    Unit& u = *up;
+    std::vector<int> opts;
+    for (int p = 0; p < PR_COUNT; p++) if (g.promotionAllowed(u, p)) opts.push_back(p);
+    int rowH = 40, pw = 420, ph = 46 + (int)opts.size() * (rowH + 4) + 6;
+    int px = 0, py = H - 178 - ph - 6;
+    if (py < TOP + 4) py = TOP + 4;
+    panel(px, py, pw, ph, rgb(26, 30, 40));
+    Hot area{px, py, pw, ph, nullptr, "", true};
+    hots.push_back(area);
+    cv->text(px + 14, py + 12, "Promote " + (u.name.empty() ? g_units[u.type].name : u.name), 17, C_GOLD, AL_LEFT, true);
+    button(px + pw - 36, py + 8, 26, 26, "X", true, [this] { promoteFor = -1; }, "Decide later");
+    int y = py + 42;
+    for (int p : opts) {
+        const PromotionDef& pd = g_promotions[p];
+        int uid = u.id;
+        cv->fillRoundRectGrad(px + 10, y, pw - 20, rowH, 6, rgb(48, 56, 72), rgb(34, 40, 52));
+        drawPromoBadge(p, px + 30, y + rowH / 2, 12);
+        cv->text(px + 50, y + 4, pd.name, 14, C_TEXT, AL_LEFT, true);
+        cv->text(px + 50, y + 21, pd.desc, 12, C_DIM);
+        hot(px + 10, y, pw - 20, rowH, [this, uid, p] {
+            Game& gg = *game;
+            if (uid < (int)gg.units.size() && gg.promote(gg.units[uid], p)) { toast = gg.units[uid].name.empty() ? g_units[gg.units[uid].type].name + " promoted: " + g_promotions[p].name : gg.units[uid].name + " promoted"; toastMs = 1800; }
+            promoteFor = -1;
+        }, "Take this promotion (also restores 25 HP)");
+        y += rowH + 4;
+    }
+}
+
+// A small emblem for each promotion: chevrons for attack, a shield for defence, and so on.
+void GameUI::drawPromoBadge(int p, int cx, int cy, int r) {
+    cv->fillCircle(cx, cy, r, rgb(20, 22, 28));
+    cv->fillCircleGrad(cx, cy, r - 1, rgb(230, 200, 110), 255, rgb(140, 100, 40), 255, cx - r / 2, cy - r / 2);
+    Color ink = rgb(40, 30, 16);
+    int s = std::max(3, r * 2 / 3);
+    switch (p) {
+        case PR_SHOCK1: case PR_SHOCK2: {
+            int n = p == PR_SHOCK1 ? 1 : 2;
+            for (int k = 0; k < n; k++) {
+                int oy = cy - (n - 1) * s / 3 + k * s * 2 / 3;
+                cv->line(cx - s, oy + s / 3, cx, oy - s / 3, ink, 2);
+                cv->line(cx, oy - s / 3, cx + s, oy + s / 3, ink, 2);
+            }
+            break;
+        }
+        case PR_GUARD1: case PR_GUARD2: {
+            int sh[10] = {cx - s, cy - s, cx + s, cy - s, cx + s, cy, cx, cy + s, cx - s, cy};
+            cv->fillPoly(sh, 5, ink);
+            if (p == PR_GUARD2) cv->line(cx, cy - s + 2, cx, cy + s - 2, rgb(230, 200, 110), 2);
+            break;
+        }
+        case PR_WOODSMAN: {
+            int tr[6] = {cx, cy - s, cx + s, cy + s / 2, cx - s, cy + s / 2};
+            cv->fillPoly(tr, 3, ink);
+            cv->fillRect(cx - 1, cy + s / 2, 3, s / 2, ink);
+            break;
+        }
+        case PR_HIGHLANDER: {
+            int m[8] = {cx - s, cy + s / 2, cx - s / 3, cy - s / 2, cx + s / 3, cy + s / 4, cx + s, cy + s / 2};
+            cv->fillPoly(m, 4, ink);
+            break;
+        }
+        case PR_RAIDER: {
+            cv->fillRect(cx - s, cy - s / 3, s * 2, s, ink);
+            for (int k = -1; k <= 1; k++) cv->fillRect(cx + k * s * 2 / 3 - s / 5, cy - s * 2 / 3, s * 2 / 5, s / 3 + 1, ink);
+            break;
+        }
+        case PR_MEDIC:
+            cv->fillRect(cx - s / 4, cy - s, s / 2 + 1, s * 2, rgb(190, 40, 40));
+            cv->fillRect(cx - s, cy - s / 4, s * 2, s / 2 + 1, rgb(190, 40, 40));
+            break;
+        case PR_SWIFT:
+            for (int k = 0; k < 2; k++) {
+                int ox = cx - s / 2 + k * s * 2 / 3;
+                cv->line(ox - s / 3, cy - s * 2 / 3, ox + s / 3, cy, ink, 2);
+                cv->line(ox + s / 3, cy, ox - s / 3, cy + s * 2 / 3, ink, 2);
+            }
+            break;
+        case PR_SIGHT:
+            cv->fillEllipseA(cx, cy, s, s / 2 + 1, ink, 255);
+            cv->fillCircle(cx, cy, std::max(1, s / 3), rgb(230, 200, 110));
+            break;
+        case PR_SEALEGS: {
+            cv->line(cx, cy - s, cx, cy + s / 2, ink, 2);
+            cv->line(cx - s * 2 / 3, cy - s / 3, cx + s * 2 / 3, cy - s / 3, ink, 2);
+            cv->line(cx - s, cy, cx - s / 2, cy + s * 2 / 3, ink, 2);
+            cv->line(cx - s / 2, cy + s * 2 / 3, cx + s / 2, cy + s * 2 / 3, ink, 2);
+            cv->line(cx + s / 2, cy + s * 2 / 3, cx + s, cy, ink, 2);
+            break;
+        }
     }
 }
 
@@ -2009,9 +2126,9 @@ void GameUI::renderHelp() {
         "or more to spare (size 3+) it celebrates: +10% Food and Gold. Below 0 it is unhappy and stops growing; 3 or more short, "
         "it falls into unrest: no growth and -25% Production, Science, Culture and Gold. The face beside a city's name shows its mood.\n"
         "COMBAT  Move a military unit onto an enemy to attack. Ranged units attack from a distance. Hills, forest, jungle and fortifying help defence. "
-        "Capture cities by reducing their HP to zero with a melee unit. Beware the feral packs that roam the wastelands.\n"
+        "Capture cities by reducing their HP to zero with a melee unit. Beware the feral packs that roam the wastelands. Battles give units experience; each level brings a promotion of your choice (Z, or the Promote button) - a gold ring around a unit means one is waiting.\n"
         "CONTROLS  Left-click: select.  Right-click: move / attack.  Drag or arrow keys: scroll.  Wheel or +/-: zoom.  Enter: end turn.  "
-        "Space: skip unit.  Tab: next unit.  B: settle / found city.  G: split band.  R: war party.  F: fortify.  S: sleep.  E: excavate.  X: decontaminate.  M: move mode.  C: centre on unit.  "
+        "Space: skip unit.  Tab: next unit.  B: settle / found city.  G: split band.  R: war party.  F: fortify.  S: sleep.  E: excavate.  X: decontaminate.  M: move mode.  C: centre on unit.  Z: promote.  "
         "T: technologies.  V: evolution.  P: traditions.  D: diplomacy.  I: tribes.  O: empire overview.  A: advisors.  L: log (filter messages by kind there).  Ctrl+S / Ctrl+L: save / load.  Ctrl + / Ctrl - / Ctrl 0: interface size.  Esc: menu / close.";
     int top = py + 56, viewH = ph - 70;
     Hot area{px, top, pw, viewH, nullptr, "", true};
@@ -2566,6 +2683,9 @@ void GameUI::key(int k, bool shift, bool ctrl) {
         case 'C': if (sel()) centerOn(sel()->x, sel()->y); return;
         case 'M': if (sel()) moveMode = !moveMode; return;
         case 'B': case 'F': case 'S': case 'W': case 'E': case 'X': case 'G': case 'R': case 'U': case 'K': case KEY_SPACE: unitCommand((char)k); return;
+        case 'Z':
+            if (sel() && sel()->owner == game->player && game->canPromote(*sel())) promoteFor = promoteFor == selUnit ? -1 : selUnit;
+            return;
         case KEY_DELETE: if (sel()) { if (disbandArm == selUnit) unitCommand('D'); else disbandArm = selUnit; } return;
         default: return;
     }

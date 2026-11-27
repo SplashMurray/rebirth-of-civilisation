@@ -486,6 +486,8 @@ void initData() {
         {"Elder Circle", 45, "Cooking", Y(0, 0, 2, 0, 0), Y(0, 0, 0, 0, 0), 0, 0, false, BSpecial::None, ""},
         {"Tool Shed", 55, "Woodcraft", Y(0, 2, 0, 0, 0), Y(0, 0, 0, 0, 0), 0, 0, false, BSpecial::None, ""},
         {"Palisade", 50, "Digging", Y(0, 0, 0, 0, 0), Y(0, 0, 0, 0, 0), 4, 50, false, BSpecial::None, ""},
+        {"Training Ground", 60, "Spearcraft", Y(0, 0, 0, 0, 0), Y(0, 0, 0, 0, 0), 0, 0, false, BSpecial::Veterans,
+         "Military units trained here start with 15 experience: a promotion at once"},
         {"Shrine", 60, "Symbols", Y(0, 0, 0, 3, 0), Y(0, 0, 0, 0, 0), 0, 0, false, BSpecial::None, ""},
         {"Salvage Yard", 70, "Salvaging", Y(0, 1, 0, 0, 0), Y(0, 10, 0, 0, 0), 0, 0, false, BSpecial::RuinProd, "+1 Production per ruin in territory"},
         {"Knowledge Hut", 75, "Writing", Y(0, 0, 3, 0, 0), Y(0, 0, 10, 0, 0), 0, 0, false, BSpecial::None, ""},
