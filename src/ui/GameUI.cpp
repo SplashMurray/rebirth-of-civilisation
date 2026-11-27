@@ -447,6 +447,7 @@ void GameUI::renderGame() {
         case OV_TRIBES: renderTribes(); break;
         case OV_EMPIRE: renderEmpire(); break;
         case OV_RELIGION: renderReligion(); break;
+        case OV_COUNCIL: renderCouncil(); break;
         case OV_ADVISORS: renderAdvisors(); break;
         case OV_TRADE: renderTrade(); break;
         case OV_ROUTES: renderRoutes(); break;
@@ -487,6 +488,8 @@ void GameUI::renderTopBar() {
     rb("log", "Log", [this] { overlay = overlay == OV_LOG ? OV_NONE : OV_LOG; logScroll = 0; }, "Event log (L)");
     rb("advisors", compact ? "Adv" : "Advisors", [this] { overlay = overlay == OV_ADVISORS ? OV_NONE : OV_ADVISORS; }, "Your advisors' advice (A)");
     rb("evo", compact ? "Evo" : "Evolution", [this] { overlay = overlay == OV_EVO ? OV_NONE : OV_EVO; }, "Evolutionary traits and pressures (V)");
+    if (g.council.formed)
+        rb("council", compact ? "WC" : "Council", [this] { overlay = overlay == OV_COUNCIL ? OV_NONE : OV_COUNCIL; }, "The World Council (N)");
     rb("religion", compact ? "Rel" : "Religion", [this] { overlay = overlay == OV_RELIGION ? OV_NONE : OV_RELIGION; }, "Faith and religions (H)");
     rb("empire", compact ? "Emp" : "Empire", [this] { overlay = overlay == OV_EMPIRE ? OV_NONE : OV_EMPIRE; empireScroll = 0; }, "Empire overview: all your cities (O)");
     rb("tribes", "Tribes", [this] { overlay = overlay == OV_TRIBES ? OV_NONE : OV_TRIBES; tribeWarArm = -1; }, "Minor tribes: influence, gifts, allies (I)");
@@ -2239,6 +2242,12 @@ void GameUI::renderHelp() {
         "influence with a tribe), Great Tale (Culture and +2 Happiness in every city for a while) or Rally Troops (nearby troops heal and "
         "fight at +20%) - or Settle in City for a lasting +3 Science, Production or Culture or +4 Gold there. Great Primates can share a "
         "tile with any of your units.\n"
+        "WORLD COUNCIL (N)  Formed when the first people discovers Philosophy; meets every 45 turns (standard speed). Each people has a "
+        "delegate, plus one per allied tribe. Each session votes on two resolutions (the chair proposes one) - treaties, sanctions, calls for "
+        "peace - and every second session elects a chair. Being chair never wins the game, but gives 2 more delegates, a place on the agenda, "
+        "+10% Culture and +1 Happiness everywhere, and four powers (each once a term): Mediate Peace, Council Levy, Emergency Sanctions, "
+        "Censure. Self-serving use - and declaring war on a member or using a nuclear weapon while chair - is abuse of power; at 3 the chair "
+        "may not stand for re-election. Vote and choose your chair on the Council screen before the session.\n"
         "RELIGION (H)  Shrines (+2 Faith), Temples (+4), Cathedrals (+6), natural wonders your cities work and holy cities give Faith. With "
         "Symbols and enough Faith you may found one of a few religions (the world has room for about half as many as there are peoples), "
         "choosing a follower belief for every city that follows it and a founder belief for your people; with Theology, enhance it with "
@@ -2277,7 +2286,7 @@ void GameUI::renderHelp() {
         "Capture cities by reducing their HP to zero with a melee unit. Beware the feral packs that roam the wastelands. Battles give units experience; each level brings a promotion of your choice (Z, or the Promote button) - a gold ring around a unit means one is waiting.\n"
         "CONTROLS  Left-click: select.  Right-click: move / attack.  Drag or arrow keys: scroll.  Wheel or +/-: zoom.  Enter: end turn.  "
         "Space: skip unit.  Tab: next unit.  B: settle / found city.  G: split band.  R: war party.  F: fortify.  S: sleep.  E: excavate.  X: decontaminate.  M: move mode.  C: centre on unit.  Z: promote.  "
-        "T: technologies.  V: evolution.  P: traditions.  D: diplomacy.  I: tribes.  H: religion.  O: empire overview.  A: advisors.  L: log (filter messages by kind there).  Ctrl+S / Ctrl+L: save / load.  Ctrl + / Ctrl - / Ctrl 0: interface size.  Esc: menu / close.";
+        "T: technologies.  V: evolution.  P: traditions.  D: diplomacy.  I: tribes.  H: religion.  N: World Council.  O: empire overview.  A: advisors.  L: log (filter messages by kind there).  Ctrl+S / Ctrl+L: save / load.  Ctrl + / Ctrl - / Ctrl 0: interface size.  Esc: menu / close.";
     int top = py + 56, viewH = ph - 70;
     Hot area{px, top, pw, viewH, nullptr, "", true};
     hots.push_back(area);
@@ -2848,7 +2857,7 @@ void GameUI::key(int k, bool shift, bool ctrl) {
     if (overlay == OV_CITY && (k == 'T' || k == 'P' || k == 'D' || k == 'L' || k == 'V' || k == 'I' || k == 'A')) overlay = OV_NONE;
     if (overlay != OV_NONE && overlay != OV_CITY) {
         if ((k == 'T' && overlay == OV_TECH) || (k == 'P' && overlay == OV_POLICY) || (k == 'D' && overlay == OV_DIPLO) || (k == 'L' && overlay == OV_LOG) ||
-            (k == 'V' && overlay == OV_EVO) || (k == 'I' && overlay == OV_TRIBES) || (k == 'O' && overlay == OV_EMPIRE) || (k == 'H' && overlay == OV_RELIGION) || (k == 'A' && overlay == OV_ADVISORS))
+            (k == 'V' && overlay == OV_EVO) || (k == 'I' && overlay == OV_TRIBES) || (k == 'O' && overlay == OV_EMPIRE) || (k == 'H' && overlay == OV_RELIGION) || (k == 'N' && overlay == OV_COUNCIL) || (k == 'A' && overlay == OV_ADVISORS))
             overlay = OV_NONE;
         return;
     }
@@ -2861,6 +2870,7 @@ void GameUI::key(int k, bool shift, bool ctrl) {
         case 'I': overlay = OV_TRIBES; tribeWarArm = -1; return;
         case 'O': overlay = OV_EMPIRE; empireScroll = 0; return;
         case 'H': overlay = OV_RELIGION; return;
+        case 'N': if (g.council.formed) overlay = OV_COUNCIL; return;
         case 'A': overlay = OV_ADVISORS; return;
         case KEY_TAB: { int n = nextUnitNeedingOrders(selUnit); if (n >= 0) selectUnit(n, true); return; }
         case 'C': if (sel()) centerOn(sel()->x, sel()->y); return;
@@ -3100,7 +3110,8 @@ std::string GameUI::moodTip(const City& c) const {
     std::string lux;
     for (int r : g.luxuriesOf(c.owner)) lux += (lux.empty() ? "" : ", ") + g_resources[r].name;
     std::string s = "Happy " + std::to_string(m.happy()) + line("luxuries", m.luxuries) + line("buildings", m.buildings) + line("wonders", m.wonders) +
-                    line("natural wonders in its lands", m.naturals) + line("traditions", m.traditions);
+                    line("natural wonders in its lands", m.naturals) + line("traditions", m.traditions) +
+                    line("festivals", m.festival) + line("its faith", m.faith) + line("chairing the World Council", m.council);
     s += "\nUnhappy " + std::to_string(m.unhappy()) + line("citizens beyond the first 5", m.crowding) + line("size of your empire", m.empire) +
          line("war weariness", m.war);
     s += "\nLuxuries: " + (lux.empty() ? std::string("none - find them, settle near them or trade for them") : lux) + ".";

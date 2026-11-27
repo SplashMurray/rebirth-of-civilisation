@@ -583,7 +583,7 @@ void initData() {
 
     // ------------------------------------------------------------ traditions
     g_policies = {
-        {"Grooming Circles", "+15% Culture", PolicyEffect::Culture, 15, ""},
+        {"Grooming Circles", "+10% Culture", PolicyEffect::Culture, 15, ""},
         {"Communal Feeding", "+15% Food", PolicyEffect::Food, 15, ""},
         {"Craft Lore", "+15% Production", PolicyEffect::Prod, 15, ""},
         {"Elder Wisdom", "+15% Science", PolicyEffect::Sci, 15, ""},

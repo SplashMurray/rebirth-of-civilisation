@@ -54,6 +54,7 @@ int Game::tradeCapacity(int c) const {
     int markets = 0;
     for (auto& ci : cities)
         if (ci.alive && ci.owner == c && ci.has[marketId()]) markets++;
+    if (resolutionActive(RS_TRADE)) cap++;  // the World Council's Trade Charter
     return cap + markets / 2;
 }
 

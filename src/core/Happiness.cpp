@@ -32,6 +32,7 @@ MoodParts Game::moodParts(const City& city) const {
     m.traditions = policyPct(c, PolicyEffect::Happy);
     if (civs[c].festivalUntil >= turn) m.festival = 2;  // a Great Storyteller's festivals, or holy ones
     if (hasBelief(city.religion, BL_PRAYER)) m.faith = 1;
+    if (council.formed && council.chair == c) m.council = 1;  // the prestige of the World Council's chair
     m.crowding = std::max(0, city.pop - CONTENT_BASE);
     m.empire = std::max(0, (numCities(c) - 1) / 4);
     m.war = std::min(4, civs[c].weariness / 25);

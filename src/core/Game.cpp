@@ -754,6 +754,12 @@ void Game::computeCity(City& city) {
     pct.gold += policyPct(c, PolicyEffect::Gold);
     if (ownsWonderSpecial(c, BSpecial::GrowthBonus)) pct.food += 10;
     if (city.droughtTurns > 0) pct.food -= 33;
+    if (council.formed && isMajor(c)) {  // the World Council
+        if (resolutionActive(RS_ARCHIVES)) pct.sci += 10;
+        if (council.chair == c) pct.cult += 10;  // the prestige of the chair
+        if (sanctioned(c)) pct.gold -= 10;
+        if (resolutionActive(RS_SECULAR)) total.faith = total.faith * 85 / 100;
+    }
     int hb = civs[c].yieldBonusPct;
     pct.food += hb / 2; pct.prod += hb; pct.sci += hb;
     // the citizens' mood
@@ -907,6 +913,7 @@ bool Game::canBuild(const City& city, int kind, int id) const {
         if (!unitBelongs(*this, c, id) || !hasTech(c, g_units[id].techId) || g_units[id].cls == UnitClass::Band) return false;
         if (!hasNeeds(c, g_units[id].needs)) return false;
         if (g_units[id].cls == UnitClass::Settler && city.pop < 2) return false;
+        if (g_units[id].cls == UnitClass::Nuke && resolutionActive(RS_NONPROLIF)) return false;  // the World Council's treaty
         if (g_units[id].naval() && !isCoastal(city.x, city.y) && !(g_units[id].river && hasRiver(city.x, city.y))) return false;
         if (g_units[id].cls == UnitClass::Trader) {  // only as many caravans as trade routes allowed
             int busy = tradeUsed(c);
@@ -1593,7 +1600,7 @@ void Game::startExcavate(Unit& u) {
 void Game::startDecon(Unit& u) {
     if (!canDecon(u)) return;
     u.order = ORD_DECON;
-    u.work = workTurns(u, 4);
+    u.work = workTurns(u, resolutionActive(RS_RECLAIM) ? 2 : 4);
     u.moves = 0;
 }
 

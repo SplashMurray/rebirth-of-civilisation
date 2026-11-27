@@ -315,9 +315,10 @@ int Game::zealOf(int c, int* share, int* beliefs, int* traditions) const {
     if (cv.founded >= 0) for (int x : religions[cv.founded].beliefs) if (g_beliefs[x].founder) b += g_beliefs[x].zeal;
     static int freeThought = policyIndex("Free Thought");
     int t = freeThought >= 0 && freeThought < (int)cv.policies.size() && cv.policies[freeThought] ? -10 : 0;
+    if (resolutionActive(RS_SECULAR)) t -= 10;  // the World Council's Secular Accord
     if (share) *share = s;
     if (beliefs) *beliefs = b;
-    if (traditions) *traditions = t;
+    if (traditions) *traditions = t;  // traditions and accords
     return std::max(0, s + b + t);
 }
 

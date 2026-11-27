@@ -5,7 +5,7 @@
 #include <sstream>
 
 namespace {
-const int SAVE_VERSION = 26;
+const int SAVE_VERSION = 27;
 
 struct Archive {
     bool writing;
@@ -141,7 +141,7 @@ void ioGame(Archive& a, Game& g) {
         for (int k = 0; k < GK_COUNT; k++) { a.io(c.greatPts[k]); a.io(c.greatBorn[k]); }
         a.io(c.festivalUntil); a.io(c.preservation); a.io(c.metCassandra); a.io(c.greatEarned);
         a.io(c.faith); a.io(c.faithPerTurn); a.io(c.faithTotal); a.io(c.sciRawPerTurn); a.io(c.zeal); a.io(c.zealPenalty); a.io(c.founded);
-        a.io(c.missionariesBought); a.io(c.festivalsHeld);
+        a.io(c.missionariesBought); a.io(c.festivalsHeld); a.io(c.lastAggression); a.io(c.termsAsChair);
     }
     if (!a.writing) g.allyResTurn = -1;
     long long nu = (long long)g.units.size();
@@ -176,6 +176,22 @@ void ioGame(Archive& a, Game& g) {
     if (!a.writing) g.routes.assign((size_t)std::max(0LL, nr), TradeRoute());
     for (auto& r : g.routes) { a.io(r.owner); a.io(r.from); a.io(r.to); a.io(r.start); a.io(r.until); a.io(r.sea); a.io(r.path); }
     if (!a.writing) g.offers.clear();
+    // the World Council
+    Council& k = g.council;
+    a.io(k.formed); a.io(k.founded); a.io(k.founder); a.io(k.chair); a.io(k.termStart); a.io(k.nextSession); a.io(k.electionNext); a.io(k.sessions);
+    a.io(k.ballot); a.io(k.abuse); a.io(k.powersUsed); a.io(k.lastElection);
+    long long na = (long long)k.agenda.size();
+    a.num(na);
+    if (!a.writing) k.agenda.assign((size_t)std::max(0LL, na), Proposal());
+    for (auto& p : k.agenda) { a.io(p.kind); a.io(p.t1); a.io(p.t2); a.io(p.proposer); a.io(p.votes); }
+    long long nact = (long long)k.active.size();
+    a.num(nact);
+    if (!a.writing) k.active.assign((size_t)std::max(0LL, nact), ActiveResolution());
+    for (auto& r : k.active) { a.io(r.kind); a.io(r.t1); a.io(r.t2); a.io(r.until); }
+    long long nres = (long long)k.lastResults.size();
+    a.num(nres);
+    if (!a.writing) k.lastResults.assign((size_t)std::max(0LL, nres), std::string());
+    for (auto& s : k.lastResults) a.io(s);
 }
 }  // namespace
 

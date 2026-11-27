@@ -63,6 +63,53 @@ static void invariants(Game& g) {
 
 int unitIndex(const std::string& n);
 
+// The World Council: an abusive chair cannot be re-elected; sanctions stop trade; the treaty stops warheads.
+static void councilTests() {
+    Game g;
+    GameSettings s;
+    s.seed = 5;
+    s.mapSize = 1;
+    s.allAI = true;
+    g.newGame(s);
+    std::vector<int> majors;
+    for (int c = FIRST_PRIMATE_CIV; c < (int)g.civs.size(); c++) if (g.isMajor(c)) majors.push_back(c);
+    for (int a : majors) for (int b : majors) g.civs[a].met[b] = 1;
+    g.civs[majors[0]].techs[techIndex("Philosophy")] = 1;
+    g.councilTurn();
+    CHECK(g.council.formed && g.council.founder == majors[0], "council should form with Philosophy");
+    int chair = majors[1];
+    g.council.chair = chair;
+    CHECK(g.canStand(chair), "a fair chair may stand");
+    for (int c : majors) g.civs[c].gold = 500;
+    CHECK(g.usePower(chair, CP_LEVY, -1, -1), "the chair may levy");
+    CHECK(g.civs[chair].gold > 500, "the levy should pay the chair");
+    CHECK(!g.canUsePower(chair, CP_LEVY, -1, -1), "each power once a term");
+    CHECK(g.council.abuse[chair] >= ABUSE_BAR && !g.canStand(chair), "a levying chair is barred from standing");
+    // everyone (even the chair) would vote for the chair: still not re-elected
+    g.council.electionNext = true;
+    g.council.nextSession = g.turn;
+    g.holdSession();
+    CHECK(g.council.chair != chair, "an abusive chair must lose the election");
+    // a fair mediation between two others costs nothing
+    int ch = g.council.chair;
+    std::vector<int> others;
+    for (int c : majors) if (c != ch) others.push_back(c);
+    g.civs[others[0]].war[others[1]] = g.civs[others[1]].war[others[0]] = 1;
+    int before = g.council.abuse[ch];
+    CHECK(g.powerAbuse(CP_MEDIATE, others[0], others[1]) <= 0, "neutral mediation is not abuse");
+    CHECK(g.usePower(ch, CP_MEDIATE, others[0], others[1]), "the chair may mediate");
+    CHECK(!g.civs[others[0]].war[others[1]] && g.council.abuse[ch] <= before, "mediation makes peace without abuse");
+    // resolutions take effect
+    ActiveResolution r;
+    r.kind = RS_SANCTIONS; r.t1 = others[2]; r.until = g.turn + 10;
+    g.council.active.push_back(r);
+    CHECK(g.embargoed(others[2], others[3]), "sanctions stop trade");
+    r.kind = RS_NONPROLIF; r.t1 = -1;
+    g.council.active.push_back(r);
+    for (auto& ci : g.cities) if (ci.alive) CHECK(!g.canBuild(ci, BK_UNIT, ID.uNuke), "no warheads under the treaty");
+    std::printf("council tests passed\n");
+}
+
 // Rivers are navigable: river boats sail along them (faster downstream), big ships cannot, land units ford them.
 static void riverTests() {
     Game g;
@@ -144,6 +191,7 @@ int main(int argc, char** argv) {
     std::setvbuf(stdout, nullptr, _IONBF, 0);  // keep output if anything crashes
     initData();
     riverTests();
+    councilTests();
     for (int gi = 0; gi < games; gi++) {
         auto t0 = std::chrono::steady_clock::now();
         Game g;

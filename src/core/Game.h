@@ -141,9 +141,9 @@ static const int CONTENT_BASE = 5;  // citizens content with nothing at all
 
 // Where a city's happiness and unhappiness come from.
 struct MoodParts {
-    int luxuries = 0, buildings = 0, wonders = 0, naturals = 0, traditions = 0, festival = 0, faith = 0;  // happiness
-    int crowding = 0, empire = 0, war = 0;                                                               // unhappiness
-    int happy() const { return luxuries + buildings + wonders + naturals + traditions + festival + faith; }
+    int luxuries = 0, buildings = 0, wonders = 0, naturals = 0, traditions = 0, festival = 0, faith = 0, council = 0;  // happiness
+    int crowding = 0, empire = 0, war = 0;                                                                            // unhappiness
+    int happy() const { return luxuries + buildings + wonders + naturals + traditions + festival + faith + council; }
     int unhappy() const { return crowding + empire + war; }
 };
 
@@ -232,6 +232,45 @@ struct Civ {
     int zealPenalty = 0;      // % of science lost to it (derived)
     int founded = -1;         // the religion this civ founded
     int missionariesBought = 0, festivalsHeld = 0;
+    int lastAggression = -1000;  // the last turn they declared war (World Council: censure, sanctions)
+    int termsAsChair = 0;
+};
+
+// ---- the World Council (see Council.cpp)
+enum ResolutionKind { RS_NONPROLIF, RS_ARCHIVES, RS_TRADE, RS_SECULAR, RS_TRIBES, RS_RECLAIM, RS_SANCTIONS, RS_PEACE, RS_COUNT };
+struct ResolutionDef {
+    const char* name;
+    const char* desc;
+    int targets;   // 0: none, 1: one people, 2: two peoples
+    int duration;  // turns at standard speed
+};
+extern const ResolutionDef g_resolutions[RS_COUNT];
+enum ChairPower { CP_MEDIATE, CP_LEVY, CP_SANCTION, CP_CENSURE, CP_COUNT };
+extern const char* CHAIR_POWER_NAMES[CP_COUNT];
+static const int ABUSE_BAR = 3;  // a chair whose abuse of power reaches this cannot stand for election
+struct Proposal {
+    int kind = -1;              // -1: the proposer (a human) has not chosen yet
+    int t1 = -1, t2 = -1;
+    int proposer = -1;
+    std::vector<int> votes;     // per civ, humans' choices: 1 yes, -1 no, 0 abstain
+};
+struct ActiveResolution {
+    int kind = 0, t1 = -1, t2 = -1, until = 0;
+};
+struct Council {
+    bool formed = false;
+    int founded = 0, founder = -1;
+    int chair = -1, termStart = 0;
+    int nextSession = 0;
+    bool electionNext = true;
+    int sessions = 0;
+    std::vector<Proposal> agenda;           // to be voted on at the next session
+    std::vector<int> ballot;                // per civ: the candidate a human votes for (-1: abstain)
+    std::vector<ActiveResolution> active;
+    std::vector<int> abuse;                 // per civ: abuse of the chair's powers (fades slowly)
+    int powersUsed = 0;                     // bit per ChairPower: used this term
+    std::vector<std::string> lastResults;   // what happened at the last session
+    std::vector<int> lastElection;          // delegates each candidate won at the last election
 };
 
 // ---- religion
@@ -395,7 +434,7 @@ public:
     // Bigger maps give each species more room and bigger empires, so (as in Civilization) research,
     // traditions and the Rebirth Project cost more on them. Derived from the map size, not saved.
     int mapCostPct() const { static const int P[] = {100, 130, 170}; return P[std::clamp(settings.mapSize, 0, 2)]; }
-    int researchCost(int v) const { return (int)((long long)sc(v) * mapCostPct() * 107 / 10000); }  // +7%: Great Primates and happier cities speed things up
+    int researchCost(int v) const { return (int)((long long)sc(v) * mapCostPct() * 112 / 10000); }  // +12%: Great Primates, happier cities and the World Council speed things up
     int techCost(int t) const { return researchCost(g_techs[t].cost); }
     int traitCost(int t, int k) const { return sc(g_traits[t].cost[k]); }
     int statWars = 0, statCaptures = 0, statRazes = 0, statNukes = 0;  // diagnostics only (not saved)
@@ -557,6 +596,30 @@ public:
     bool nearFaithful(int c, int x, int y) const;  // Holy Warriors: within 2 tiles of a city following c's religion
     void aiReligion(int c);
     int aiPickBelief(int c, bool founder) const;
+
+    // ---- the World Council (Council.cpp)
+    Council council;
+    int delegates(int c, bool election = false) const;
+    bool resolutionActive(int kind) const;
+    bool sanctioned(int c) const;
+    bool validProposal(const Proposal& p, std::string* why = nullptr) const;
+    bool setProposal(int slot, int kind, int t1, int t2);  // the proposer (a human) chooses
+    void setVote(int c, int slot, int vote);
+    void setBallot(int c, int candidate);
+    bool canStand(int c, std::string* why = nullptr) const;  // may stand for election as chair
+    int powerAbuse(int power, int t1, int t2) const;          // the abuse the chair would incur
+    bool canUsePower(int c, int power, int t1, int t2, std::string* why = nullptr) const;
+    bool usePower(int c, int power, int t1, int t2);
+    std::string proposalText(const Proposal& p, int viewer) const;
+    void councilTurn();
+    void holdSession();
+    void prepareAgenda();
+    void passResolution(const ActiveResolution& r);
+    int aiVoteOn(int c, const Proposal& p) const;  // -1 no, 0 abstain, 1 yes
+    int aiResolutionValue(int c, const Proposal& p) const;
+    Proposal aiPropose(int c) const;
+    int aiCandidate(int c) const;
+    void aiChairPowers(int c);
 
     // ---- units
     int spawnUnit(int c, int type, int x, int y);

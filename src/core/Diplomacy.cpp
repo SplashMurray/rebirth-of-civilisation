@@ -66,6 +66,7 @@ int Game::diploSciPct(int c) const {
 
 bool Game::embargoed(int a, int b) const {
     if (a < FIRST_PRIMATE_CIV || b < FIRST_PRIMATE_CIV || a == b || civs[a].minor || civs[b].minor) return false;
+    if (sanctioned(a) || sanctioned(b)) return true;  // the World Council's sanctions
     return (civs[a].embargo.size() > (size_t)b && civs[a].embargo[b]) || (civs[b].embargo.size() > (size_t)a && civs[b].embargo[a]);
 }
 
@@ -105,6 +106,7 @@ bool Game::canDeclareWar(int a, int b, std::string* why) const {
     if (a == b || b < FIRST_PRIMATE_CIV || !civs[b].alive) return fail("Not possible");
     if (civs[a].war[b]) return fail("Already at war");
     if (!civs[a].met[b]) return fail("You have not met them");
+    if (isMinor(b) && resolutionActive(RS_TRIBES)) return fail("The World Council's Protection of the Tribes forbids it");
     if (civs[a].peaceUntil.size() > (size_t)b && civs[a].peaceUntil[b] > turn)
         return fail("Your peace treaty forbids war for " + std::to_string(civs[a].peaceUntil[b] - turn) + " more turns");
     return true;

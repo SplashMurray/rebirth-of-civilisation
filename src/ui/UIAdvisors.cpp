@@ -6,6 +6,7 @@
 // SPDX-License-Identifier: MIT
 #include "GameUI.h"
 #include <algorithm>
+static int dur5(const Game& g) { return std::max(1, g.dur(5)); }
 #include <cctype>
 #include <cmath>
 
@@ -133,6 +134,23 @@ std::vector<GameUI::Advice> GameUI::gatherAdvice() {
             add(0, 55, "A Missionary waits. Lead it to a city that does not yet follow our faith and preach.", [this, uid] { overlay = OV_NONE; selectUnit(uid, true); }, "Select");
             break;
         }
+    // the World Council (the Far-Traveller's business, but urgent before a session)
+    if (g.council.formed) {
+        const Council& k = g.council;
+        int left = k.nextSession - g.turn;
+        bool pending = false, unvoted = false;
+        for (auto& pr : k.agenda) {
+            if (pr.kind < 0 && pr.proposer == p) pending = true;
+            if (pr.kind >= 0 && (p >= (int)pr.votes.size() || pr.votes[p] == 0)) unvoted = true;
+        }
+        bool noBallot = k.electionNext && (p >= (int)k.ballot.size() || k.ballot[p] < 0);
+        if (pending) add(3, left <= 3 ? 80 : 50, "We may put a resolution before the World Council (session in " + std::to_string(left) + " turns).", open(OV_COUNCIL), "Council");
+        else if ((unvoted || noBallot) && left <= dur5(g)) add(3, 65, "The World Council meets in " + std::to_string(left) + " turns and we have not cast all our votes" +
+                                                               (noBallot ? ", nor chosen a chair" : "") + ".", open(OV_COUNCIL), "Council");
+        if (k.chair == p && p < (int)k.abuse.size() && k.abuse[p] > 0)
+            add(3, 40, "Our abuse of the chair's powers stands at " + std::to_string(k.abuse[p]) + " of " + std::to_string(ABUSE_BAR) + ". At " +
+                std::to_string(ABUSE_BAR) + " we could not stand for re-election.", open(OV_COUNCIL), "Council");
+    }
     // ---- the Keeper of Knowledge: science and evolution
     if (me.zealPenalty >= 10)
         add(1, me.zealPenalty >= 25 ? 85 : 60, "Our people's zeal costs us " + std::to_string(me.zealPenalty) + "% of our Science: they resist ideas that contradict "

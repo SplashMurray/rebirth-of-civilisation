@@ -38,7 +38,7 @@ public:
 
     // ---- used by tests / screenshot tool
     enum Screen { SCR_TITLE, SCR_SETUP, SCR_GAME };
-    enum Overlay { OV_NONE, OV_CITY, OV_TECH, OV_POLICY, OV_DIPLO, OV_MENU, OV_HELP, OV_LOG, OV_EVO, OV_ACHIEVEMENTS, OV_TRADE, OV_ROUTES, OV_TRIBES, OV_ADVISORS, OV_EMPIRE, OV_RELIGION };
+    enum Overlay { OV_NONE, OV_CITY, OV_TECH, OV_POLICY, OV_DIPLO, OV_MENU, OV_HELP, OV_LOG, OV_EVO, OV_ACHIEVEMENTS, OV_TRADE, OV_ROUTES, OV_TRIBES, OV_ADVISORS, OV_EMPIRE, OV_RELIGION, OV_COUNCIL };
     Screen screen = SCR_TITLE;
     Overlay overlay = OV_NONE;
     std::unique_ptr<Game> game;
@@ -256,6 +256,9 @@ private:
     void renderTribes();
     void renderEmpire();
     void renderReligion();
+    void renderCouncil();
+    int councilKind = -1, councilT1 = -1, councilT2 = -1;              // Council screen: the proposal being drafted
+    int councilPower = -1, councilPT1 = -1, councilPT2 = -1;           // ... and the chair's power being aimed
     void drawReligionSymbol(int r, int cx, int cy, int rad);
     Color religionColor(int r) const;
     std::string zealTip(int c);

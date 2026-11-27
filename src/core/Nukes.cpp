@@ -26,6 +26,15 @@ bool Game::launchNuke(int c, int x, int y) {
     Civ& cv = civs[c];
     cv.warheads--;
     cv.nukesLaunched++;
+    if (council.formed) {
+        if (council.chair == c) {  // the chair of the council that was meant to stop this
+            if ((int)council.abuse.size() < (int)civs.size()) council.abuse.resize(civs.size(), 0);
+            council.abuse[c] += 4;
+        }
+        if (resolutionActive(RS_NONPROLIF))  // breaking the treaty: every member condemns it
+            for (int o = FIRST_PRIMATE_CIV; o < (int)civs.size(); o++)
+                if (o != c && isMajor(o)) civs[o].grievance[c] += 30;
+    }
     statNukes++;
     blasts.push_back({x, y});
 

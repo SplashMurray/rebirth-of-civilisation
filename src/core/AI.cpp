@@ -291,6 +291,7 @@ void Game::aiTurn(int c) {
     aiTribes(c);
     aiGreat(c);
     aiReligion(c);
+    aiChairPowers(c);
     aiPacts(c);
     aiOffers(c);
     for (size_t i = 0; i < cities.size(); i++)

@@ -52,6 +52,15 @@ void Game::meet(int a, int b) {
 
 void Game::declareWar(int a, int b) {
     if (a == b || civs[a].war[b]) return;
+    if (isMajor(a) && isMinor(b) && resolutionActive(RS_TRIBES)) return;  // the World Council protects the tribes
+    if (isMajor(a)) civs[a].lastAggression = turn;
+    if (council.formed && council.chair == a && isMajor(b) && !sanctioned(b) && civs[b].lastAggression < turn - dur(10)) {  // the chair attacking a member: abuse of their office
+        if ((int)council.abuse.size() < (int)civs.size()) council.abuse.resize(civs.size(), 0);
+        council.abuse[a] += 2;
+        for (int v : viewers())
+            notify(v, "The " + civs[a].name + ", chair of the World Council, declared war on a fellow member. Abuse of power: " + std::to_string(council.abuse[a]) +
+                          " of " + std::to_string(ABUSE_BAR) + ".");
+    }
     bool friends = hasAgreement(AG_FRIENDSHIP, a, b) || hasAgreement(AG_DEFENSIVE, a, b);
     civs[a].war[b] = civs[b].war[a] = 1;
     statWars++;
@@ -196,6 +205,7 @@ void Game::endTurn() {
     tradeTurn();
     tribesTurn();
     religionTurn();
+    councilTurn();
     cassandraCheck();
     volcanoTurn();
     regrowForage();
