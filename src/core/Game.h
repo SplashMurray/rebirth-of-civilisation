@@ -195,6 +195,7 @@ struct Civ {
     int tribe = -1;                   // index into g_tribes
     std::vector<int> influence;       // each major civ's standing with this tribe
     int ally = -1;                    // the major civ it is allied with
+    int allySince = 0;                // since when
     int questKind = 0, questTarget = -1, questUntil = 0;
     std::vector<uint8_t> questDone;   // who has completed the current quest
     std::vector<int> lastUnitGift;    // militant tribes: last turn each major was sent troops
@@ -324,7 +325,7 @@ public:
     // Bigger maps give each species more room and bigger empires, so (as in Civilization) research,
     // traditions and the Rebirth Project cost more on them. Derived from the map size, not saved.
     int mapCostPct() const { static const int P[] = {100, 130, 170}; return P[std::clamp(settings.mapSize, 0, 2)]; }
-    int researchCost(int v) const { return (int)((long long)sc(v) * mapCostPct() * 103 / 10000); }  // +3%: Great Primates speed things up
+    int researchCost(int v) const { return (int)((long long)sc(v) * mapCostPct() * 107 / 10000); }  // +7%: Great Primates and happier cities speed things up
     int techCost(int t) const { return researchCost(g_techs[t].cost); }
     int traitCost(int t, int k) const { return sc(g_traits[t].cost[k]); }
     int statWars = 0, statCaptures = 0, statRazes = 0, statNukes = 0;  // diagnostics only (not saved)

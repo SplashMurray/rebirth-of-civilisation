@@ -121,8 +121,10 @@ void Game::aiNaval(Unit& uref) {
     if (atWarAny) {
         int bx = -1, by = -1, bd = 99;
         for (auto& e : units) {
-            if (!e.alive || !atWar(c, e.owner) || (!isWater(e.x, e.y) && !g_units[e.type].naval())) continue;
+            if (!e.alive || !atWar(c, e.owner)) continue;
             int dd = dist(e.x, e.y, U().x, U().y);
+            bool bank = d.river && d.ranged() && dd <= 6 && g_units[e.type].landMilitary();  // river gunboats shell the banks
+            if (!isWater(e.x, e.y) && !g_units[e.type].naval() && !bank) continue;
             if (dd > 8 || dd >= bd) continue;
             auto o = odds(e);
             if (sk >= 1 && !d.ranged() && o.first < o.second && e.hp > 40) continue;

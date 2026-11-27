@@ -334,6 +334,25 @@ void Game::aiCity(City& city) {
     bool keep = city.buildKind != BK_NONE && canBuild(city, city.buildKind, city.buildId);
     if (keep && threat > 0 && !garrison && !(city.buildKind == BK_UNIT && g_units[city.buildId].landMilitary())) keep = false;
     int sk = skillOf(c);
+    // an unhappy city (or a big one that cannot grow) turns to contentment, unless it is building a wonder
+    bool sad = moodOf(city) < MOOD_CONTENT || (city.happy <= city.unhappy && city.pop >= 8 && sk >= 1);
+    bool onWonder = city.buildKind == BK_BUILDING && (g_buildings[city.buildId].wonder || g_buildings[city.buildId].special == BSpecial::Victory);
+    bool onHappy = city.buildKind == BK_BUILDING && g_buildings[city.buildId].happy > 0;
+    if (sad && !onWonder && !onHappy && threat == 0) {
+        int best = -1;
+        double bv = 0;
+        for (int b : availableBuildings(city)) {
+            const BuildingDef& bd = g_buildings[b];
+            if (bd.happy <= 0 || bd.wonder || !canBuild(city, BK_BUILDING, b)) continue;
+            double v = bd.happy * 100.0 / std::max(1, buildCost(c, BK_BUILDING, b));
+            if (v > bv) { bv = v; best = b; }
+        }
+        if (best >= 0) {
+            city.buildKind = BK_BUILDING;
+            city.buildId = best;
+            return;
+        }
+    }
     if (keep) {
         if (sk > 0 && threat > 0 && hasGold(c) && buyCost(city) > 0 && cv.gold >= buyCost(city)) buy(city);
         else if (sk >= 2 && hasGold(c) && buyCost(city) > 0 && cv.gold >= buyCost(city) * 13 / 10 &&

@@ -754,6 +754,7 @@ void Game::computeCity(City& city) {
     city.yields = total;
     city.foodSurplus = total.food - 2 * city.pop;
     if (city.happy <= city.unhappy && isMajor(c) && city.foodSurplus > 0) city.foodSurplus = 0;  // a new citizen needs happiness to spare
+    if (isMinor(c) && city.pop >= 5 + era(c) && city.foodSurplus > 0) city.foodSurplus = 0;      // a tribe's home stays modest
 }
 
 int Game::cityStrength(const City& city) const {

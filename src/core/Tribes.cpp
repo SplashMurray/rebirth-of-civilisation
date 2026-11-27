@@ -222,6 +222,7 @@ void Game::tribesTurn() {
         if (best != tv.ally) {
             int was = tv.ally;
             tv.ally = best;
+            tv.allySince = turn;
             allyResTurn = -1;
             markResourcesDirty();
             if (best == player) popup(player, POP_INFO, "A New Ally", "The " + civs[t].name + " of " + td.city + " are now your allies.\n\n" + tribeBonusText(t) +
@@ -231,10 +232,15 @@ void Game::tribesTurn() {
             else if (best >= 0 && civs[player].met[t]) notify(player, "The " + civs[t].name + " of " + td.city + " have allied with the " + civs[best].name + ".", home.x, home.y);
         }
         // allies' enemies are their enemies; old quarrels end when the reason does
+        // - but a tribe only takes up arms against an enemy on its doorstep, and only for an ally of some standing
         for (int x = FIRST_PRIMATE_CIV; x < (int)civs.size(); x++) {
             if (!isMajor(x) || !civs[x].alive || x == tv.ally) continue;
             bool allyWar = tv.ally >= 0 && civs[tv.ally].war[x];
-            if (allyWar && !tv.war[x]) {
+            if (allyWar && !tv.war[x] && turn - tv.allySince >= dur(5)) {
+                bool near = false;
+                for (auto& ci : cities)
+                    if (ci.alive && ci.owner == x && dist(ci.x, ci.y, home.x, home.y) <= 10) { near = true; break; }
+                if (!near) continue;
                 declareWar(t, x);
             } else if (!allyWar && tv.war[x] && tv.influence[x] > -30) {
                 makePeace(t, x);
