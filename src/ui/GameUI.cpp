@@ -142,7 +142,10 @@ void GameUI::render(Canvas& c) {
     switch (screen) {
         case SCR_TITLE: renderTitle(); break;
         case SCR_SETUP: renderSetup(); break;
-        case SCR_GAME: renderGame(); break;
+        case SCR_GAME:
+            if (handover && game) renderHandover();  // nothing of the last player's view shows through
+            else renderGame();
+            break;
     }
     renderToast();
     renderAchBanner();
@@ -249,14 +252,20 @@ void GameUI::renderSetup() {
     cv->glowEllipse(W / 2, 0, W / 2, H / 3, rgb(240, 170, 90), 40);
     cv->textA(W / 2 + 2, 26, "Choose Your Primate", 34, rgb(0, 0, 0), AL_CENTER, true, 140);
     cv->text(W / 2, 24, "Choose Your Primate", 34, C_TEXT, AL_CENTER, true);
-    cv->text(W / 2, 66, "Each primate has its own strengths. Humans are not playable - they will not survive 2034.", 15, C_DIM, AL_CENTER);
+    setupHot[0] = setupPrimate;
+    if (setupPlayers > 1)
+        cv->text(W / 2, 66, "Hotseat: Player " + std::to_string(setupEditing + 1) + ", click your primate. (Choose whose pick to change on the right.)", 15,
+                 rgb(255, 214, 120), AL_CENTER, true);
+    else cv->text(W / 2, 66, "Each primate has its own strengths. Humans are not playable - they will not survive 2034.", 15, C_DIM, AL_CENTER);
     int cols = 4, gap = 14;
     int cw = std::min(330, (W - 80 - gap * (cols - 1)) / cols), ch = std::min(236, (H - 100 - 232) / 2);
     int gx = (W - (cw * cols + gap * (cols - 1))) / 2, gy = 100;
     for (int i = 0; i < (int)g_primates.size(); i++) {
         const PrimateDef& p = g_primates[i];
         int x = gx + (i % cols) * (cw + gap), y = gy + (i / cols) * (ch + gap);
-        bool selp = setupPrimate == i;
+        int owner = -1;  // which human picked this species
+        for (int h = 0; h < setupPlayers; h++) if (setupHot[h] == i) owner = h;
+        bool selp = setupPlayers > 1 ? owner >= 0 : setupPrimate == i;
         bool hvp = over(x, y, cw, ch);
         cv->fillRoundRectGrad(x + 2, y + 4, cw, ch, 9, rgb(0, 0, 0), rgb(0, 0, 0), 90);
         cv->fillRoundRectGrad(x, y, cw, ch, 9, selp ? rgb(56, 66, 84) : hvp ? rgb(44, 52, 66) : rgb(36, 42, 54), selp ? rgb(32, 38, 50) : rgb(22, 26, 34));
@@ -271,7 +280,19 @@ void GameUI::renderSetup() {
         int ty = textBlock(x + 12, y + 92, cw - 24, p.abilityDesc + (p.evoPct ? " Evolves +" + std::to_string(p.evoPct) + "% faster." : "") + " Leans towards the " + STRAND_NAMES[p.evoLean] + ".", 13, C_TEXT, 3);
         bool flavourFits = ty + 6 + (int)wrap(p.flavor, cw - 24, 12).size() * 15 <= y + ch - 4;  // short screens: it moves to the tooltip
         if (flavourFits) textBlock(x + 12, ty + 6, cw - 24, p.flavor, 12, C_DIM, 2);
-        hot(x, y, cw, ch, [this, i] { setupPrimate = i; snd->call(i, 0.6f, 0.0f, 0); }, flavourFits ? "" : p.flavor);
+        if (setupPlayers > 1 && owner >= 0) {
+            cv->fillRoundRectGrad(x + cw - 46, y + 8, 38, 22, 6, rgb(110, 90, 40), rgb(80, 64, 28));
+            cv->text(x + cw - 27, y + 11, "P" + std::to_string(owner + 1), 13, C_TEXT, AL_CENTER, true);
+        }
+        hot(x, y, cw, ch, [this, i] {
+            if (setupPlayers > 1) {
+                for (int h = 0; h < setupPlayers; h++) if (setupHot[h] == i && h != setupEditing) std::swap(setupHot[h], setupHot[setupEditing]);
+                setupHot[setupEditing] = i;
+                setupPrimate = setupHot[0];
+                setupEditing = (setupEditing + 1) % setupPlayers;
+            } else setupPrimate = i;
+            snd->call(i, 0.6f, 0.0f, 0);
+        }, flavourFits ? "" : p.flavor);
     }
     int oy = gy + 2 * (ch + gap) + 10;
     const char* sizes[] = {"Small (4 primates)", "Standard (6 primates)", "Large (8 primates)"};
@@ -317,13 +338,43 @@ void GameUI::renderSetup() {
         button(gx + 110 + i * s3, oy + 4 * RP, s3 - 10, BH, std::string(SPEED_NAMES[i]) + " (" + std::to_string(SPEED_TURNS[i]) + " turns)", true,
                [this, i] { setupSpeed = i; }, SPEED_TIPS[i], setupSpeed == i ? rgb(110, 90, 40) : C_PANEL2, 14);
     // guidance: the tutorial and advisor tips
-    button(beginX, oy + 84, 108, 34, std::string("Tutorial: ") + (setupTutorial ? "On" : "Off"), true, [this] { setupTutorial = !setupTutorial; },
+    button(beginX, oy + 84, 108, 34, std::string("Tutorial: ") + (setupTutorial && setupPlayers == 1 ? "On" : "Off"), setupPlayers == 1, [this] { setupTutorial = !setupTutorial; },
            "Step-by-step guidance through your first game", setupTutorial ? rgb(110, 90, 40) : C_PANEL2, 12);
     button(beginX + 112, oy + 84, 108, 34, std::string("Tips: ") + (advisorTips ? "On" : "Off"), true, [this] { advisorTips = !advisorTips; },
            "Advisor tips: your advisors speak up at the start of a turn when something needs you", advisorTips ? rgb(110, 90, 40) : C_PANEL2, 12);
+    // hotseat: up to four humans take turns at this computer
+    {
+        int maxP = std::min(4, setupSize == 0 ? 4 : setupSize == 1 ? 6 : 8);
+        cv->text(beginX, oy + 132, "Players:", 13, C_DIM);
+        for (int n = 1; n <= maxP; n++)
+            button(beginX + 66 + (n - 1) * 39, oy + 126, 35, 28, std::to_string(n), true, [this, n] {
+                setupPlayers = n;
+                setupEditing = std::min(setupEditing, n - 1);
+                // make sure every human has a species of their own
+                for (int h = 1; h < n; h++)
+                    for (int a = 0; a < h; a++)
+                        if (setupHot[h] == setupHot[a]) {
+                            for (int p = 0; p < (int)g_primates.size(); p++) {
+                                bool used = false;
+                                for (int b = 0; b < h; b++) if (setupHot[b] == p) used = true;
+                                if (!used) { setupHot[h] = p; break; }
+                            }
+                        }
+                if (n > 1) setupTutorial = false;
+            }, n == 1 ? "One player against the computer" : std::to_string(n) + " players taking turns at this computer (hotseat)",
+                   setupPlayers == n ? rgb(110, 90, 40) : C_PANEL2, 13);
+        if (setupPlayers > 1) {
+            cv->text(beginX, oy + 168, "Choosing:", 13, C_DIM);
+            for (int h = 0; h < setupPlayers; h++)
+                button(beginX + 66 + h * 39, oy + 162, 35, 28, "P" + std::to_string(h + 1), true, [this, h] { setupEditing = h; },
+                       "Player " + std::to_string(h + 1) + ": " + g_primates[setupHot[h]].name + ". Click, then click a primate card to change it.",
+                       setupEditing == h ? rgb(150, 110, 50) : C_PANEL2, 12);
+        }
+    }
     button(beginX, oy + 4, 220, 70, "Begin", true, [this] {
         GameSettings s;
-        s.tutorial = setupTutorial;
+        s.tutorial = setupTutorial && setupPlayers == 1;
+        for (int h = 1; h < setupPlayers; h++) s.hotseat.push_back(setupHot[h]);
         s.primate = setupPrimate;
         s.mapSize = setupSize;
         s.difficulty = setupDiff;
@@ -339,6 +390,7 @@ void GameUI::renderSetup() {
 void GameUI::startGame(const GameSettings& s) {
     game.reset(new Game());
     game->newGame(s);
+    handover = false;
     resetMotion();
     boxPlayed = false;
     boxT = -1;
@@ -353,6 +405,7 @@ void GameUI::startGame(const GameSettings& s) {
     if (first >= 0) {
         selectUnit(first, true);
     }
+    if (game->numHumans() > 1) beginHandover();  // hotseat: player 1 takes the chair
 }
 
 // ============================================================ game screen
@@ -1843,23 +1896,32 @@ void GameUI::renderTrade() {
     if (draft.items.empty()) { verdict = "Add something to the deal."; vc = C_DIM; }
     else {
         std::string why;
-        bool ok = g.aiAccepts(c, draft, &why);
-        verdict = ok ? "The " + g.civs[c].name + " would accept this deal." : g.civs[c].leader + ": \"" + why + ".\"";
-        vc = ok ? rgb(130, 220, 120) : rgb(240, 140, 110);
+        if (g.human(c)) {
+            verdict = "The " + g.civs[c].name + " are played by a human: they will answer on their turn.";
+            vc = C_TEXT;
+        } else {
+            bool ok = g.aiAccepts(c, draft, &why);
+            verdict = ok ? "The " + g.civs[c].name + " would accept this deal." : g.civs[c].leader + ": \"" + why + ".\"";
+            vc = ok ? rgb(130, 220, 120) : rgb(240, 140, 110);
+        }
     }
     cv->text(px + 24, ry, verdict, 16, vc, AL_LEFT, true);
     int by = py + ph - 56;
     button(px + 24, by, 150, 38, "Propose", !draft.items.empty(), [this] {
         Game& gg = *game;
         std::string why;
-        if (gg.aiAccepts(draft.b, draft, &why) && gg.executeDeal(draft)) {
+        if (gg.human(draft.b)) {
+            toast = gg.offerToHuman(draft) ? "Proposal sent: the " + gg.civs[draft.b].name + " will answer on their turn."
+                                           : "Cannot send this proposal (one open proposal at a time).";
+            if (toast[0] == 'P') { draft.items.clear(); overlay = OV_DIPLO; }
+        } else if (gg.aiAccepts(draft.b, draft, &why) && gg.executeDeal(draft)) {
             toast = "Deal agreed with the " + gg.civs[draft.b].name + ".";
             draft.items.clear();
             overlay = OV_DIPLO;
         } else toast = "Refused: " + why;
         toastMs = 2800;
     }, "", rgb(50, 100, 60), 15);
-    button(px + 184, by, 210, 38, "What would it take?", !draft.items.empty(), [this] { balanceDraft(); },
+    button(px + 184, by, 210, 38, "What would it take?", !draft.items.empty() && !g.human(c), [this] { balanceDraft(); },
            "Add the gold they would want from you to make this deal acceptable", C_PANEL2, 14);
     button(px + 404, by, 110, 38, "Clear", true, [this] { draft.items.clear(); }, "", C_PANEL2, 14);
     button(px + pw - 134, by, 110, 38, "Back", true, [this] { overlay = OV_DIPLO; }, "", C_PANEL2, 14);
@@ -2445,7 +2507,26 @@ void GameUI::endTurnNow() {
     Game& g = *game;
     if (g.gameOver && g.winner < 0) return;  // defeated
     overlay = overlay == OV_CITY ? OV_NONE : overlay;
+    // hotseat: each human takes a turn in civ order; after the last, the world moves on
+    bool hotseat = false;
+    for (int c = FIRST_PRIMATE_CIV; c < (int)g.civs.size(); c++) if (g.civs[c].player && c != g.player) hotseat = true;
+    int next = hotseat ? g.nextHuman(g.player) : -1;
+    if (next >= 0) {
+        g.switchPlayer(next);
+        moveMode = false;
+        disbandArm = -1;
+        nukeMode = false;
+        beginHandover();
+        return;
+    }
     g.endTurn();
+    if (hotseat) {
+        int first = g.nextHuman(FIRST_PRIMATE_CIV - 1);
+        if (first >= 0) {
+            g.switchPlayer(first);
+            beginHandover();
+        }
+    }
     moveMode = false;
     disbandArm = -1;
     nukeMode = false;
@@ -2504,6 +2585,8 @@ void GameUI::loadGame() {
     if (me.capital >= 0) centerOn(game->cities[me.capital].x, game->cities[me.capital].y);
     int n = nextUnitNeedingOrders(-1);
     if (n >= 0) selectUnit(n, me.capital < 0);
+    handover = false;
+    if (game->numHumans() > 1) beginHandover();
     toast = "Game loaded";
     toastMs = 2000;
 }
@@ -2549,6 +2632,15 @@ void GameUI::mouseUp(int x, int y, int button) {
     bool wasDrag = dragging && dragMoved;
     dragging = false;
     if (button == MOUSE_LEFT && wasDrag) return;
+    if (screen == SCR_GAME && game && handover) {
+        for (int i = (int)hots.size() - 1; i >= 0; i--)  // the handover screen's own buttons (save, menu)
+            if (hots[i].fn && x >= hots[i].x && y >= hots[i].y && x < hots[i].x + hots[i].w && y < hots[i].y + hots[i].h) {
+                auto fn = hots[i].fn;
+                fn();
+                return;
+            }
+        return;
+    }
     if (screen == SCR_GAME && game && nukeT >= 0) {
         skipNuke();
         return;
@@ -2618,6 +2710,10 @@ void GameUI::adjustUiScale(int dir) {
 
 void GameUI::key(int k, bool shift, bool ctrl) {
     (void)shift;
+    if (screen == SCR_GAME && game && handover) {
+        if (k == KEY_ENTER || k == ' ') endHandover();
+        return;
+    }
     if (ctrl && (k == KEY_PLUS || k == KEY_MINUS || k == '0')) {
         adjustUiScale(k == KEY_PLUS ? 1 : k == KEY_MINUS ? -1 : 0);
         return;

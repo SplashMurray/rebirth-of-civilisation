@@ -94,9 +94,10 @@ void Game::setEmbargo(int a, int b, bool on) {
         civs[b].goodwill[a] += 5;
     }
     std::string what = on ? " imposed an embargo on " : " lifted their embargo on ";
-    if (a == player) notify(player, std::string(on ? "You imposed an embargo on the " : "You lifted your embargo on the ") + civs[b].name + ".");
-    else if (b == player) notify(player, "The " + civs[a].name + what + "you." + (on ? " No trade is possible between you." : ""));
-    else if (civs[player].met[a] && civs[player].met[b]) notify(player, "The " + civs[a].name + what + "the " + civs[b].name + ".");
+    notify(a, std::string(on ? "You imposed an embargo on the " : "You lifted your embargo on the ") + civs[b].name + ".");
+    notify(b, "The " + civs[a].name + what + "you." + (on ? " No trade is possible between you." : ""));
+    for (int v : viewers())
+        if (v != a && v != b && civs[v].met[a] && civs[v].met[b]) notify(v, "The " + civs[a].name + what + "the " + civs[b].name + ".");
 }
 
 bool Game::canDeclareWar(int a, int b, std::string* why) const {
@@ -440,9 +441,10 @@ void Game::denounce(int a, int b) {
     civs[a].denouncedUntil[b] = turn + dur(30);
     civs[b].grievance[a] += 15;
     endAgreements(a, b);
-    if (b == player) notify(player, civs[a].leader + " of the " + civs[a].name + " has publicly denounced you.");
-    else if (a == player) notify(player, "You have denounced the " + civs[b].name + ".");
-    else if (civs[player].met[a] && civs[player].met[b]) notify(player, "The " + civs[a].name + " have denounced the " + civs[b].name + ".");
+    notify(b, civs[a].leader + " of the " + civs[a].name + " has publicly denounced you.");
+    notify(a, "You have denounced the " + civs[b].name + ".");
+    for (int v : viewers())
+        if (v != a && v != b && civs[v].met[a] && civs[v].met[b]) notify(v, "The " + civs[a].name + " have denounced the " + civs[b].name + ".");
 }
 
 void Game::expelUnits(int a, int b) {
@@ -471,21 +473,30 @@ void Game::answerOffer(int idx, bool accept) {
     if (idx < 0 || idx >= (int)offers.size()) return;
     Deal d = offers[idx];
     offers[idx].items.clear();
-    int ai = d.a;
+    int ai = d.a, me = d.b;  // ai proposed to me (in hotseat 'ai' may be another human)
     if (d.items.empty() || !civs[ai].alive) return;
     if (accept) {
-        if (!executeDeal(d)) notify(player, "The deal with the " + civs[ai].name + " could no longer be completed.");
-        else notify(player, "Deal agreed with the " + civs[ai].name + ".");
+        if (!executeDeal(d)) {
+            notify(me, "The deal with the " + civs[ai].name + " could no longer be completed.");
+            notify(ai, "Your deal with the " + civs[me].name + " could no longer be completed.");
+        } else {
+            notify(me, "Deal agreed with the " + civs[ai].name + ".");
+            if (human(ai)) notify(ai, "The " + civs[me].name + " accepted your proposal.");
+        }
+        return;
+    }
+    if (human(ai)) {
+        notify(ai, "The " + civs[me].name + " turned down your proposal.");
         return;
     }
     if (d.demand) {
-        civs[ai].grievance[player] += 20;
-        notify(player, "You refused the " + civs[ai].name + "'s demand. " + civs[ai].leader + " will not forget it.");
+        civs[ai].grievance[me] += 20;
+        notify(me, "You refused the " + civs[ai].name + "'s demand. " + civs[ai].leader + " will not forget it.");
         const PrimateDef* pd = primate(ai);
         std::string w;
-        if (pd && rng.chance(pd->aggression * 0.06) && canDeclareWar(ai, player, &w)) declareWar(ai, player);
+        if (pd && rng.chance(pd->aggression * 0.06) && canDeclareWar(ai, me, &w)) declareWar(ai, me);
     } else {
-        civs[ai].goodwill[player] = std::max(0, civs[ai].goodwill[player] - 2);
+        civs[ai].goodwill[me] = std::max(0, civs[ai].goodwill[me] - 2);
     }
 }
 
@@ -497,7 +508,7 @@ void Game::diplomacyTurn() {
             if (!civs[ag.a].alive || civs[ag.a].gold < ag.value) {
                 ag.until = turn;
                 civs[ag.b].grievance[ag.a] += 10;
-                if (ag.a == player || ag.b == player) notify(player, "A gold-per-turn deal between the " + civs[ag.a].name + " and the " + civs[ag.b].name + " collapsed: the payer ran out of gold.");
+                for (int v : {ag.a, ag.b}) notify(v, "A gold-per-turn deal between the " + civs[ag.a].name + " and the " + civs[ag.b].name + " collapsed: the payer ran out of gold.");
             } else {
                 civs[ag.a].gold -= ag.value;
                 civs[ag.b].gold += ag.value;
@@ -505,11 +516,11 @@ void Game::diplomacyTurn() {
         }
         if (ag.until == turn) {
             if (ag.kind == AG_OPEN_BORDERS && !civs[ag.b].war[ag.a]) expelUnits(ag.b, ag.a);
-            if (ag.a == player || ag.b == player) {
-                int other = ag.a == player ? ag.b : ag.a;
+            for (int me : {ag.a, ag.b}) {
+                int other = ag.a == me ? ag.b : ag.a;
                 static const char* NAMES[AG_COUNT] = {"An open-borders agreement", "The research pact", "The defensive pact", "The declaration of friendship",
                                                       "Resource sharing", "A gold-per-turn deal"};
-                if (civs[other].alive && !civs[player].war[other]) notify(player, std::string(NAMES[ag.kind]) + " with the " + civs[other].name + " has ended.");
+                if (civs[other].alive && !civs[me].war[other]) notify(me, std::string(NAMES[ag.kind]) + " with the " + civs[other].name + " has ended.");
             }
             markResourcesDirty();
         }
@@ -530,7 +541,7 @@ void Game::diplomacyTurn() {
 void Game::aiPacts(int c) {
     if (skillOf(c) == 0 && !rng.chance(0.5)) return;
     for (int o = FIRST_PRIMATE_CIV; o < (int)civs.size(); o++) {
-        if (o == c || o == player || !civs[o].alive || civs[o].minor || !civs[c].met[o] || civs[c].war[o]) continue;
+        if (o == c || human(o) || o == player || !civs[o].alive || civs[o].minor || !civs[c].met[o] || civs[c].war[o]) continue;
         if (turn - civs[c].lastOffer[o] < dur(6)) continue;
         if (!rng.chance(0.15)) continue;
         civs[c].lastOffer[o] = turn;
@@ -552,11 +563,12 @@ void Game::aiPacts(int c) {
             if (!valid) continue;
             if (dealValue(c, d) >= 0 && aiAccepts(o, d)) {
                 executeDeal(d);
-                if (civs[player].met[c] && civs[player].met[o]) {
+                for (int v : viewers()) {
+                    if (!civs[v].met[c] || !civs[v].met[o]) continue;
                     std::string what = dealItemText(d.items[0], -1);
                     if (d.items[0].kind == DI_RESOURCE) what = "a resource trade";
                     if (d.items[0].kind == DI_DEFENSIVE || d.items[0].kind == DI_FRIENDSHIP)
-                        notify(player, "The " + civs[c].name + " and the " + civs[o].name + " signed: " + what + ".");
+                        notify(v, "The " + civs[c].name + " and the " + civs[o].name + " signed: " + what + ".");
                 }
                 break;
             }
@@ -577,10 +589,14 @@ void Game::aiPacts(int c) {
     }
 }
 
-// proposals to the human player
+// proposals to the human players
 void Game::aiOffers(int c) {
-    int p = player;
-    if (settings.allAI || p < FIRST_PRIMATE_CIV || !civs[p].alive || !civs[c].met[p] || c == p) return;
+    if (settings.allAI) return;
+    for (int p = FIRST_PRIMATE_CIV; p < (int)civs.size(); p++)
+        if (human(p) && civs[p].alive && civs[c].met[p] && c != p) aiOfferTo(c, p);
+}
+
+void Game::aiOfferTo(int c, int p) {
     for (auto& d : offers) if (!d.items.empty() && d.a == c) return;  // one open offer at a time
     if (turn - civs[c].lastOffer[p] < dur(10)) return;
     const PrimateDef* pd = primate(c);
@@ -631,7 +647,24 @@ void Game::aiOffers(int c) {
         pp.title = d.demand ? "A Demand from the " + civs[c].name : "A Proposal from the " + civs[c].name;
         pp.body = body;
         pp.deal = idx;
-        popups.push_back(pp);
+        deliverPopup(p, pp);
         return;
     }
+}
+
+// hotseat: one human's proposal waits for the other's turn, like the computer players' offers
+bool Game::offerToHuman(const Deal& d) {
+    if (!human(d.b) || !civs[d.b].alive || d.items.empty()) return false;
+    for (auto& it : d.items) if (!dealItemValid(d, it)) return false;
+    for (auto& o : offers) if (!o.items.empty() && o.a == d.a && o.b == d.b) return false;  // one open offer at a time
+    offers.push_back(d);
+    std::string body = civs[d.a].leader + " of the " + civs[d.a].name + " (a human player) proposes:\n";
+    for (auto& it : d.items) body += "\n  - " + dealItemText(it, d.b);
+    Popup pp;
+    pp.kind = POP_DEAL;
+    pp.title = "A Proposal from the " + civs[d.a].name;
+    pp.body = body;
+    pp.deal = (int)offers.size() - 1;
+    deliverPopup(d.b, pp);
+    return true;
 }

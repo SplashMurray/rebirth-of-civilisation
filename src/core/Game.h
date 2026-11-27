@@ -276,6 +276,7 @@ struct GameSettings {
     bool tutorial = false;  // guide a new player step by step
     int mapType = 0;     // MapType
     int seaLevel = 1;    // 0 low, 1 medium, 2 high
+    std::vector<int> hotseat;  // hotseat: the primates of human players 2, 3, ... (player 1 is 'primate')
 };
 enum MapType { MT_CONTINENTS, MT_PANGAEA, MT_ARCHIPELAGO, MT_FRACTAL, MT_COUNT };
 extern const char* MAP_TYPE_NAMES[MT_COUNT];
@@ -316,7 +317,15 @@ public:
     std::vector<HumanSite> sites;
     std::vector<int> wonderCity;   // per building index, city id or -1
     int turn = 1;
-    int player = -1;
+    int player = -1;  // the human whose turn it is (in hotseat games each human takes a turn in civ order)
+    bool human(int c) const { return c >= 0 && c < (int)civs.size() && civs[c].player; }
+    int numHumans() const;
+    std::vector<int> viewers() const;       // who hears world news: every human (the watched civ in an all-AI game)                  // living human players
+    int nextHuman(int after) const;         // the next living human after civ 'after' this turn, or -1
+    void switchPlayer(int c);
+    void deliverPopup(int c, const Popup& p);  // now, or kept until that human's turn
+    void aiOfferTo(int c, int p);
+    bool offerToHuman(const Deal& d);           // hotseat: one human proposes a deal to another, answered on their turn               // hand the game to another human: their messages and pop-ups come back
     Rng rng;
     GameSettings settings;
     bool warHappened = false;
@@ -325,6 +334,9 @@ public:
     std::string victoryType;
     std::vector<Notification> log;
     std::vector<Popup> popups;
+    // hotseat: each waiting human's own messages and pop-ups, kept until their turn
+    std::vector<std::vector<Notification>> heldLog;
+    std::vector<std::vector<Popup>> heldPopups;
     bool nukeAnimPending = false;
     // strategic resources owned by each civ (cached; rebuilt when territory or techs change)
     mutable std::vector<std::vector<int>> resCache;

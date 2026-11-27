@@ -196,6 +196,7 @@
   | Reclamation / Industrial / Modern / Rebirth | 10 / 5 / 2 / 1 |
 
   Evolution therefore unfolds over a hundred thousand years or so, while recorded history takes a few thousand, slowing to a year per turn at the end as in *Civilization*. Other speeds scale the years per turn so a game spans similar history.
+* **Hotseat multiplayer.** Up to four people can share one computer: choose *Players* on the setup screen, then each player clicks their own primate (the P1/P2/... buttons choose whose pick to change). Each human plays their turn in turn order; between turns the screen is covered so the next player does not see the last one's lands, and each player gets their own messages, pop-ups and proposals. Humans can trade, make treaties and go to war with each other - a deal proposed to another human waits for their answer on their turn. A player who is wiped out drops out and the others play on.
 * **Map types and sea level**, chosen at setup: **Continents** (two great landmasses, three on large maps, split by ocean), **Pangaea** (one huge landmass - neighbours close, wars by land), **Archipelago** (many islands cut by straits - boats decide everything) and **Fractal** (wild land of every shape and size); sea level **Low** (about half the world is land), **Medium** (about 42%) or **High** (about a third). Every species starts with room to grow on a landmass of its own size, spread as far apart as the land allows.
 
   ![Map types (columns: Continents, Pangaea, Archipelago, Fractal) at low, medium and high sea level (rows); red dots are the starting spots](docs/screenshots/39_map_types.png)
@@ -260,6 +261,7 @@
 | ![Every resource](docs/screenshots/32_resources.png) | ![The tutorial](docs/screenshots/33_tutorial.png) |
 | ![Advisors](docs/screenshots/34_advisors.png) | |
 | ![Empire overview](docs/screenshots/36_empire.png) | ![Message filters](docs/screenshots/37_log_filter.png) |
+| ![Hotseat setup](docs/screenshots/40_hotseat_setup.png) | |
 | ![Promotions](docs/screenshots/38_promotions.png) | |
 | ![Start](docs/screenshots/04_start_map.png) | ![The Fall](docs/screenshots/07_fall_popup.png) |
 | ![A drought](docs/screenshots/11c_disaster.png) | ![Late game](docs/screenshots/16_lategame.png) |

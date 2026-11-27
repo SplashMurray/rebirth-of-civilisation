@@ -76,21 +76,21 @@ bool Game::launchNuke(int c, int x, int y) {
     markResourcesDirty();
 
     std::string where = cityHit.empty() ? "open country" : cityHit;
-    std::string who = c == player ? "You" : "The " + civs[c].name;
-    for (int o = FIRST_PRIMATE_CIV; o < (int)civs.size(); o++) {
+    std::string who = "The " + civs[c].name;
+    for (int o : viewers()) {
         if (!civs[o].alive) continue;
-        if (o == c && o == player) {
+        if (o == c) {
             popup(o, POP_NUKE, "Here We Go Again",
                   "The warhead streaks into the sky. Seconds later a second sun rises over " + where + ".\n\n"
                   "The first civilisation ended this way. Every species that knows you has seen what you did, and few will forgive it. "
                   "Your victims are now at war with you." + (unitsKilled ? "\n\nEnemy units destroyed: " + std::to_string(unitsKilled) : std::string()),
                   x, y);
-        } else if (o == player && std::find(victims.begin(), victims.end(), o) != victims.end()) {
+        } else if (std::find(victims.begin(), victims.end(), o) != victims.end()) {
             popup(o, POP_NUKE, "Nuclear Attack!",
                   "The " + civs[c].name + " have launched a nuclear warhead at " + where + ". The old nightmare has returned.\n\n"
                   "Your people are at war with the " + civs[c].name + ".",
                   x, y);
-        } else if (o == player && civs[o].met[c]) {
+        } else if (civs[o].met[c]) {
             notify(o, who + " detonated a nuclear warhead at " + where + "!", x, y);
         }
     }
@@ -104,7 +104,7 @@ bool Game::launchNuke(int c, int x, int y) {
         if (o != c && civs[o].met[c]) civs[o].grievance[c] += 15;
     for (int o = FIRST_PRIMATE_CIV; o < (int)civs.size(); o++) {
         if (o == c || !civs[o].alive || !civs[o].met[c] || civs[o].war[c]) continue;
-        if (o != player && rng.chance(0.35)) declareWar(o, c);
+        if (!human(o) && o != player && rng.chance(0.35)) declareWar(o, c);
     }
     // horror is evolutionary pressure for everyone nearby
     for (int o = FIRST_PRIMATE_CIV; o < (int)civs.size(); o++) {

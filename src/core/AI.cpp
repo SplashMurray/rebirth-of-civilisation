@@ -162,7 +162,7 @@ void Game::aiDiplomacy(int c) {
         int sk = skillOf(c);
         if (cv.war[o]) {
             int len = turn - cv.warSince[o];
-            if (o == player) continue;
+            if (human(o) || o == player) continue;
             if (sk == 0 && len > dur(8) && (myPow < theirPow * 1.2 || rng.chance(0.15))) proposePeace(c, o);
             else if (sk == 1 && len > dur(12) && (myPow < theirPow || rng.chance(0.08))) proposePeace(c, o);
             else if (sk >= 2) {

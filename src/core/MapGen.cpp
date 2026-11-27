@@ -426,7 +426,8 @@ void Game::newGame(const GameSettings& s) {
     cassandraTurn = cassandraX = cassandraY = -1;
     cassandraPlan = -1;
     std::vector<int> pool;
-    for (int p = 0; p < (int)g_primates.size(); p++) if (p != s.primate) pool.push_back(p);
+    for (int p = 0; p < (int)g_primates.size(); p++)
+        if (p != s.primate && std::find(s.hotseat.begin(), s.hotseat.end(), p) == s.hotseat.end()) pool.push_back(p);
     for (size_t i = pool.size(); i > 1; i--) std::swap(pool[i - 1], pool[rng.range((int)i)]);
     for (int c = 0; c < total; c++) {
         Civ& cv = civs[c];
@@ -466,10 +467,11 @@ void Game::newGame(const GameSettings& s) {
             cv.questDone.assign(total, 0);
             cv.lastUnitGift.assign(total, -100);
         } else {
-            cv.primate = c == FIRST_PRIMATE_CIV ? s.primate : pool[(c - FIRST_PRIMATE_CIV - 1) % pool.size()];
+            int k = c - FIRST_PRIMATE_CIV;  // humans first: player 1, then the hotseat players
+            cv.primate = k == 0 ? s.primate : k <= (int)s.hotseat.size() ? s.hotseat[k - 1] : pool[(k - 1 - (int)s.hotseat.size()) % pool.size()];
             const PrimateDef& pd = g_primates[cv.primate];
             cv.name = pd.plural; cv.adjective = pd.name; cv.leader = pd.leader; cv.color = pd.color;
-            cv.player = (c == FIRST_PRIMATE_CIV) && !s.allAI;
+            cv.player = k <= (int)s.hotseat.size() && !s.allAI;
             cv.aiSkill = std::clamp(s.difficulty, 0, 3);  // difficulty = how cleverly the AI plays, never free yields
         }
     }
@@ -509,8 +511,9 @@ void Game::newGame(const GameSettings& s) {
                 for (auto& q : ring(s2.x, s2.y, 1)) civs[c].explored[idx(q.x, q.y)] = 1;
     }
     updateAllVisibility();
-    const PrimateDef& pp = g_primates[s.primate];
-    popup(player, POP_INTRO, "Rebirth of Civilisation",
+    for (int v : viewers()) {
+    const PrimateDef& pp = g_primates[civs[v].primate];
+    popup(v, POP_INTRO, "Rebirth of Civilisation",
           "January 2032. On the horizon the lights of the human cities still burn, but their radios speak of nothing but war.\n\n"
           "You lead the " + pp.plural + " under " + pp.leader + ". " + pp.flavor + "\n\n"
           "Keep your troop away from the human cities. When the end comes - and it will come soon - the survivors will inherit the Earth, "
@@ -519,5 +522,6 @@ void Game::newGame(const GameSettings& s) {
           "Your people are wanderers. Your Roaming Band forages the land around it, but picked-over land takes time to recover: keep the band on the move "
           "to fresh fruit and forest. Well-fed bands grow, and large bands can split in two or send members off as war parties and scouts. "
           "Only when your species has evolved Speech and discovered Cultivation can a band settle down and found your first city.");
-    notify(player, "The year is 2032. Humanity is on the brink of nuclear war.");
+    notify(v, "The year is 2032. Humanity is on the brink of nuclear war.");
+    }
 }

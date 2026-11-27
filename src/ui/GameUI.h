@@ -87,6 +87,12 @@ private:
     Canvas* cv = nullptr;
 
     // ---- setup choices
+    int setupPlayers = 1, setupEditing = 0;  // hotseat: how many humans, and whose primate the cards are choosing
+    int setupHot[4] = {0, 1, 2, 3};          // each human's primate (setupHot[0] mirrors setupPrimate)
+    bool handover = false;                   // hotseat: the screen is covered until the next player is ready
+    void renderHandover();
+    void beginHandover();
+    void endHandover();
     int setupPrimate = 0, setupSize = 1, setupDiff = 1, setupSpeed = 1, setupMapType = 0, setupSea = 1;
 
     // ---- map camera

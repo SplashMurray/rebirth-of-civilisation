@@ -42,13 +42,12 @@ void Game::meet(int a, int b) {
         if (!isMajor(m) || !isMinor(t)) continue;
         bool first = civs[t].firstMet < 0;
         if (first) { civs[t].firstMet = m; addInfluence(m, t, 15); }
-        if (m == player)
-            notify(player, "You have met " + tribeTitle(t) + ", a " + TRIBE_KIND_NAMES[g_tribes[civs[t].tribe].kind] + " tribe. " + tribeBonusText(t) +
+        notify(m, "You have met " + tribeTitle(t) + ", a " + TRIBE_KIND_NAMES[g_tribes[civs[t].tribe].kind] + " tribe. " + tribeBonusText(t) +
                                (first ? ". As the first to meet them you start with 15 influence." : ". See the Tribes screen."));
     }
     if (isMinor(a) || isMinor(b)) return;
-    if (a == player) notify(a, "You have met the " + civs[b].name + ", led by " + civs[b].leader + ".");
-    if (b == player) notify(b, "You have met the " + civs[a].name + ", led by " + civs[a].leader + ".");
+    notify(a, "You have met the " + civs[b].name + ", led by " + civs[b].leader + ".");
+    notify(b, "You have met the " + civs[a].name + ", led by " + civs[a].leader + ".");
 }
 
 void Game::declareWar(int a, int b) {
@@ -62,13 +61,12 @@ void Game::declareWar(int a, int b) {
     if (isMinor(a) || isMinor(b)) {  // a war with a tribe
         if (isMajor(a)) tribeDeclaredOn(a, b);
         cancelRoutesBetween(a, b, "war broke out between the " + civs[a].name + " and the " + civs[b].name);
-        if (a == player) notify(a, "You declared war on " + tribeTitle(b) + ".");
-        else if (b == player) {
-            if (isMinor(a) && civs[a].ally >= 0)
-                notify(player, tribeTitle(a) + " have joined their allies, the " + civs[civs[a].ally].name + ", in the war against you.");
-            else popup(b, POP_WAR, "War!", "The " + civs[a].name + " have declared war on " + tribeTitle(b) + "!");
-        } else if (isMajor(a) && civs[player].met[a] && civs[player].met[b])
-            notify(player, "The " + civs[a].name + " declared war on " + tribeTitle(b) + ".");
+        notify(a, "You declared war on " + tribeTitle(b) + ".");
+        if (isMinor(a) && civs[a].ally >= 0)
+            notify(b, tribeTitle(a) + " have joined their allies, the " + civs[civs[a].ally].name + ", in the war against you.");
+        else popup(b, POP_WAR, "War!", "The " + civs[a].name + " have declared war on " + tribeTitle(b) + "!");
+        for (int v : viewers())
+            if (v != a && v != b && isMajor(a) && civs[v].met[a] && civs[v].met[b]) notify(v, "The " + civs[a].name + " declared war on " + tribeTitle(b) + ".");
         return;
     }
     // diplomacy: the victim remembers; betraying a friend shocks everyone
@@ -79,14 +77,15 @@ void Game::declareWar(int a, int b) {
             civs[b].grievance[a] += 40;
             for (int x = FIRST_PRIMATE_CIV; x < (int)civs.size(); x++)
                 if (x != a && x != b && civs[x].met[a]) civs[x].grievance[a] += 12;
-            if (b == player) notify(player, "The " + civs[a].name + " have betrayed your friendship!");
+            notify(b, "The " + civs[a].name + " have betrayed your friendship!");
         }
         endAgreements(a, b);
         cancelRoutesBetween(a, b, "war broke out between the " + civs[a].name + " and the " + civs[b].name);
     }
-    if (b == player) popup(b, POP_WAR, "War!", civs[a].leader + " of the " + civs[a].name + " has declared war on you!");
-    if (a == player) notify(a, "You declared war on the " + civs[b].name + ".");
-    else if (b != player && civs[player].met[a]) notify(player, "The " + civs[a].name + " declared war on the " + civs[b].name + ".");
+    popup(b, POP_WAR, "War!", civs[a].leader + " of the " + civs[a].name + " has declared war on you!");
+    notify(a, "You declared war on the " + civs[b].name + ".");
+    for (int v : viewers())
+        if (v != a && v != b && civs[v].met[a]) notify(v, "The " + civs[a].name + " declared war on the " + civs[b].name + ".");
     // defensive pacts: an attack on one is an attack on all of its partners
     if (a >= FIRST_PRIMATE_CIV && b >= FIRST_PRIMATE_CIV) {
         std::vector<int> allies;
@@ -98,9 +97,10 @@ void Game::declareWar(int a, int b) {
         for (int x : allies) {
             if (civs[x].war[a]) continue;
             civs[x].peaceUntil[a] = civs[a].peaceUntil[x] = 0;  // the pact overrides any treaty
-            if (x == player) popup(player, POP_WAR, "Your Pact Is Called Upon",
+            popup(x, POP_WAR, "Your Pact Is Called Upon",
                                    "The " + civs[a].name + " attacked your partners, the " + civs[b].name + ". Honouring your defensive pact, you are now at war with the " + civs[a].name + ".");
-            else if (civs[player].met[x]) notify(player, "Honouring their defensive pact, the " + civs[x].name + " join the war against the " + civs[a].name + ".");
+            for (int v : viewers())
+                if (v != x && civs[v].met[x]) notify(v, "Honouring their defensive pact, the " + civs[x].name + " join the war against the " + civs[a].name + ".");
             declareWar(x, a);
             civs[x].warsDeclared--;  // defending a partner is not warmongering
             civs[a].grievance[x] -= 30;
@@ -118,8 +118,8 @@ void Game::makePeace(int a, int b) {
         expelUnits(a, b);
         expelUnits(b, a);
     }
-    if (a == player || b == player)
-        notify(player, "Peace has been made between " + (isMinor(a) ? tribeTitle(a) : "the " + civs[a].name) + " and " + (isMinor(b) ? tribeTitle(b) : "the " + civs[b].name) + ".");
+    for (int v : viewers())
+        if (v == a || v == b) notify(v, "Peace has been made between " + (isMinor(a) ? tribeTitle(a) : "the " + civs[a].name) + " and " + (isMinor(b) ? tribeTitle(b) : "the " + civs[b].name) + ".");
 }
 
 bool Game::proposePeace(int from, int to) {
@@ -134,7 +134,7 @@ bool Game::proposePeace(int from, int to) {
     int pf = militaryPower(from) + 5, pt = militaryPower(to) + 5;
     bool accept = len >= dur(8) && pt < pf * 1.5 && rng.chance(0.75);
     if (civs[to].primate >= 0 && g_primates[civs[to].primate].aggression <= 2 && len >= dur(4)) accept = true;
-    if (to != player && skillOf(to) >= 1) accept = peaceValue(to, from) > 0 || (accept && peaceValue(to, from) > -60);
+    if (!human(to) && to != player && skillOf(to) >= 1) accept = peaceValue(to, from) > 0 || (accept && peaceValue(to, from) > -60);
     if (accept) makePeace(from, to);
     return accept;
 }
@@ -170,7 +170,7 @@ void Game::beginTurn(int c) {
         // work orders keep the unit busy
         if (u.order == ORD_BUILD || u.order == ORD_EXCAVATE || u.order == ORD_DECON) u.moves = 0;
     }
-    if (c == player && civs[c].player) {
+    if (human(c)) {
         for (auto& u : units)
             if (u.alive && u.owner == c && u.order == ORD_GOTO) continueGoto(u);
         // wake sentries when enemies are near
@@ -342,13 +342,11 @@ void Game::processCity(City& city) {
                             gameOver = true;
                             winner = c;
                             victoryType = "Rebirth";
-                            if (c == player)
-                                popup(player, POP_VICTORY, "Victory: Rebirth of Civilisation",
+                            for (int v : viewers())
+                                if (v != c) popup(v, POP_DEFEAT, "Defeat", "The " + civs[c].name + " have completed the Rebirth Project and will lead the new civilisation.");
+                            popup(c, POP_VICTORY, "Victory: Rebirth of Civilisation",
                                       "The Rebirth Project is complete. From the ashes of humanity your people have built a new civilisation - "
-                                      "one that remembers the mistakes of the last. History will remember the " + civs[player].name + ".");
-                            else
-                                popup(player, POP_DEFEAT, "Defeat",
-                                      "The " + civs[c].name + " have completed the Rebirth Project and will lead the new civilisation.");
+                                      "one that remembers the mistakes of the last. History will remember the " + civs[c].name + ".");
                         }
                     }
                     notify(c, city.name + " has completed the " + bd.name + ".", city.x, city.y);
@@ -416,7 +414,7 @@ void Game::processUnitsEndOfTurn(int c) {
                     if (next > 0) {
                         t.road = (uint8_t)next;
                         civs[c].bestRoad = std::max(civs[c].bestRoad, next);
-                        if (c == player) notify(c, g_roads[next].name + " completed.", u.x, u.y);
+                        notify(c, g_roads[next].name + " completed.", u.x, u.y);
                     }
                 } else if (u.order == ORD_BUILD) {
                     t.imp = (uint8_t)u.buildImp;
@@ -460,14 +458,14 @@ void Game::cityBombard(City& city) {
     target->hp -= dmg;
     civs[city.owner].battles++;
     civs[target->owner].battles++;
-    std::string msg = city.name + " bombarded " + (target->owner == player ? "your " : civs[target->owner].adjective + " ") +
-                      g_units[target->type].name + " (-" + std::to_string(dmg) + ")";
+    int victim = target->owner, tx = target->x, ty = target->y;
+    std::string tail = g_units[target->type].name + " (-" + std::to_string(dmg) + ")";
     if (target->hp <= 0) {
-        msg += ", destroying it";
+        tail += ", destroying it";
         killUnit(*target);
     }
-    notify(city.owner, msg, target->x, target->y);
-    notify(target->owner, msg, target->x, target->y);
+    notify(city.owner, city.name + " bombarded " + civs[victim].adjective + " " + tail, tx, ty);
+    notify(victim, city.name + " bombarded your " + tail, tx, ty);
 }
 
 // ------------------------------------------------------------ the last days of humanity
@@ -483,7 +481,7 @@ void Game::humanNews() {
     if (turn >= 1 && turn <= 5) {
         for (int c = FIRST_PRIMATE_CIV; c < (int)civs.size(); c++) notify(c, NEWS[turn]);
         if (turn == 5)
-            popup(player, POP_INFO, "The Sirens",
+            for (int v : viewers()) popup(v, POP_INFO, "The Sirens",
                   "The human cities are howling with sirens. Strange lights rise from the military bases and arc across the sky.\n\n"
                   "Whatever is coming, it is coming soon. Keep your troop far from the human cities.");
     }
@@ -538,7 +536,7 @@ void Game::triggerNuclearWar() {
     nukeAnimPending = civs[player].player;
     int nCities = 0;
     for (auto& s : sites) if (s.type == RUIN_CITY) nCities++;
-    popup(player, POP_NUKE, "The Fall - August 2034",
+    for (int v : viewers()) popup(v, POP_NUKE, "The Fall - August 2034",
           "It took less than an hour.\n\n"
           "The missiles rose from every continent. " + std::to_string(nCities) + " great cities and every human settlement on Earth vanished in fire. "
           "The skies darkened, the radio fell silent, and humanity was gone - wiped out completely by its own hand.\n\n"
@@ -630,11 +628,13 @@ void Game::checkElimination() {
         for (int o = FIRST_PRIMATE_CIV; o < (int)civs.size(); o++)
             if (o != c && civs[o].alive && (!cv.minor || civs[o].met[c]))
                 notify(o, cv.minor ? "The " + cv.name + " of " + g_tribes[cv.tribe].city + " are no more." : "The " + cv.name + " have been wiped out.");
-        if (c == player && !gameOver) {
+        if (human(c) && !gameOver && numHumans() > 0) {  // one hotseat player is out; the others play on
+            popup(c, POP_DEFEAT, "Defeat", "Your people have been wiped out. The game goes on for the other players.");
+        } else if ((c == player || human(c)) && !gameOver) {
             gameOver = true;
             winner = -1;
             victoryType = "Defeat";
-            popup(player, POP_DEFEAT, "Defeat", "Your people have been wiped out. Like the humans before you, your civilisation has ended.");
+            popup(c, POP_DEFEAT, "Defeat", "Your people have been wiped out. Like the humans before you, your civilisation has ended.");
         }
     }
 }
@@ -647,8 +647,9 @@ void Game::checkVictory() {
         gameOver = true;
         winner = c;
         victoryType = type;
-        if (c == player) popup(player, POP_VICTORY, type + " Victory!", text);
-        else popup(player, POP_DEFEAT, "Defeat", "The " + civs[c].name + " have achieved a " + type + " victory.\n\n" + text);
+        if (c == player || human(c)) popup(c, POP_VICTORY, type + " Victory!", text);
+        for (int v : viewers())
+            if (v != c) popup(v, POP_DEFEAT, "Defeat", "The " + civs[c].name + " have achieved a " + type + " victory.\n\n" + text);
     };
     // domination
     int capitals = 0;

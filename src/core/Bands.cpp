@@ -219,15 +219,15 @@ int Game::settleBand(Unit& u) {
     if (firstEver) {
         const PrimateDef* pd = primate(c);
         std::string who = pd ? pd->plural : civs[c].name;
-        if (c == player)
+        if (human(c))
             popup(c, POP_SETTLE, "The First Settlement",
                   "For countless generations the " + who + " wandered, following the fruit and fleeing the cold. Today, beside the gardens "
                   "they planted, they stopped - and stayed.\n\n" + city.name + " is the first settlement of your people. "
                   "Cities grow, build, research and claim land around them. Choose what " + city.name + " should build.\n\n"
                   "Any bands still roaming can settle too - or keep wandering and foraging until they find the right place.",
                   city.x, city.y);
-        for (int o = FIRST_PRIMATE_CIV; o < (int)civs.size(); o++)
-            if (o != c && o == player && civs[o].met[c]) notify(o, "The " + civs[c].name + " have given up the wandering life and founded " + city.name + ".", city.x, city.y);
+        for (int o : viewers())
+            if (o != c && civs[o].met[c]) notify(o, "The " + civs[c].name + " have given up the wandering life and founded " + city.name + ".", city.x, city.y);
     }
     return cid;
 }

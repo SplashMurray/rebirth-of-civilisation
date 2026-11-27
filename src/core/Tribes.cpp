@@ -36,8 +36,8 @@ void Game::addInfluence(int m, int t, int amount, const std::string& why) {
     Civ& tv = civs[t];
     if ((int)tv.influence.size() < (int)civs.size()) tv.influence.resize(civs.size(), 0);
     tv.influence[m] = std::clamp(tv.influence[m] + amount, -100, 160);
-    if (!why.empty() && m == player)
-        notify(player, (amount > 0 ? "+" : "") + std::to_string(amount) + " influence with " + tribeTitle(t) + ": " + why + ".",
+    if (!why.empty())
+        notify(m, (amount > 0 ? "+" : "") + std::to_string(amount) + " influence with " + tribeTitle(t) + ": " + why + ".",
                cities[std::max(0, tv.capital)].x, cities[std::max(0, tv.capital)].y);
 }
 
@@ -51,7 +51,7 @@ bool Game::giftGold(int m, int t, int gold) {
     if (!hasGold(m) || gold <= 0 || civs[m].gold < gold) return false;
     civs[m].gold -= gold;
     addInfluence(m, t, giftInfluence(m, t, gold));
-    if (m == player) notify(player, "You gave " + std::to_string(gold) + " gold to " + tribeTitle(t) + ".");
+    notify(m, "You gave " + std::to_string(gold) + " gold to " + tribeTitle(t) + ".");
     return true;
 }
 
@@ -209,8 +209,8 @@ void Game::tribesTurn() {
             if (tv.questKind != TQ_NONE) {
                 tv.questUntil = turn + dur(40);
                 std::fill(tv.questDone.begin(), tv.questDone.end(), 0);
-                if (civs[player].met[t] && !civs[player].war[t] && civs[player].alive)
-                    notify(player, "The " + civs[t].name + " of " + td.city + " ask for help: " + questText(t) + ". Reward: +40 influence.", home.x, home.y);
+                for (int v : viewers())
+                    if (civs[v].met[t] && !civs[v].war[t] && civs[v].alive) notify(v, "The " + civs[t].name + " of " + td.city + " ask for help: " + questText(t) + ". Reward: +40 influence.", home.x, home.y);
             }
         }
         // who is their ally?
@@ -225,11 +225,12 @@ void Game::tribesTurn() {
             tv.allySince = turn;
             allyResTurn = -1;
             markResourcesDirty();
-            if (best == player) popup(player, POP_INFO, "A New Ally", "The " + civs[t].name + " of " + td.city + " are now your allies.\n\n" + tribeBonusText(t) +
+            if (best >= 0) popup(best, POP_INFO, "A New Ally", "The " + civs[t].name + " of " + td.city + " are now your allies.\n\n" + tribeBonusText(t) +
                                       ". You may use their luxuries and strategic resources, and they will fight your enemies.", home.x, home.y);
-            else if (was == player) notify(player, "The " + civs[t].name + " of " + td.city + " are no longer your allies" +
-                                                       (best >= 0 ? ": the " + civs[best].name + " have won them over." : "."), home.x, home.y);
-            else if (best >= 0 && civs[player].met[t]) notify(player, "The " + civs[t].name + " of " + td.city + " have allied with the " + civs[best].name + ".", home.x, home.y);
+            if (was >= 0) notify(was, "The " + civs[t].name + " of " + td.city + " are no longer your allies" +
+                                     (best >= 0 ? ": the " + civs[best].name + " have won them over." : "."), home.x, home.y);
+            for (int v : viewers())
+                if (v != best && v != was && best >= 0 && civs[v].met[t]) notify(v, "The " + civs[t].name + " of " + td.city + " have allied with the " + civs[best].name + ".", home.x, home.y);
         }
         // allies' enemies are their enemies; old quarrels end when the reason does
         // - but a tribe only takes up arms against an enemy on its doorstep, and only for an ally of some standing
@@ -285,7 +286,7 @@ void Game::tribesTurn() {
                         if (cityAt(p.x, p.y) && cityAt(p.x, p.y)->owner != m) continue;
                         spawnUnit(m, type, p.x, p.y);
                         tv.lastUnitGift[m] = turn;
-                        if (m == player) notify(player, "The " + civs[t].name + " of " + td.city + " have sent you " + g_units[type].name + ".", p.x, p.y);
+                        notify(m, "The " + civs[t].name + " of " + td.city + " have sent you " + g_units[type].name + ".", p.x, p.y);
                         break;
                     }
                     break;

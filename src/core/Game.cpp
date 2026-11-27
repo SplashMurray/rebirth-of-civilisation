@@ -250,7 +250,7 @@ void Game::grantTech(int c, int t, bool announce) {
     }
     if (cv.goal == t) cv.goal = -1;
     markResourcesDirty();
-    if (announce && c == player) {
+    if (announce && (c == player || human(c))) {
         std::string unlocks;
         for (auto& u : g_units)
             if (u.techId == t && (u.primate == -1 || u.primate == cv.primate)) {
@@ -1380,7 +1380,12 @@ CombatResult Game::attackImpl(Unit& u, int tx, int ty) {
     civs[u.owner].battles++;
     if (const City* tc = cityAt(tx, ty)) civs[tc->owner].battles++;
     for (auto& o : units) if (o.alive && o.x == tx && o.y == ty && o.owner != u.owner) { civs[o.owner].battles++; break; }
-    std::string an = (u.owner == player ? "Your " : u.owner == CIV_FERAL ? std::string("Wild ") : civs[u.owner].adjective + " ") + d.name;
+    // messages are worded for whoever reads them ("Your" to the owner, the species' name to everyone else)
+    auto unitFor = [&](int owner, int type, int viewer, bool cap) {
+        return (owner == viewer ? std::string(cap ? "Your " : "your ") : owner == CIV_FERAL ? std::string(cap ? "Wild " : "wild ") : civs[owner].adjective + " ") +
+               g_units[type].name;
+    };
+    int uType = u.type;
     City* city = cityAt(tx, ty);
     if (city && atWar(u.owner, city->owner)) {
         meet(u.owner, city->owner);
@@ -1399,8 +1404,9 @@ CombatResult Game::attackImpl(Unit& u, int tx, int ty) {
             else { res.attackerDied = true; }
         }
         if (!res.attackerDied) gainXP(u, ranged ? 3 : 4, false);
-        std::string msg = an + " attacked " + city->name + " (-" + std::to_string(res.dmgToDef) + " HP)";
-        if (res.attackerDied) msg += " and was destroyed";
+        int cityOwner = city->owner;
+        std::string tail = " attacked " + city->name + " (-" + std::to_string(res.dmgToDef) + " HP)";
+        if (res.attackerDied) tail += " and was destroyed";
         if (city->hp <= 0) {
             if (!ranged && !res.attackerDied && u.owner != CIV_FERAL) {
                 res.cityCaptured = true;
@@ -1411,8 +1417,8 @@ CombatResult Game::attackImpl(Unit& u, int tx, int ty) {
                 city->hp = 1;
             }
         }
-        notify(u.owner, msg, tx, ty);
-        if (city->owner != u.owner) notify(city->owner, msg, tx, ty);
+        notify(u.owner, unitFor(u.owner, uType, u.owner, true) + tail, tx, ty);
+        if (cityOwner != u.owner) notify(cityOwner, unitFor(u.owner, uType, cityOwner, true) + tail, tx, ty);
         if (res.attackerDied) killUnit(u);
     } else {
         Unit* def = militaryAt(tx, ty);
@@ -1445,12 +1451,11 @@ CombatResult Game::attackImpl(Unit& u, int tx, int ty) {
             if (res.defenderDied) u.hp = 1;
             else res.attackerDied = true;
         }
-        std::string dn = (def->owner == player ? "your " : def->owner == CIV_FERAL ? std::string("wild ") : civs[def->owner].adjective + " ") + g_units[def->type].name;
-        std::string msg = an + " attacked " + dn + ": dealt " + std::to_string(res.dmgToDef) + ", took " + std::to_string(res.dmgToAtt);
-        if (res.defenderDied) msg += ". The " + g_units[def->type].name + " was destroyed";
-        if (res.attackerDied) msg += ". The attacker was destroyed";
-        notify(u.owner, msg, tx, ty);
-        notify(def->owner, msg, tx, ty);
+        std::string tail = ": dealt " + std::to_string(res.dmgToDef) + ", took " + std::to_string(res.dmgToAtt);
+        if (res.defenderDied) tail += ". The " + g_units[def->type].name + " was destroyed";
+        if (res.attackerDied) tail += ". The attacker was destroyed";
+        for (int v : {u.owner, def->owner})
+            notify(v, unitFor(u.owner, uType, v, true) + " attacked " + unitFor(def->owner, def->type, v, false) + tail, tx, ty);
         int dx = tx, dy = ty;
         if (g_units[def->type].military()) {  // experience: the attacker learns more, a win teaches most
             if (!res.attackerDied) gainXP(u, (ranged ? 3 : 5) + (res.defenderDied ? 2 : 0), def->owner == CIV_FERAL);
@@ -1673,19 +1678,64 @@ NoteCat classifyNote(const std::string& text) {
 }
 
 void Game::notify(int c, const std::string& text, int x, int y) {
-    if (c != player) return;
+    if (c != player && !human(c)) return;
     Notification n;
     n.turn = turn;
     n.text = text;
     n.cat = classifyNote(text);
     n.x = x; n.y = y;
-    log.push_back(n);
-    if (log.size() > 300) log.erase(log.begin(), log.begin() + 50);
+    if (heldLog.size() < civs.size()) heldLog.resize(civs.size());
+    std::vector<Notification>& to = c == player ? log : heldLog[c];  // another human's turn: kept for them
+    to.push_back(n);
+    if (to.size() > 300) to.erase(to.begin(), to.begin() + 50);
+}
+
+int Game::numHumans() const {
+    int n = 0;
+    for (int c = FIRST_PRIMATE_CIV; c < (int)civs.size(); c++) if (civs[c].alive && civs[c].player) n++;
+    return n;
+}
+
+std::vector<int> Game::viewers() const {
+    std::vector<int> v;
+    for (int c = FIRST_PRIMATE_CIV; c < (int)civs.size(); c++) if (civs[c].alive && civs[c].player) v.push_back(c);
+    if (v.empty() && player >= 0) v.push_back(player);
+    return v;
+}
+
+int Game::nextHuman(int after) const {
+    for (int c = after + 1; c < (int)civs.size(); c++) if (civs[c].alive && civs[c].player) return c;
+    return -1;
+}
+
+void Game::switchPlayer(int c) {
+    if (c == player || c < 0) return;
+    if (heldLog.size() < civs.size()) heldLog.resize(civs.size());
+    if (heldPopups.size() < civs.size()) heldPopups.resize(civs.size());
+    if (player >= 0) {
+        heldLog[player] = std::move(log);
+        heldPopups[player] = std::move(popups);
+    }
+    log = std::move(heldLog[c]);
+    popups = std::move(heldPopups[c]);
+    heldLog[c].clear();
+    heldPopups[c].clear();
+    player = c;
+    updateVisibility(c);
 }
 
 void Game::popup(int c, int kind, const std::string& title, const std::string& body, int x, int y) {
-    if (c != player || !civs[c].player) return;
+    if (!human(c)) return;
     Popup p;
     p.kind = kind; p.title = title; p.body = body; p.x = x; p.y = y;
+    deliverPopup(c, p);
+}
+
+void Game::deliverPopup(int c, const Popup& p) {
+    if (c != player) {
+        if (heldPopups.size() < civs.size()) heldPopups.resize(civs.size());
+        heldPopups[c].push_back(p);
+        return;
+    }
     popups.push_back(p);
 }

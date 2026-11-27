@@ -62,11 +62,11 @@ int Game::spawnGreat(int c, int kind, int x, int y) {
     u.moves = maxMoves(u);
     cv.greatEarned++;
     if (kind != GK_LAST_HUMAN) {
-        if (c == player)
+        if (human(c))
             popup(c, POP_GREAT, "A " + std::string(GREAT_KIND_NAMES[kind]) + " is born",
                   u.name + " has been born among the " + cv.name + ".\n\n" + g_units[u.type].desc, x, y);
-        for (int o = FIRST_PRIMATE_CIV; o < (int)civs.size(); o++)
-            if (o != c && o == player && civs[o].met[c]) notify(o, "A " + std::string(GREAT_KIND_NAMES[kind]) + " has been born among the " + cv.name + ".");
+        for (int o : viewers())
+            if (o != c && civs[o].met[c]) notify(o, "A " + std::string(GREAT_KIND_NAMES[kind]) + " has been born among the " + cv.name + ".");
     }
     return id;
 }
@@ -232,7 +232,7 @@ bool Game::greatAct(Unit& u, int act) {
             }
         }
     }
-    if (c == player) notify(c, msg, u.x, u.y);
+    notify(c, msg, u.x, u.y);
     u.moves = 0;
     killUnit(u);
     return true;
@@ -266,7 +266,7 @@ void Game::cassandraCheck() {
     int id = spawnGreat(c, GK_LAST_HUMAN, p.x, p.y);
     if (id < 0) return;
     civs[c].metCassandra = true;
-    if (c == player)
+    if (human(c))
         popup(c, POP_GREAT, "The Last Human",
               "A blue box came tumbling out of the clear sky, spinning end over end. Its door banged open, a figure fell out onto the grass - "
               "and with a strange wheezing, groaning sound the box faded away.\n\n"
@@ -274,8 +274,8 @@ void Game::cassandraCheck() {
               "this ends. She seems to think she is a Great Primate. Technically, she is not wrong.\n\n"
               "Use her Preservation: she will recall the knowledge of the old world.",
               p.x, p.y);
-    for (int o = FIRST_PRIMATE_CIV; o < (int)civs.size(); o++)
-        if (o != c && o == player && civs[o].explored[idx(p.x, p.y)])
+    for (int o : viewers())
+        if (o != c && civs[o].explored[idx(p.x, p.y)])
             notify(o, "Your scouts saw a blue box fall from the sky over the lands of the " + civs[c].name + ". Then it was gone.", p.x, p.y);
 }
 

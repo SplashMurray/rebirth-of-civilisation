@@ -15,6 +15,7 @@ const Color C_CULT = {206, 130, 236};
 const Color C_FOOD = {124, 206, 92};
 const Color C_PROD = {236, 148, 64};
 const Color C_RED = {232, 84, 70};
+const Color C_PANEL2 = {40, 48, 62};
 }  // namespace
 
 void GameUI::renderEmpire() {
@@ -203,4 +204,52 @@ void GameUI::renderEmpire() {
         }
     }
     if (maxScroll > 0) cv->text(px + pw - 20, ty, "Scroll for more", 12, C_DIM, AL_RIGHT);
+}
+
+// ============================================================ hotseat handover
+// Between the turns of two human players the screen is covered, so the next player does not see the last one's
+// lands, cities or armies; they click when they are in the chair.
+void GameUI::beginHandover() {
+    handover = true;
+    overlay = OV_NONE;
+    selUnit = -1;
+    selCity = -1;
+    moveMode = false;
+}
+
+void GameUI::endHandover() {
+    Game& g = *game;
+    handover = false;
+    resetMotion();
+    // look at home: the capital, else the first unit
+    int ax = -1, ay = -1;
+    for (auto& c : g.cities) if (c.alive && c.owner == g.player) { ax = c.x; ay = c.y; if (c.capital) break; }
+    if (ax < 0) for (auto& u : g.units) if (u.alive && u.owner == g.player) { ax = u.x; ay = u.y; break; }
+    if (ax >= 0) centerOn(ax, ay);
+    int n = nextUnitNeedingOrders(-1);
+    if (n >= 0) selectUnit(n, false);
+    if (!g.popups.empty() && g.popups.front().x >= 0) centerOn(g.popups.front().x, g.popups.front().y);
+}
+
+void GameUI::renderHandover() {
+    Game& g = *game;
+    const Civ& me = g.civs[g.player];
+    cv->fillRectGrad(0, 0, W, H, rgb(26, 30, 40), rgb(8, 10, 14));
+    cv->glowEllipse(W / 2, H / 2 - 40, W / 3, H / 3, me.color, 60);
+    int pn = 1;
+    for (int c = FIRST_PRIMATE_CIV; c < g.player; c++) if (g.civs[c].player) pn++;
+    int cy = H / 2 - 60;
+    if (me.primate >= 0) drawPortrait(me.primate, W / 2, cy - 70, 54, me.color);
+    cv->text(W / 2, cy + 6, "Player " + std::to_string(pn) + ": the " + me.name, 34, C_TEXT, AL_CENTER, true);
+    cv->text(W / 2, cy + 52, me.leader + "  -  turn " + std::to_string(g.turn) + ", " + g.dateString(g.turn), 17, C_DIM, AL_CENTER);
+    int msgs = 0;
+    for (auto& n : g.log) if (n.turn >= g.turn - 1) msgs++;
+    std::string news = g.popups.empty() ? "" : std::to_string(g.popups.size()) + (g.popups.size() == 1 ? " matter awaits" : " matters await") + " you";
+    if (msgs) news += (news.empty() ? "" : ", ") + std::to_string(msgs) + " new message" + (msgs == 1 ? "" : "s");
+    if (!news.empty()) cv->text(W / 2, cy + 82, news + ".", 15, rgb(255, 214, 120), AL_CENTER);
+    cv->text(W / 2, cy + 124, "Pass the computer to the " + me.adjective + " player. Everyone else, look away!", 16, C_TEXT, AL_CENTER);
+    button(W / 2 - 110, cy + 160, 220, 54, "I'm ready", true, [this] { endHandover(); }, "Begin your turn (Enter)", rgb(60, 110, 60), 20);
+    button(W / 2 - 110, cy + 226, 105, 32, "Save", true, [this] { saveGame(); }, "Save the game (Ctrl+S)", C_PANEL2, 13);
+    button(W / 2 + 5, cy + 226, 105, 32, "Quit", true, [this] { handover = false; game.reset(); screen = SCR_TITLE; overlay = OV_NONE; },
+           "Back to the title screen (unsaved progress is lost)", C_PANEL2, 13);
 }
