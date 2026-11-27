@@ -196,6 +196,9 @@
   | Reclamation / Industrial / Modern / Rebirth | 10 / 5 / 2 / 1 |
 
   Evolution therefore unfolds over a hundred thousand years or so, while recorded history takes a few thousand, slowing to a year per turn at the end as in *Civilization*. Other speeds scale the years per turn so a game spans similar history.
+* **Map types and sea level**, chosen at setup: **Continents** (two great landmasses, three on large maps, split by ocean), **Pangaea** (one huge landmass - neighbours close, wars by land), **Archipelago** (many islands cut by straits - boats decide everything) and **Fractal** (wild land of every shape and size); sea level **Low** (about half the world is land), **Medium** (about 42%) or **High** (about a third). Every species starts with room to grow on a landmass of its own size, spread as far apart as the land allows.
+
+  ![Map types (columns: Continents, Pangaea, Archipelago, Fractal) at low, medium and high sea level (rows); red dots are the starting spots](docs/screenshots/39_map_types.png)
 * **Three game speeds**, chosen at setup as in *Civilization VI*:
 
   | Speed | Turn limit | Pace |

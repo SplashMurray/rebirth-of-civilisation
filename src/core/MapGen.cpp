@@ -46,8 +46,10 @@ void Game::generateMap() {
     };
     // Continents: the seams between landmasses wander from top to bottom
     int nCont = settings.mapSize >= 2 ? 3 : 2;
-    Noise seam;
+    Noise seam, channel;
     seam.init(rng, 4, H / 4 + 2);
+    channel.init(rng, W / 4 + 2, H / 4 + 2);
+    std::vector<double> shape(W * H, 0.0);  // the map type's own push up or down, kept apart from the land's relief
     for (int y = 0; y < H; y++)
         for (int x = 0; x < W; x++) {
             double e;
@@ -55,36 +57,45 @@ void Game::generateMap() {
                 case MT_PANGAEA: {
                     e = 0.55 * n1.at(x / 7.0, y / 7.0) + 0.3 * n2.at(x / 3.0, y / 3.0) + 0.15 * n3.at(x / 2.0, y / 2.0);
                     double dx = (x - (W - 1) / 2.0) / (W * 0.5), dy = (y - (H - 1) / 2.0) / (H * 0.5);
-                    e -= std::sqrt(dx * dx + dy * dy) * 0.6;  // one landmass in the middle
+                    shape[idx(x, y)] = -std::sqrt(dx * dx + dy * dy) * 0.6 - (1 - edgeF(x, y, 0.08)) * 0.45;  // one landmass in the middle
                     break;
                 }
                 case MT_ARCHIPELAGO:
+                {
                     e = 0.2 * n1.at(x / 7.0, y / 7.0) + 0.5 * n2.at(x / 3.0, y / 3.0) + 0.3 * n3.at(x / 2.0, y / 2.0);
-                    e -= (1 - edgeF(x, y, 0.06)) * 0.45;
+                    // a web of straits cuts the land into islands
+                    double c1 = (channel.at(x / 4.0, y / 4.0) - 0.5) / 0.09, c2 = (channel.at(x / 5.0 + 7.3, y / 5.0 + 3.1) - 0.5) / 0.09;
+                    shape[idx(x, y)] = -(1 - edgeF(x, y, 0.06)) * 0.45 - 0.5 * std::exp(-c1 * c1) - 0.5 * std::exp(-c2 * c2);
                     break;
+                }
                 case MT_FRACTAL:
                     e = 0.45 * n1.at(x / 7.0, y / 7.0) + 0.35 * n2.at(x / 3.0, y / 3.0) + 0.2 * n3.at(x / 2.0, y / 2.0);
-                    e -= (1 - edgeF(x, y, 0.07)) * 0.45;
+                    shape[idx(x, y)] = -(1 - edgeF(x, y, 0.07)) * 0.45;
                     break;
                 default: {  // continents
                     e = 0.6 * n1.at(x / 7.0, y / 7.0) + 0.3 * n2.at(x / 3.0, y / 3.0) + 0.1 * n3.at(x / 2.0, y / 2.0);
-                    e -= (1 - edgeF(x, y, 0.10)) * 0.45;
+                    double sh = -(1 - edgeF(x, y, 0.10)) * 0.45;
                     for (int k = 1; k < nCont; k++) {
                         double cx = W * (double)k / nCont + (seam.at(k * 1.3, y / 4.0) - 0.5) * W * 0.16;
                         double d = (x - cx) / (W * 0.035);
-                        e -= 0.6 * std::exp(-d * d);
+                        sh -= 0.6 * std::exp(-d * d);
                     }
+                    shape[idx(x, y)] = sh;
                     break;
                 }
             }
-            elev[idx(x, y)] = e;
+            elev[idx(x, y)] = e + shape[idx(x, y)];
         }
     std::vector<double> sorted = elev;
     std::sort(sorted.begin(), sorted.end());
     static const double SEA_Q[3] = {0.50, 0.58, 0.66};
-    double seaQ = SEA_Q[std::clamp(settings.seaLevel, 0, 2)] + (type == MT_ARCHIPELAGO ? 0.06 : 0.0);
+    double seaQ = SEA_Q[std::clamp(settings.seaLevel, 0, 2)] + (type == MT_ARCHIPELAGO ? 0.03 : 0.0);
     double seaLevel = sorted[(size_t)(sorted.size() * seaQ)];
-    double mountLevel = sorted[std::min(sorted.size() - 1, (size_t)(sorted.size() * (1.0 - (1.0 - seaQ) * 0.06)))];  // ~6% of the land
+    // mountains: the highest ~6% of the land by its own relief, not by the map type's shaping
+    std::vector<double> relief;
+    for (int i = 0; i < W * H; i++) if (elev[i] >= seaLevel) relief.push_back(elev[i] - shape[i]);
+    std::sort(relief.begin(), relief.end());
+    double mountLevel = relief.empty() ? 1e9 : relief[std::min(relief.size() - 1, (size_t)(relief.size() * 0.94))];
     for (int y = 0; y < H; y++)
         for (int x = 0; x < W; x++) {
             Tile& t = at(x, y);
@@ -103,7 +114,7 @@ void Game::generateMap() {
                 else if (rng.chance(0.08)) t.veg = V_FOREST;
             }
             double h = hillN.at(x / 3.0, y / 3.0);
-            if (e > mountLevel || (h > 0.83 && rng.chance(0.5))) { t.mountain = true; t.veg = V_NONE; }
+            if (e - shape[idx(x, y)] > mountLevel || (h > 0.83 && rng.chance(0.5))) { t.mountain = true; t.veg = V_NONE; }
             else if (h > 0.66 || rng.chance(0.05)) t.hills = true;
         }
     // coast
@@ -257,9 +268,34 @@ void Game::placeHumanity() {
 std::vector<Pt> Game::chooseStarts(int count) {
     struct Cand { Pt p; int quality; int bias[5]; };
     std::vector<Cand> cands;
-    for (int relax = 0; relax < 4 && (int)cands.size() < count * 6; relax++) {
-        cands.clear();
+    // landmass sizes: a species starting on a scrap of island has no room to grow
+    std::vector<int> mass(W * H, -1), massSize;
+    for (int y0 = 0; y0 < H; y0++)
+        for (int x0 = 0; x0 < W; x0++) {
+            if (isWater(x0, y0) || mass[idx(x0, y0)] >= 0) continue;
+            int id = (int)massSize.size();
+            massSize.push_back(0);
+            std::vector<Pt> stack{{x0, y0}};
+            mass[idx(x0, y0)] = id;
+            while (!stack.empty()) {
+                Pt p = stack.back();
+                stack.pop_back();
+                massSize[id]++;
+                Pt nb[6];
+                int n = neighbors(p.x, p.y, nb);
+                for (int k = 0; k < n; k++) {
+                    if (isWater(nb[k].x, nb[k].y) || mass[idx(nb[k].x, nb[k].y)] >= 0) continue;
+                    mass[idx(nb[k].x, nb[k].y)] = id;
+                    stack.push_back(nb[k]);
+                }
+            }
+        }
+    // Gather spots at every level of strictness, the looser ones marked down, so that a world whose good land
+    // is all in one place still spreads the species out rather than crowding them together.
+    std::vector<uint8_t> added(W * H, 0);
+    for (int relax = 0; relax < 4; relax++) {
         int dCity = 7 - relax, minLand = 12 - relax * 2;
+        int minMass = relax < 3 ? 45 : 30;  // room for a few cities at least
         for (int y = 2; y < H - 2; y++)
             for (int x = 2; x < W - 2; x++) {
                 const Tile& t = at(x, y);
@@ -268,7 +304,8 @@ std::vector<Pt> Game::chooseStarts(int count) {
                 for (auto& s : sites)
                     if (dist(s.x, s.y, x, y) < (s.type == RUIN_CITY ? dCity : 4)) { ok = false; break; }
                 if (!ok) continue;
-                Cand c{{x, y}, 0, {0, 0, 0, 0, 0}};
+                if (added[idx(x, y)]) continue;
+                Cand c{{x, y}, -relax * 12, {0, 0, 0, 0, 0}};
                 int land = 0;
                 for (auto& p : ring(x, y, 2)) {
                     const Tile& tt = at(p.x, p.y);
@@ -281,12 +318,13 @@ std::vector<Pt> Game::chooseStarts(int count) {
                     if (tt.terrain == T_COAST) c.bias[3] += 6;
                     if (tt.terrain == T_TUNDRA || tt.terrain == T_SNOW) c.bias[4] += 6;
                 }
-                if (land < minLand) continue;
+                if (land < minLand || massSize[mass[idx(x, y)]] < minMass) continue;
                 int room = 0;  // land within reach: a start squeezed onto a peninsula is a poor one
                 for (auto& p : ring(x, y, 5)) if (!isWater(p.x, p.y) && !at(p.x, p.y).mountain) room++;
-                c.quality += room / 3;
+                c.quality += room / 3 + std::min(massSize[mass[idx(x, y)]], 400) / 10;
                 if (t.terrain == T_DESERT) c.quality -= 10;
                 if (freshWater(x, y)) c.quality += 6;
+                added[idx(x, y)] = 1;
                 cands.push_back(c);
             }
     }
@@ -294,7 +332,7 @@ std::vector<Pt> Game::chooseStarts(int count) {
     if ((int)cands.size() >= count) {
         // Many tries of farthest-point placement from different first spots; keep the set whose closest
         // pair is furthest apart (then the best land). Spacing beyond 'target' stops mattering.
-        int target = (int)(std::sqrt((double)W * H / count) * 1.1);
+        int target = (int)(std::sqrt((double)W * H / count) * 0.8);
         std::vector<int> bestSet;
         int bestMin = -1, bestQ = INT32_MIN;
         for (int run = 0; run < 48; run++) {

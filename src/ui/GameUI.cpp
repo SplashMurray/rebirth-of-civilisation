@@ -269,8 +269,9 @@ void GameUI::renderSetup() {
         cv->text(x + 68, y + 44, p.leader, 13, rgb(214, 220, 228));
         cv->text(x + 12, y + 70, p.ability, 15, C_GOLD, AL_LEFT, true);
         int ty = textBlock(x + 12, y + 92, cw - 24, p.abilityDesc + (p.evoPct ? " Evolves +" + std::to_string(p.evoPct) + "% faster." : "") + " Leans towards the " + STRAND_NAMES[p.evoLean] + ".", 13, C_TEXT, 3);
-        textBlock(x + 12, ty + 6, cw - 24, p.flavor, 12, C_DIM, 2);
-        hot(x, y, cw, ch, [this, i] { setupPrimate = i; snd->call(i, 0.6f, 0.0f, 0); });
+        bool flavourFits = ty + 6 + (int)wrap(p.flavor, cw - 24, 12).size() * 15 <= y + ch - 4;  // short screens: it moves to the tooltip
+        if (flavourFits) textBlock(x + 12, ty + 6, cw - 24, p.flavor, 12, C_DIM, 2);
+        hot(x, y, cw, ch, [this, i] { setupPrimate = i; snd->call(i, 0.6f, 0.0f, 0); }, flavourFits ? "" : p.flavor);
     }
     int oy = gy + 2 * (ch + gap) + 10;
     const char* sizes[] = {"Small (4 primates)", "Standard (6 primates)", "Large (8 primates)"};

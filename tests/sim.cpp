@@ -70,7 +70,7 @@ static void riverTests() {
     for (int i = 0; i < g.W * g.H && tested < 5; i++) {
         int ax = i % g.W, ay = i / g.W;
         const Tile& t = g.tiles[i];
-        if (!g.hasRiver(ax, ay) || t.riverOut < 0 || g.isFalls(ax, ay) || t.site >= 0) continue;
+        if (!g.hasRiver(ax, ay) || t.riverOut < 0 || g.isFalls(ax, ay) || t.site >= 0 || g.cityAt(ax, ay)) continue;
         Pt b;
         if (!g.neighborDir(ax, ay, t.riverOut, b) || g.isFalls(b.x, b.y) || g.cityAt(b.x, b.y)) continue;
         g.units.clear();
