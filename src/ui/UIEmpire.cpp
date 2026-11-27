@@ -217,18 +217,70 @@ void GameUI::beginHandover() {
     moveMode = false;
 }
 
+bool GameUI::hotseatGame() const { return game && !game->settings.hotseat.empty(); }
+
+// The player whose turn is ending: where they were looking, and how much of their log they have seen.
+void GameUI::rememberView() {
+    Game& g = *game;
+    int p = g.player;
+    if (p < 0) return;
+    if ((int)views.size() < (int)g.civs.size()) views.resize(g.civs.size());
+    if ((int)seenLog.size() < (int)g.civs.size()) seenLog.resize(g.civs.size(), -1);
+    views[p].camX = camX;
+    views[p].camY = camY;
+    views[p].hs = hs;
+    views[p].set = true;
+    seenLog[p] = (int)g.log.size();
+}
+
+// What happened to this player while the others played and the world turned: the most important first.
+void GameUI::sinceLastTurn() {
+    Game& g = *game;
+    int p = g.player;
+    if ((int)seenLog.size() <= p || seenLog[p] < 0) return;  // their first turn
+    int from = seenLog[p];
+    if (from > (int)g.log.size()) from = 0;  // the log was trimmed meanwhile
+    std::vector<const Notification*> news;
+    for (int i = from; i < (int)g.log.size(); i++) news.push_back(&g.log[i]);
+    if (news.empty()) return;
+    static const int RANK[NC_COUNT] = {0, 1, 2, 3, 4};  // combat, diplomacy, cities, trade, world
+    std::stable_sort(news.begin(), news.end(), [](const Notification* a, const Notification* b) { return RANK[a->cat] < RANK[b->cat]; });
+    std::string body;
+    int shown = 0;
+    for (auto* n : news) {
+        if (shown >= 10) break;
+        body += "- " + n->text + "\n";
+        shown++;
+    }
+    if ((int)news.size() > shown) body += "\n...and " + std::to_string(news.size() - shown) + " more in the Event Log (L).";
+    Popup pp;
+    pp.kind = POP_INFO;
+    pp.title = "Since your last turn";
+    pp.body = body;
+    g.popups.insert(g.popups.begin(), pp);
+}
+
 void GameUI::endHandover() {
     Game& g = *game;
     handover = false;
     resetMotion();
-    // look at home: the capital, else the first unit
-    int ax = -1, ay = -1;
-    for (auto& c : g.cities) if (c.alive && c.owner == g.player) { ax = c.x; ay = c.y; if (c.capital) break; }
-    if (ax < 0) for (auto& u : g.units) if (u.alive && u.owner == g.player) { ax = u.x; ay = u.y; break; }
-    if (ax >= 0) centerOn(ax, ay);
+    int p = g.player;
+    if (p >= 0 && p < (int)views.size() && views[p].set) {  // back to where they were looking
+        camX = views[p].camX;
+        camY = views[p].camY;
+        hs = views[p].hs;
+    } else {  // look at home: the capital, else the first unit
+        int ax = -1, ay = -1;
+        for (auto& c : g.cities) if (c.alive && c.owner == p) { ax = c.x; ay = c.y; if (c.capital) break; }
+        if (ax < 0) for (auto& u : g.units) if (u.alive && u.owner == p) { ax = u.x; ay = u.y; break; }
+        if (ax >= 0) centerOn(ax, ay);
+    }
     int n = nextUnitNeedingOrders(-1);
     if (n >= 0) selectUnit(n, false);
+    sinceLastTurn();
     if (!g.popups.empty() && g.popups.front().x >= 0) centerOn(g.popups.front().x, g.popups.front().y);
+    turnMsLeft = g.settings.turnTimer > 0 ? g.settings.turnTimer * 1000 : -1;  // the clock starts now
+    timerWarned = false;
 }
 
 void GameUI::renderHandover() {
@@ -240,16 +292,20 @@ void GameUI::renderHandover() {
     for (int c = FIRST_PRIMATE_CIV; c < g.player; c++) if (g.civs[c].player) pn++;
     int cy = H / 2 - 60;
     if (me.primate >= 0) drawPortrait(me.primate, W / 2, cy - 70, 54, me.color);
-    cv->text(W / 2, cy + 6, "Player " + std::to_string(pn) + ": the " + me.name, 34, C_TEXT, AL_CENTER, true);
+    std::string who = me.playerName.empty() ? "Player " + std::to_string(pn) : me.playerName;
+    cv->text(W / 2, cy + 6, who + ": the " + me.name, 34, C_TEXT, AL_CENTER, true);
     cv->text(W / 2, cy + 52, me.leader + "  -  turn " + std::to_string(g.turn) + ", " + g.dateString(g.turn), 17, C_DIM, AL_CENTER);
     int msgs = 0;
     for (auto& n : g.log) if (n.turn >= g.turn - 1) msgs++;
     std::string news = g.popups.empty() ? "" : std::to_string(g.popups.size()) + (g.popups.size() == 1 ? " matter awaits" : " matters await") + " you";
     if (msgs) news += (news.empty() ? "" : ", ") + std::to_string(msgs) + " new message" + (msgs == 1 ? "" : "s");
     if (!news.empty()) cv->text(W / 2, cy + 82, news + ".", 15, rgb(255, 214, 120), AL_CENTER);
-    cv->text(W / 2, cy + 124, "Pass the computer to the " + me.adjective + " player. Everyone else, look away!", 16, C_TEXT, AL_CENTER);
-    button(W / 2 - 110, cy + 160, 220, 54, "I'm ready", true, [this] { endHandover(); }, "Begin your turn (Enter)", rgb(60, 110, 60), 20);
-    button(W / 2 - 110, cy + 226, 105, 32, "Save", true, [this] { saveGame(); }, "Save the game (Ctrl+S)", C_PANEL2, 13);
-    button(W / 2 + 5, cy + 226, 105, 32, "Quit", true, [this] { handover = false; game.reset(); screen = SCR_TITLE; overlay = OV_NONE; },
+    cv->text(W / 2, cy + 124, "Pass the computer to " + (me.playerName.empty() ? "the " + me.adjective + " player" : me.playerName) + ". Everyone else, look away!", 16,
+             C_TEXT, AL_CENTER);
+    if (g.settings.turnTimer > 0)
+        cv->text(W / 2, cy + 146, "You will have " + std::to_string(g.settings.turnTimer / 60) + " minutes - the clock starts when you are ready.", 13, C_DIM, AL_CENTER);
+    button(W / 2 - 110, cy + 170, 220, 54, "I'm ready", true, [this] { endHandover(); }, "Begin your turn (Enter)", rgb(60, 110, 60), 20);
+    button(W / 2 - 110, cy + 236, 105, 32, "Save", true, [this] { saveGame(); }, "Save the game (Ctrl+S)", C_PANEL2, 13);
+    button(W / 2 + 5, cy + 236, 105, 32, "Quit", true, [this] { handover = false; game.reset(); screen = SCR_TITLE; overlay = OV_NONE; },
            "Back to the title screen (unsaved progress is lost)", C_PANEL2, 13);
 }

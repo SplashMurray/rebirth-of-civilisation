@@ -19,6 +19,7 @@ public:
     void mouseMove(int x, int y);
     void wheel(int x, int y, int delta);           // +1 = away from user (zoom in / scroll up)
     void key(int k, bool shift, bool ctrl);
+    void charInput(unsigned ch);  // typed text (hotseat player names)
     bool tick(int ms);                             // returns true if a redraw is needed
     bool wantsQuit() const { return quit; }
     std::string savePath = "rebirth_save.roc";
@@ -90,6 +91,17 @@ private:
     int setupPlayers = 1, setupEditing = 0;  // hotseat: how many humans, and whose primate the cards are choosing
     int setupHot[4] = {0, 1, 2, 3};          // each human's primate (setupHot[0] mirrors setupPrimate)
     bool handover = false;                   // hotseat: the screen is covered until the next player is ready
+    std::string setupNames[4];               // hotseat players' names
+    int nameEditing = -1;                    // setup: whose name is being typed (-1: none)
+    int setupTimer = 0;                      // hotseat: seconds per turn (0: no limit)
+    int turnMsLeft = -1;                     // hotseat turn timer: time left this turn (-1: none)
+    bool timerWarned = false;
+    struct ViewMem { double camX = 0, camY = 0; int hs = 34; bool set = false; };
+    std::vector<ViewMem> views;              // hotseat: where each player was looking
+    std::vector<int> seenLog;                // hotseat: how much of their log each player had seen
+    bool hotseatGame() const;
+    void rememberView();                     // the player whose turn is ending
+    void sinceLastTurn();                    // a summary of what happened to them since
     void renderHandover();
     void beginHandover();
     void endHandover();

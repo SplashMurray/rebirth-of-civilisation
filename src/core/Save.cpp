@@ -5,7 +5,7 @@
 #include <sstream>
 
 namespace {
-const int SAVE_VERSION = 27;
+const int SAVE_VERSION = 28;
 
 struct Archive {
     bool writing;
@@ -97,7 +97,8 @@ void ioYields(Archive& a, Yields& y) { a.io(y.food); a.io(y.prod); a.io(y.sci); 
 void ioGame(Archive& a, Game& g) {
     a.io(g.W); a.io(g.H); a.io(g.turn); a.io(g.player);
     a.io(g.rng.s);
-    a.io(g.settings.primate); a.io(g.settings.mapSize); a.io(g.settings.difficulty); a.io(g.settings.seed); a.io(g.settings.allAI); a.io(g.settings.speed); a.io(g.settings.tutorial); a.io(g.settings.mapType); a.io(g.settings.seaLevel); a.io(g.tutorialStep); a.io(g.cassandraTurn); a.io(g.cassandraPlan); a.io(g.cassandraX); a.io(g.cassandraY);
+    a.io(g.settings.primate); a.io(g.settings.mapSize); a.io(g.settings.difficulty); a.io(g.settings.seed); a.io(g.settings.allAI); a.io(g.settings.speed); a.io(g.settings.tutorial); a.io(g.settings.mapType); a.io(g.settings.seaLevel); a.io(g.settings.hotseat); a.io(g.settings.turnTimer);
+    { long long nn = (long long)g.settings.playerNames.size(); a.num(nn); if (!a.writing) g.settings.playerNames.assign((size_t)std::max(0LL, nn), std::string()); for (auto& s : g.settings.playerNames) a.io(s); } a.io(g.tutorialStep); a.io(g.cassandraTurn); a.io(g.cassandraPlan); a.io(g.cassandraX); a.io(g.cassandraY);
     a.io(g.speedPct); a.io(g.costPct); a.io(g.maxTurns); a.io(g.yearAF);
     a.io(g.warHappened); a.io(g.gameOver); a.io(g.winner); a.io(g.victoryType);
     // tiles
@@ -141,7 +142,7 @@ void ioGame(Archive& a, Game& g) {
         for (int k = 0; k < GK_COUNT; k++) { a.io(c.greatPts[k]); a.io(c.greatBorn[k]); }
         a.io(c.festivalUntil); a.io(c.preservation); a.io(c.metCassandra); a.io(c.greatEarned);
         a.io(c.faith); a.io(c.faithPerTurn); a.io(c.faithTotal); a.io(c.sciRawPerTurn); a.io(c.zeal); a.io(c.zealPenalty); a.io(c.founded);
-        a.io(c.missionariesBought); a.io(c.festivalsHeld); a.io(c.lastAggression); a.io(c.termsAsChair);
+        a.io(c.missionariesBought); a.io(c.festivalsHeld); a.io(c.lastAggression); a.io(c.termsAsChair); a.io(c.playerName);
     }
     if (!a.writing) g.allyResTurn = -1;
     long long nu = (long long)g.units.size();
@@ -175,7 +176,6 @@ void ioGame(Archive& a, Game& g) {
     a.num(nr);
     if (!a.writing) g.routes.assign((size_t)std::max(0LL, nr), TradeRoute());
     for (auto& r : g.routes) { a.io(r.owner); a.io(r.from); a.io(r.to); a.io(r.start); a.io(r.until); a.io(r.sea); a.io(r.path); }
-    if (!a.writing) g.offers.clear();
     // the World Council
     Council& k = g.council;
     a.io(k.formed); a.io(k.founded); a.io(k.founder); a.io(k.chair); a.io(k.termStart); a.io(k.nextSession); a.io(k.electionNext); a.io(k.sessions);
@@ -192,6 +192,42 @@ void ioGame(Archive& a, Game& g) {
     a.num(nres);
     if (!a.writing) k.lastResults.assign((size_t)std::max(0LL, nres), std::string());
     for (auto& s : k.lastResults) a.io(s);
+    // pop-ups, proposals and each hotseat player's messages waiting for their turn
+    auto ioPopups = [&](std::vector<Popup>& v) {
+        long long n = (long long)v.size();
+        a.num(n);
+        if (!a.writing) v.assign((size_t)std::max(0LL, n), Popup());
+        for (auto& p : v) { a.io(p.kind); a.io(p.title); a.io(p.body); a.io(p.x); a.io(p.y); a.io(p.deal); }
+    };
+    auto ioLog = [&](std::vector<Notification>& v) {
+        long long n = (long long)v.size();
+        a.num(n);
+        if (!a.writing) v.assign((size_t)std::max(0LL, n), Notification());
+        for (auto& x : v) { a.io(x.turn); a.io(x.text); a.io(x.x); a.io(x.y); if (!a.writing) x.cat = classifyNote(x.text); }
+    };
+    ioPopups(g.popups);
+    if (a.writing) {
+        size_t m = std::max(g.heldLog.size(), g.heldPopups.size());
+        g.heldLog.resize(m);
+        g.heldPopups.resize(m);
+    }
+    long long nh = (long long)g.heldLog.size();
+    a.num(nh);
+    if (!a.writing) { g.heldLog.assign((size_t)std::max(0LL, nh), {}); g.heldPopups.assign((size_t)std::max(0LL, nh), {}); }
+    for (long long i = 0; i < nh; i++) {
+        ioLog(g.heldLog[(size_t)i]);
+        ioPopups(g.heldPopups[(size_t)i]);
+    }
+    long long no = (long long)g.offers.size();
+    a.num(no);
+    if (!a.writing) g.offers.assign((size_t)std::max(0LL, no), Deal());
+    for (auto& d : g.offers) {
+        a.io(d.a); a.io(d.b); a.io(d.demand);
+        long long ni = (long long)d.items.size();
+        a.num(ni);
+        if (!a.writing) d.items.assign((size_t)std::max(0LL, ni), DealItem());
+        for (auto& it : d.items) { a.io(it.kind); a.io(it.from); a.io(it.value); }
+    }
 }
 }  // namespace
 
@@ -227,7 +263,6 @@ bool Game::load(const std::string& path) {
     *this = tmp;
     resDirty = true;
     for (size_t c = 0; c < civs.size(); c++) refreshTraitFx((int)c);
-    popups.clear();
     nukeAnimPending = false;
     for (auto& c : cities) if (c.alive) computeCity(c);
     return true;

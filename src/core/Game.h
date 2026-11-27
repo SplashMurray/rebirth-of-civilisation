@@ -232,6 +232,7 @@ struct Civ {
     int zealPenalty = 0;      // % of science lost to it (derived)
     int founded = -1;         // the religion this civ founded
     int missionariesBought = 0, festivalsHeld = 0;
+    std::string playerName;      // a hotseat player's name
     int lastAggression = -1000;  // the last turn they declared war (World Council: censure, sanctions)
     int termsAsChair = 0;
 };
@@ -355,6 +356,8 @@ struct GameSettings {
     int mapType = 0;     // MapType
     int seaLevel = 1;    // 0 low, 1 medium, 2 high
     std::vector<int> hotseat;  // hotseat: the primates of human players 2, 3, ... (player 1 is 'primate')
+    std::vector<std::string> playerNames;  // hotseat: each human's name (player 1 first); empty: "Player N"
+    int turnTimer = 0;         // hotseat: seconds each human has for a turn (0: no limit)
 };
 enum MapType { MT_CONTINENTS, MT_PANGAEA, MT_ARCHIPELAGO, MT_FRACTAL, MT_COUNT };
 extern const char* MAP_TYPE_NAMES[MT_COUNT];

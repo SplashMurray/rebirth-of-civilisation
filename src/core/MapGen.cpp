@@ -474,6 +474,8 @@ void Game::newGame(const GameSettings& s) {
             const PrimateDef& pd = g_primates[cv.primate];
             cv.name = pd.plural; cv.adjective = pd.name; cv.leader = pd.leader; cv.color = pd.color;
             cv.player = k <= (int)s.hotseat.size() && !s.allAI;
+            if (cv.player && !s.hotseat.empty())
+                cv.playerName = k < (int)s.playerNames.size() && !s.playerNames[k].empty() ? s.playerNames[k] : "Player " + std::to_string(k + 1);
             cv.aiSkill = std::clamp(s.difficulty, 0, 3);  // difficulty = how cleverly the AI plays, never free yields
         }
     }

@@ -565,6 +565,12 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             afterInput(hwnd);
             return 0;
         }
+        case WM_CHAR:
+            if (wp >= 32) {
+                g_ui->charInput((unsigned)wp);
+                afterInput(hwnd);
+            }
+            return 0;
         case WM_KEYDOWN: {
             int k = mapKey(wp);
             if (k) {

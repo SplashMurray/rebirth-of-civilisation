@@ -148,7 +148,7 @@ void GameUI::render(Canvas& c) {
             break;
     }
     renderToast();
-    renderAchBanner();
+    if (!(screen == SCR_GAME && handover)) renderAchBanner();
     tooltip();
 }
 
@@ -163,7 +163,7 @@ bool GameUI::tick(int ms) {
     animMs += ms;
     bool redraw = false;
     if (toastMs > 0) { toastMs -= ms; redraw = true; }
-    if (nukeT >= 0) {
+    if (nukeT >= 0 && !handover) {  // (held while a hotseat screen is covered, so the next player sees it)
         nukeT += ms;
         if (nukeT > NUKE_LEN) nukeT = -1;
         redraw = true;
@@ -173,7 +173,7 @@ bool GameUI::tick(int ms) {
         if (boxT > BOX_LEN) boxT = -1;
         redraw = true;
     }
-    if (achBannerMs > 0) {
+    if (achBannerMs > 0 && !(screen == SCR_GAME && handover)) {  // kept for the player it belongs to, not the handover screen
         achBannerMs -= ms;
         if (achBannerMs <= 0 && !achBanners.empty()) {
             achBanners.erase(achBanners.begin());
@@ -181,10 +181,27 @@ bool GameUI::tick(int ms) {
         }
         redraw = true;
     }
-    if (blastT >= 0) {
+    if (blastT >= 0 && !handover) {
         blastT += ms;
         if (blastT > 3400) blastT = -1;
         redraw = true;
+    }
+    if (screen == SCR_GAME && game && turnMsLeft >= 0 && !handover && nukeT < 0 && boxT < 0) {  // the hotseat turn clock
+        int before = turnMsLeft;
+        turnMsLeft = std::max(0, turnMsLeft - ms);
+        if (before / 1000 != turnMsLeft / 1000) redraw = true;
+        if (!timerWarned && turnMsLeft <= 30000 && before > 30000) {
+            timerWarned = true;
+            toast = "30 seconds left this turn!";
+            toastMs = 2500;
+        }
+        if (turnMsLeft == 0) {
+            turnMsLeft = -1;
+            toast = "Time is up";
+            toastMs = 2000;
+            endTurnNow();
+            redraw = true;
+        }
     }
     if (screen == SCR_GAME && game) {
         achPollMs += ms;
@@ -253,9 +270,25 @@ void GameUI::renderSetup() {
     cv->textA(W / 2 + 2, 26, "Choose Your Primate", 34, rgb(0, 0, 0), AL_CENTER, true, 140);
     cv->text(W / 2, 24, "Choose Your Primate", 34, C_TEXT, AL_CENTER, true);
     setupHot[0] = setupPrimate;
-    if (setupPlayers > 1)
-        cv->text(W / 2, 66, "Hotseat: Player " + std::to_string(setupEditing + 1) + ", click your primate. (Choose whose pick to change on the right.)", 15,
-                 rgb(255, 214, 120), AL_CENTER, true);
+    if (setupPlayers > 1) {  // the player choosing, with a box for their name
+        std::string pre = "Player " + std::to_string(setupEditing + 1) + ", your name:";
+        std::string post = "- then click your primate.";
+        int bw = 190;
+        int tw = cv->textWidth(pre, 15, true) + 10 + bw + 10 + cv->textWidth(post, 15, true);
+        int tx = W / 2 - tw / 2;
+        cv->text(tx, 72, pre, 15, rgb(255, 214, 120), AL_LEFT, true);
+        tx += cv->textWidth(pre, 15, true) + 10;
+        bool editing = nameEditing == setupEditing;
+        cv->fillRoundRectGrad(tx, 68, bw, 26, 5, editing ? rgb(56, 64, 80) : rgb(40, 46, 58), rgb(30, 34, 44));
+        cv->roundRect(tx, 68, bw, 26, 5, editing ? rgb(255, 214, 120) : rgb(90, 100, 120), 1);
+        std::string nm = setupNames[setupEditing];
+        bool blink = editing && (animMs / 500) % 2 == 0;
+        cv->text(tx + 8, 72, nm.empty() && !editing ? "Player " + std::to_string(setupEditing + 1) : nm + (blink ? "|" : ""), 14,
+                 nm.empty() && !editing ? C_DIM : C_TEXT, AL_LEFT, true);
+        int ed = setupEditing;
+        hot(tx, 68, bw, 26, [this, ed] { nameEditing = ed; }, "Click and type a name (Enter when done)");
+        cv->text(tx + bw + 10, 72, post, 15, rgb(255, 214, 120), AL_LEFT, true);
+    }
     else cv->text(W / 2, 66, "Each primate has its own strengths. Humans are not playable - they will not survive 2034.", 15, C_DIM, AL_CENTER);
     int cols = 4, gap = 14;
     int cw = std::min(330, (W - 80 - gap * (cols - 1)) / cols), ch = std::min(236, (H - 100 - 232) / 2);
@@ -338,8 +371,14 @@ void GameUI::renderSetup() {
         button(gx + 110 + i * s3, oy + 4 * RP, s3 - 10, BH, std::string(SPEED_NAMES[i]) + " (" + std::to_string(SPEED_TURNS[i]) + " turns)", true,
                [this, i] { setupSpeed = i; }, SPEED_TIPS[i], setupSpeed == i ? rgb(110, 90, 40) : C_PANEL2, 14);
     // guidance: the tutorial and advisor tips
-    button(beginX, oy + 84, 108, 34, std::string("Tutorial: ") + (setupTutorial && setupPlayers == 1 ? "On" : "Off"), setupPlayers == 1, [this] { setupTutorial = !setupTutorial; },
-           "Step-by-step guidance through your first game", setupTutorial ? rgb(110, 90, 40) : C_PANEL2, 12);
+    if (setupPlayers > 1) {  // hotseat: a turn clock instead of the tutorial
+        std::string tl = setupTimer == 0 ? "Clock: off" : "Clock: " + std::to_string(setupTimer / 60) + " min";
+        button(beginX, oy + 84, 108, 34, tl, true, [this] { setupTimer = setupTimer == 0 ? 120 : setupTimer == 120 ? 300 : setupTimer == 300 ? 600 : 0; },
+               "A time limit for each player's turn (click to change): off, 2, 5 or 10 minutes. When it runs out the turn ends by itself.",
+               setupTimer ? rgb(110, 90, 40) : C_PANEL2, 12);
+    } else
+        button(beginX, oy + 84, 108, 34, std::string("Tutorial: ") + (setupTutorial ? "On" : "Off"), true, [this] { setupTutorial = !setupTutorial; },
+               "Step-by-step guidance through your first game", setupTutorial ? rgb(110, 90, 40) : C_PANEL2, 12);
     button(beginX + 112, oy + 84, 108, 34, std::string("Tips: ") + (advisorTips ? "On" : "Off"), true, [this] { advisorTips = !advisorTips; },
            "Advisor tips: your advisors speak up at the start of a turn when something needs you", advisorTips ? rgb(110, 90, 40) : C_PANEL2, 12);
     // hotseat: up to four humans take turns at this computer
@@ -366,7 +405,7 @@ void GameUI::renderSetup() {
         if (setupPlayers > 1) {
             cv->text(beginX, oy + 168, "Choosing:", 13, C_DIM);
             for (int h = 0; h < setupPlayers; h++)
-                button(beginX + 66 + h * 39, oy + 162, 35, 28, "P" + std::to_string(h + 1), true, [this, h] { setupEditing = h; },
+                button(beginX + 66 + h * 39, oy + 162, 35, 28, "P" + std::to_string(h + 1), true, [this, h] { setupEditing = h; nameEditing = -1; },
                        "Player " + std::to_string(h + 1) + ": " + g_primates[setupHot[h]].name + ". Click, then click a primate card to change it.",
                        setupEditing == h ? rgb(150, 110, 50) : C_PANEL2, 12);
         }
@@ -375,6 +414,11 @@ void GameUI::renderSetup() {
         GameSettings s;
         s.tutorial = setupTutorial && setupPlayers == 1;
         for (int h = 1; h < setupPlayers; h++) s.hotseat.push_back(setupHot[h]);
+        if (setupPlayers > 1) {
+            for (int h = 0; h < setupPlayers; h++) s.playerNames.push_back(setupNames[h]);
+            s.turnTimer = setupTimer;
+        }
+        nameEditing = -1;
         s.primate = setupPrimate;
         s.mapSize = setupSize;
         s.difficulty = setupDiff;
@@ -391,6 +435,9 @@ void GameUI::startGame(const GameSettings& s) {
     game.reset(new Game());
     game->newGame(s);
     handover = false;
+    views.clear();
+    seenLog.clear();
+    turnMsLeft = -1;
     resetMotion();
     boxPlayed = false;
     boxT = -1;
@@ -535,6 +582,20 @@ void GameUI::renderTopBar() {
              "You have " + std::to_string(n) + (n == 1 ? " nuclear warhead" : " nuclear warheads") +
                  " in your silos.\nClick to choose a target within 12 tiles of one of your cities.",
              [this] { nukeMode = true; nukeArmX = nukeArmY = -1; selUnit = -1; overlay = OV_NONE; });
+    }
+    if (hotseatGame()) {  // whose turn it is, and the clock
+        std::string who = me.playerName.empty() ? me.name : me.playerName;
+        std::string lab = compact ? who : who + " (" + me.adjective + ")";
+        Color wc = me.color;
+        if (turnMsLeft >= 0) {
+            int sLeft = (turnMsLeft + 999) / 1000;
+            char buf[16];
+            std::snprintf(buf, sizeof buf, " %d:%02d", sLeft / 60, sLeft % 60);
+            lab += buf;
+            if (sLeft <= 30) wc = rgb(255, 110, 90);
+        }
+        item(lab, lighten(wc, 0.35f), "Hotseat: it is " + who + "'s turn, playing the " + me.name + "." +
+             (turnMsLeft >= 0 ? " When the clock runs out the turn ends by itself." : ""));
     }
     if (g.hasTrait(g.player, TR_NEOCORTEX))
         item((compact ? "Sci +" : "Science +") + std::to_string(me.sciencePerTurn), C_SCI, "Science per turn. Science is used to research new technologies.",
@@ -2595,8 +2656,8 @@ void GameUI::endTurnNow() {
     if (g.gameOver && g.winner < 0) return;  // defeated
     overlay = overlay == OV_CITY ? OV_NONE : overlay;
     // hotseat: each human takes a turn in civ order; after the last, the world moves on
-    bool hotseat = false;
-    for (int c = FIRST_PRIMATE_CIV; c < (int)g.civs.size(); c++) if (g.civs[c].player && c != g.player) hotseat = true;
+    bool hotseat = hotseatGame();
+    if (hotseat) rememberView();
     int next = hotseat ? g.nextHuman(g.player) : -1;
     if (next >= 0) {
         g.switchPlayer(next);
@@ -2609,7 +2670,7 @@ void GameUI::endTurnNow() {
     g.endTurn();
     if (hotseat) {
         int first = g.nextHuman(FIRST_PRIMATE_CIV - 1);
-        if (first >= 0) {
+        if (first >= 0 && g.numHumans() > 1) {
             g.switchPlayer(first);
             beginHandover();
         }
@@ -2673,6 +2734,9 @@ void GameUI::loadGame() {
     int n = nextUnitNeedingOrders(-1);
     if (n >= 0) selectUnit(n, me.capital < 0);
     handover = false;
+    views.clear();
+    seenLog.clear();
+    turnMsLeft = -1;
     if (game->numHumans() > 1) beginHandover();
     toast = "Game loaded";
     toastMs = 2000;
@@ -2736,6 +2800,7 @@ void GameUI::mouseUp(int x, int y, int button) {
         boxT = -1;
         return;
     }
+    if (screen == SCR_SETUP && button == MOUSE_LEFT) nameEditing = -1;  // a click elsewhere ends typing (the name box sets it again)
     // UI hotspots, top-most first
     for (int i = (int)hots.size() - 1; i >= 0; i--) {
         const Hot& h = hots[i];
@@ -2795,8 +2860,22 @@ void GameUI::adjustUiScale(int dir) {
     toastMs = 1500;
 }
 
+void GameUI::charInput(unsigned ch) {
+    if (screen != SCR_SETUP || nameEditing < 0 || nameEditing >= 4) return;
+    std::string& n = setupNames[nameEditing];
+    if (ch >= 32 && ch < 127 && n.size() < 16) n += (char)ch;
+}
+
 void GameUI::key(int k, bool shift, bool ctrl) {
     (void)shift;
+    if (screen == SCR_SETUP && nameEditing >= 0) {  // typing a name: the keys are letters, not commands
+        if (k == KEY_BACK && !setupNames[nameEditing].empty()) setupNames[nameEditing].pop_back();
+        if (k == KEY_ENTER || k == KEY_ESC || k == KEY_TAB) {
+            nameEditing = -1;
+            if (k == KEY_TAB && setupPlayers > 1) { setupEditing = (setupEditing + 1) % setupPlayers; nameEditing = setupEditing; }
+        }
+        return;
+    }
     if (screen == SCR_GAME && game && handover) {
         if (k == KEY_ENTER || k == ' ') endHandover();
         return;
