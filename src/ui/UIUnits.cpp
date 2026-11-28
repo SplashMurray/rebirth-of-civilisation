@@ -777,15 +777,23 @@ void GameUI::drawUnitFigure(int type, int owner, int sx, int sy, int r, int stri
         // -------------------------------------------------- boats and ships
         case A_CANOE: {
             p.place(0, 0.12, 1);
-            p.poly({-0.9, 0.3, 0.9, 0.24, 0.66, 0.5, -0.7, 0.52}, rgb(120, 82, 46));
-            b.x = 0.0; b.y = -0.12; b.sc = 0.62; b.sitting = true; b.clothes = 1; b.fx = 0.5; b.fy = 0.1; b.bx = 0.1; b.by = 0.1;
+            p.poly({-0.9, 0.3, -0.7, 0.22, 0.7, 0.18, 0.9, 0.24, 0.66, 0.5, -0.7, 0.52}, rgb(78, 52, 30));  // the hollow inside
+            b.x = 0.0; b.y = 0.1; b.sc = 0.62; b.sitting = true; b.clothes = 1; b.fx = 0.5; b.fy = 0.0; b.bx = 0.1; b.by = 0.04;
             bodyBack(p, sp, b);
             p.place(b.x, b.y, b.sc * sp.size);
-            p.stick(0.0, -0.5, 0.7, 0.9, 0.06, WOOD);  // paddle
-            p.ell(0.72, 0.94, 0.08, 0.14, WOOD, true, 0.6f, -0.5);
             bodyFront(p, sp, b);
             p.place(0, 0.12, 1);
-            p.poly({-0.9, 0.3, 0.9, 0.24, 0.84, 0.32, -0.86, 0.38}, rgb(150, 106, 64), false);
+            p.poly({-0.9, 0.3, 0.9, 0.24, 0.66, 0.5, -0.7, 0.52}, rgb(120, 82, 46));  // the near side, in front of the paddler's legs
+            p.poly({-0.9, 0.3, 0.9, 0.24, 0.84, 0.3, -0.86, 0.36}, rgb(150, 106, 64), false);
+            // the paddle, over the side and its blade down in the water
+            {
+                double k = b.sc * sp.size, hx = b.x + b.fx * k, hy = b.y + b.fy * k;
+                p.place(0, 0, 1);
+                p.stick(hx + 0.03, hy - 0.4, hx + 0.24, hy + 0.66, 0.05, WOOD);
+                p.ell(hx + 0.26, hy + 0.72, 0.07, 0.13, WOOD, true, 0.6f, -0.2);
+                p.cv->fillEllipseA(p.X(hx + 0.27), p.Y(hy + 0.76), p.L(0.14), p.L(0.04), rgb(230, 240, 250), 170);  // a splash
+                p.dotOut(hx, hy, 0.075 * k, sp.face);  // the hand gripping it
+            }
             break;
         }
         case A_GALLEY: case A_ARCHGALLEY: {
@@ -800,7 +808,7 @@ void GameUI::drawUnitFigure(int type, int owner, int sx, int sy, int r, int stri
                 p.cv->lineA(p.X(ox), p.Y(0.34), p.X(ox - 0.16), p.Y(0.68), DARKWOOD, std::max(1, p.L(0.03)), 255);
                 p.cv->fillEllipseA(p.X(ox - 0.17), p.Y(0.69), p.L(0.05), std::max(1, p.L(0.02)), rgb(230, 240, 250), 150);
             }
-            if (art == A_ARCHGALLEY) { Body a; a.x = -0.6; a.y = -0.18; a.sc = 0.5; a.sitting = true; a.cloth = cc; a.clothes = 2; a.helmet = 1; a.fx = 0.5; a.fy = -0.3; a.bx = 0.1; a.by = -0.32; bodyBack(p, sp, a); p.place(a.x, a.y, a.sc * sp.size); bow(p, 0.5, -0.3, true); bodyFront(p, sp, a); }
+            if (art == A_ARCHGALLEY) { Body a; a.x = -0.6; a.y = -0.22; a.sc = 0.5; a.cloth = cc; a.clothes = 2; a.helmet = 1; a.fx = 0.5; a.fy = -0.3; a.bx = 0.1; a.by = -0.32; bodyBack(p, sp, a); p.place(a.x, a.y, a.sc * sp.size); bow(p, 0.5, -0.3, true); bodyFront(p, sp, a); }
             break;
         }
         case A_CARAVEL: case A_FRIGATE: {
