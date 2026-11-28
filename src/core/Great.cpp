@@ -350,3 +350,88 @@ void Game::aiGreat(int c) {
         }
     }
 }
+
+// ------------------------------------------------------------ patronage
+// Late in the game coin and faith pile up with little left to buy. A people can instead sponsor a Great
+// Primate of its choosing: gold (once it has Banking) hires thinkers, artisans, merchants and storytellers;
+// faith (with a state religion and Theology) calls artisans, storytellers and warleaders. The price follows
+// the era, and each one sponsored the same way makes the next dearer. The points towards the next natural
+// birth are untouched.
+namespace {
+int techBanking() { static int t = techIndex("Banking"); return t; }
+int techTheo() { static int t = techIndex("Theology"); return t; }
+}  // namespace
+
+int Game::patronCost(int c, int kind, int pay) const {
+    if (!isMajor(c) || kind < 0 || kind >= GK_COUNT) return 0;
+    if (pay == PAY_GOLD && kind == GK_WARLEADER) return 0;
+    if (pay == PAY_FAITH && (kind == GK_THINKER || kind == GK_MERCHANT)) return 0;  // the faithful do not pay for doubt or for profit
+    int e = std::max(4, era(c)), n = civs[c].patronBought[pay] + 2;  // in halves: each one bought adds half the first price
+    return (pay == PAY_GOLD ? 90 : 30) * e * n * speedPct / 100;
+}
+
+bool Game::canPatronise(int c, int kind, int pay, std::string* why) const {
+    auto fail = [&](const std::string& w) { if (why) *why = w; return false; };
+    int cost = patronCost(c, kind, pay);
+    if (cost <= 0) return fail(pay == PAY_GOLD ? "Gold cannot buy this kind" : "Faith cannot call this kind");
+    if (numCities(c) == 0) return fail("No city to welcome them");
+    if (pay == PAY_GOLD) {
+        if (!hasTech(c, techBanking())) return fail("Discover Banking to sponsor Great Primates with gold");
+        if (civs[c].gold < cost) return fail("Needs " + std::to_string(cost) + " Gold");
+    } else {
+        if (!hasTech(c, techTheo())) return fail("Discover Theology to call Great Primates with faith");
+        if (stateReligion(c) < 0) return fail("Your capital follows no religion");
+        if (civs[c].faith < cost) return fail("Needs " + std::to_string(cost) + " Faith");
+    }
+    return true;
+}
+
+bool Game::patronise(int c, int kind, int pay) {
+    if (!canPatronise(c, kind, pay)) return false;
+    int cost = patronCost(c, kind, pay);
+    if (pay == PAY_GOLD) civs[c].gold -= cost;
+    else civs[c].faith -= cost;
+    civs[c].patronBought[pay]++;
+    return spawnGreat(c, kind) >= 0;
+}
+
+void Game::aiPatronage(int c) {
+    Civ& cv = civs[c];
+    int sk = skillOf(c), e = era(c);
+    bool war = false, sad = false, wonder = false;
+    for (int o = FIRST_PRIMATE_CIV; o < (int)civs.size(); o++) if (cv.war[o] && civs[o].alive && isMajor(o)) war = true;
+    for (auto& ci : cities) {
+        if (!ci.alive || ci.owner != c) continue;
+        if (ci.happy - ci.unhappy < 0) sad = true;
+        if (ci.buildKind == BK_BUILDING && g_buildings[ci.buildId].wonder && g_buildings[ci.buildId].special != BSpecial::Victory) wonder = true;
+    }
+    // how keen this people is on each kind (cost is divided by this)
+    auto want = [&](int k) {
+        switch (k) {
+            case GK_THINKER: return 1.2;
+            case GK_ARTISAN: return wonder ? 1.3 : 0.9;
+            case GK_MERCHANT: return 0.7;
+            case GK_STORYTELLER: return sad ? 1.4 : 0.9;
+            case GK_WARLEADER: return war ? 1.5 : 0.0;
+        }
+        return 0.0;
+    };
+    for (int pay = PAY_GOLD; pay <= PAY_FAITH; pay++) {
+        int have = pay == PAY_GOLD ? cv.gold : cv.faith;
+        // keep a purse for emergencies and rush-buying (or for founding, enhancing and preaching)
+        int reserve = pay == PAY_GOLD ? sc(250) + 100 * e : 150 + 40 * e;
+        if (pay == PAY_FAITH && cv.founded >= 0 && !religions[cv.founded].enhanced) reserve += enhanceCost();
+        if (sk == 0) reserve *= 2;
+        int best = -1;
+        double bv = 0;
+        for (int k = 0; k < GK_COUNT; k++) {
+            double w = want(k);
+            if (w <= 0 || !canPatronise(c, k, pay)) continue;
+            int cost = patronCost(c, k, pay);
+            if (have - cost < reserve) continue;
+            double v = w / cost;
+            if (v > bv) { bv = v; best = k; }
+        }
+        if (best >= 0) patronise(c, best, pay);
+    }
+}

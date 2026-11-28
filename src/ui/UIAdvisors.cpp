@@ -280,6 +280,19 @@ std::vector<GameUI::Advice> GameUI::gatherAdvice() {
                 break;
             }
     }
+    // a full treasury or a deep store of faith could bring a Great Primate now
+    for (int pay = Game::PAY_GOLD; pay <= Game::PAY_FAITH; pay++) {
+        int cheapest = -1;
+        for (int k = 0; k < GK_COUNT; k++)
+            if (g.canPatronise(p, k, pay) && (cheapest < 0 || g.patronCost(p, k, pay) < g.patronCost(p, cheapest, pay))) cheapest = k;
+        if (cheapest < 0) continue;
+        int have = pay == Game::PAY_GOLD ? me.gold : me.faith, cost = g.patronCost(p, cheapest, pay);
+        if (have < cost * 2) continue;
+        add(pay == Game::PAY_GOLD ? 3 : 1, 25,
+            pay == Game::PAY_GOLD ? "Our treasury holds " + std::to_string(have) + " Gold. It could sponsor a Great Primate (from " + std::to_string(cost) + ") - see the top of this screen."
+                                  : "We hold " + std::to_string(have) + " Faith. It could call a Great Primate (from " + std::to_string(cost) + ") - see the top of this screen.",
+            nullptr, "");
+    }
     std::stable_sort(out.begin(), out.end(), [](const Advice& a, const Advice& b) { return a.pri > b.pri; });
     return out;
 }
@@ -289,7 +302,7 @@ void GameUI::renderAdvisors() {
     int px = (W - pw) / 2, py = TOP + 8;
     panel(px, py, pw, ph);
     cv->text(px + 20, py + 12, "Advisors", 24, C_TEXT, AL_LEFT, true);
-    cv->text(px + 150, py + 20, "Most urgent first. Below: progress towards your next Great Primates.", 13, C_DIM);
+    cv->text(px + 150, py + 20, "Most urgent first. Below: progress towards your next Great Primates, and patronage.", 13, C_DIM);
     button(px + pw - 190, py + 10, 140, 28, advisorTips ? "Turn tips off" : "Turn tips on", true, [this] { advisorTips = !advisorTips; }, "", rgb(46, 56, 72), 12);
     button(px + pw - 40, py + 10, 28, 28, "X", true, [this] { overlay = OV_NONE; });
     auto all = gatherAdvice();
@@ -309,11 +322,25 @@ void GameUI::renderAdvisors() {
             hot(bx, by - 2, bw, 30, nullptr,
                 std::string(GREAT_KIND_NAMES[k]) + ": " + std::to_string(have) + " of " + std::to_string(cost) + " points. Earned from " + GREAT_SOURCE[k] +
                     ". Born in your capital; each one takes more points than the last.");
+            // patronage: sponsor one now with gold or faith
+            int bx2 = bx + 30, bwid = (bw - 34 - 6) / 2;
+            for (int pay = Game::PAY_GOLD; pay <= Game::PAY_FAITH; pay++) {
+                int cost = g.patronCost(p, k, pay);
+                if (cost <= 0) continue;
+                std::string why;
+                bool ok = g.canPatronise(p, k, pay, &why);
+                std::string label = std::to_string(cost) + (pay == Game::PAY_GOLD ? " Gold" : " Faith");
+                std::string tip = std::string(pay == Game::PAY_GOLD ? "Sponsor" : "Call") + " a " + GREAT_KIND_NAMES[k] + " now for " + label +
+                                  ". Each one " + (pay == Game::PAY_GOLD ? "sponsored with gold" : "called with faith") + " raises the next price." +
+                                  (ok ? "" : "\n" + why);
+                button(bx2 + (pay == Game::PAY_FAITH && g.patronCost(p, k, Game::PAY_GOLD) > 0 ? bwid + 6 : 0), by + 30, bwid, 18, label, ok, [this, k, pay] { game->patronise(game->player, k, pay); },
+                       tip, pay == Game::PAY_GOLD ? rgb(96, 80, 34) : rgb(70, 56, 96), 11);
+            }
         }
     }
-    int gap = 12, cw = (pw - 40 - gap) / 2, ch = (ph - 110 - gap) / 2;
+    int gap = 12, cw = (pw - 40 - gap) / 2, ch = (ph - 118 - gap) / 2;
     for (int who = 0; who < 4; who++) {
-        int x = px + 20 + (who % 2) * (cw + gap), y = py + 96 + (who / 2) * (ch + gap);
+        int x = px + 20 + (who % 2) * (cw + gap), y = py + 104 + (who / 2) * (ch + gap);
         cv->fillRoundRectGrad(x, y, cw, ch, 8, rgb(38, 44, 58), rgb(26, 30, 40));
         cv->roundRect(x, y, cw, ch, 8, darken(ADVISOR_COLORS[who], 0.7f), 1);
         drawAdvisor(who, x + 40, y + 40, 26);

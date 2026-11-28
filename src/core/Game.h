@@ -225,6 +225,7 @@ struct Civ {
     bool preservation = false;      // the Last Human's memories: excavations yield half as much again
     bool metCassandra = false;
     int greatEarned = 0;
+    int patronBought[2] = {};       // Great Primates sponsored with gold, and called with faith
     // faith (see Religion.cpp)
     int faith = 0, faithPerTurn = 0, faithTotal = 0;
     int sciRawPerTurn = 0;    // science before the cost of zeal (derived)
@@ -438,7 +439,7 @@ public:
     // Bigger maps give each species more room and bigger empires, so (as in Civilization) research,
     // traditions and the Rebirth Project cost more on them. Derived from the map size, not saved.
     int mapCostPct() const { static const int P[] = {100, 130, 170}; return P[std::clamp(settings.mapSize, 0, 2)]; }
-    int researchCost(int v) const { return (int)((long long)sc(v) * mapCostPct() * 112 / 10000); }  // +12%: Great Primates, happier cities and the World Council speed things up
+    int researchCost(int v) const { return (int)((long long)sc(v) * mapCostPct() * 122 / 10000); }  // +22%: Great Primates (born and bought), happier cities and the World Council speed things up
     int techCost(int t) const { return researchCost(g_techs[t].cost); }
     int traitCost(int t, int k) const { return sc(g_traits[t].cost[k]); }
     int statWars = 0, statCaptures = 0, statRazes = 0, statNukes = 0;  // diagnostics only (not saved)
@@ -667,6 +668,12 @@ public:
     std::string greatActName(const Unit& u, int act) const;
     std::string greatActTip(const Unit& u, int act) const;
     bool greatAct(Unit& u, int act);
+    // Patronage: gold (from Banking) or faith (with a state religion and Theology) brings the next Great Primate of a kind
+    enum PatronPay { PAY_GOLD, PAY_FAITH };
+    int patronCost(int c, int kind, int pay) const;  // 0 if this kind cannot be had that way
+    bool canPatronise(int c, int kind, int pay, std::string* why = nullptr) const;
+    bool patronise(int c, int kind, int pay);
+    void aiPatronage(int c);
     void cassandraCheck();
     void aiGreat(int c);
     // ---- minor tribes (Tribes.cpp)

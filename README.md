@@ -49,10 +49,10 @@
 * **Happiness and luxuries:** crowded cities and war-weary peoples grow discontent; luxuries, buildings and festivals keep them content or celebrating.
 * **Traditions** bought with culture.
 * **Trade caravans** over land, rivers and sea, and roads that improve from worn tracks to tarmac.
-* **Great Primates** - Thinkers, Artisans, Merchants, Storytellers and Warleaders - born of your people's deeds.
+* **Great Primates** - Thinkers, Artisans, Merchants, Storytellers and Warleaders - born of your people's deeds, or sponsored late in the game with gold or faith.
 
 ### Faith and its price
-Shrines, Temples and Cathedrals produce Faith. Found a religion, choose its beliefs, and spread it with Missionaries and trade. Faith buys festivals and buildings - and, for a zealous enough people, soldiers of the faith. But a people devoted too heavily to its faith grows **zealous** and resists new ideas: high zeal costs science.
+Shrines, Temples and Cathedrals produce Faith. Found a religion, choose its beliefs, and spread it with Missionaries and trade. Faith buys festivals and buildings, calls Great Primates - and, for a zealous enough people, buys soldiers of the faith. But a people devoted too heavily to its faith grows **zealous** and resists new ideas: high zeal costs science.
 
 ### War
 * Over 30 unit types, from Warbands and Stone Throwers to Salvaged Rifles, Rebuilt Tanks and Exo-Primates.

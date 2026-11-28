@@ -296,6 +296,7 @@ void Game::aiTurn(int c) {
     aiOffers(c);
     for (size_t i = 0; i < cities.size(); i++)
         if (cities[i].alive && cities[i].owner == c) aiCity(cities[i]);
+    aiPatronage(c);
     // units: iterate by index since vectors may grow
     size_t n = units.size();
     for (size_t i = 0; i < n; i++) {
@@ -335,6 +336,10 @@ void Game::aiCity(City& city) {
     };
 
     bool keep = city.buildKind != BK_NONE && canBuild(city, city.buildKind, city.buildId);
+    // a finished unit that had no room to step out of the city: build something else meanwhile
+    bool blocked = keep && city.buildKind == BK_UNIT && g_units[city.buildId].cls != UnitClass::Nuke &&
+                   city.prod >= buildCost(c, BK_UNIT, city.buildId);
+    if (blocked) keep = false;
     if (keep && threat > 0 && !garrison && !(city.buildKind == BK_UNIT && g_units[city.buildId].landMilitary())) keep = false;
     int sk = skillOf(c);
     // an unhappy city (or a big one that cannot grow) turns to contentment, unless it is building a wonder
@@ -361,6 +366,9 @@ void Game::aiCity(City& city) {
         else if (sk >= 2 && hasGold(c) && buyCost(city) > 0 && cv.gold >= buyCost(city) * 13 / 10 &&
                  !(city.buildKind == BK_BUILDING && g_buildings[city.buildId].wonder))
             buy(city);
+        else if (sk >= 1 && hasGold(c) && buyCost(city) > 0 && cv.gold - buyCost(city) >= sc(300) + 120 * era(c) &&
+                 !(city.buildKind == BK_BUILDING && g_buildings[city.buildId].wonder))
+            buy(city);  // a full treasury pays to get things done
         return;
     }
 
@@ -397,6 +405,7 @@ void Game::aiCity(City& city) {
 
     int kind = BK_NONE, id = -1;
     if (canBuild(city, BK_BUILDING, ID.bRebirth)) { kind = BK_BUILDING; id = ID.bRebirth; }
+    else if (blocked) {}  // straight to the buildings below
     else if (threat > 0 && !garrison) { kind = BK_UNIT; id = bestMilitary(false); }
     else if (mil < milWant) { kind = BK_UNIT; id = bestMilitary(mil % 3 == 2); }
     else if (workers < workWant && city.pop >= 2) { kind = BK_UNIT; id = uniqueFor(c, ID.uGatherer); }
@@ -470,6 +479,7 @@ void Game::aiCity(City& city) {
     }
     if (id >= 0) setProduction(city, kind, id);
     if (sk > 0 && hasGold(c) && city.buildKind == BK_UNIT && buyCost(city) > 0 && cv.gold > buyCost(city) * 2) buy(city);
+    else if (sk > 0 && hasGold(c) && city.buildKind == BK_BUILDING && buyCost(city) > 0 && cv.gold - buyCost(city) >= sc(300) + 120 * era(c)) buy(city);
 }
 
 void Game::aiUnit(Unit& uref) {

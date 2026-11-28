@@ -423,7 +423,7 @@ void Game::aiTribes(int c) {
     const PrimateDef* pd = primate(c);
     int aggr = pd ? pd->aggression : 5;
     // gifts of gold to tip a tribe into friendship or alliance
-    if (hasGold(c) && cv.gold > 120 + 40 * era(c) && rng.chance(sk == 0 ? 0.08 : 0.25)) {
+    if (hasGold(c) && cv.gold > 120 + 40 * era(c) && rng.chance(cv.gold > sc(1500) + 300 * era(c) ? 0.7 : sk == 0 ? 0.08 : 0.25)) {  // a swollen treasury buys friends freely
         int best = -1, bestGold = 0;
         double bv = 0;
         for (int t = FIRST_PRIMATE_CIV; t < (int)civs.size(); t++) {

@@ -5,7 +5,7 @@
 #include <sstream>
 
 namespace {
-const int SAVE_VERSION = 28;
+const int SAVE_VERSION = 29;
 
 struct Archive {
     bool writing;
@@ -140,7 +140,7 @@ void ioGame(Archive& a, Game& g) {
         a.io(c.minor); a.io(c.tribe); a.io(c.influence); a.io(c.ally); a.io(c.allySince); a.io(c.questKind); a.io(c.questTarget); a.io(c.questUntil);
         a.io(c.questDone); a.io(c.lastUnitGift); a.io(c.firstMet); a.io(c.tribeFoodCapital); a.io(c.tribeFoodAll); a.io(c.questsCompleted); a.io(c.mostAllies);
         for (int k = 0; k < GK_COUNT; k++) { a.io(c.greatPts[k]); a.io(c.greatBorn[k]); }
-        a.io(c.festivalUntil); a.io(c.preservation); a.io(c.metCassandra); a.io(c.greatEarned);
+        a.io(c.festivalUntil); a.io(c.preservation); a.io(c.metCassandra); a.io(c.greatEarned); a.io(c.patronBought[0]); a.io(c.patronBought[1]);
         a.io(c.faith); a.io(c.faithPerTurn); a.io(c.faithTotal); a.io(c.sciRawPerTurn); a.io(c.zeal); a.io(c.zealPenalty); a.io(c.founded);
         a.io(c.missionariesBought); a.io(c.festivalsHeld); a.io(c.lastAggression); a.io(c.termsAsChair); a.io(c.playerName);
     }
