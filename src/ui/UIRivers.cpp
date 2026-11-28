@@ -136,27 +136,8 @@ void GameUI::drawFeature(int x, int y, int sx, int sy) {
     uint32_t h = hashXY(x * 5 + 1, y * 3 + 7);
     int lw = std::max(1, u / 20);
     switch (t.feature) {
-        case F_FLOODPLAIN:  // dark silt and green strips of flood-fed growth
-            for (int k = 0; k < 4; k++) {
-                int fx = PX((int)((h >> (k * 4)) % 11) - 5), fy = PY((int)((h >> (k * 4 + 2)) % 9) - 4);
-                cv->lineA(fx - u / 6, fy, fx + u / 6, fy - u / 24, k % 2 ? rgb(70, 110, 46) : rgb(104, 86, 56), std::max(2, u / 12), 150);
-            }
-            break;
-        case F_MARSH: {
-            const int P[3][2] = {{-3, 2}, {3, -1}, {1, 5}};
-            for (auto& p : P) {
-                cv->fillEllipseA(PX(p[0]), PY(p[1]), u / 4, u / 10, rgb(52, 92, 104), 210);
-                cv->lineA(PX(p[0]) - u / 8, PY(p[1]) - u / 40, PX(p[0]), PY(p[1]) - u / 40, rgb(170, 210, 220), lw, 120);
-            }
-            for (int k = 0; k < 9; k++) {
-                int rx = PX((int)((h >> (k * 3)) % 13) - 6), ry = PY((int)((h >> (k * 3 + 1)) % 11) - 4);
-                int tall = u / 7 + (int)((h >> k) % 3) * u / 30;
-                cv->lineA(rx, ry, rx - u / 40, ry - tall, rgb(70, 110, 52), lw, 230);
-                cv->lineA(rx + u / 30, ry, rx + u / 24, ry - tall * 3 / 4, rgb(96, 132, 62), lw, 230);
-                if (k % 3 == 0) cv->fillEllipseA(rx - u / 40, ry - tall, std::max(1, u / 40), std::max(2, u / 22), rgb(110, 72, 40), 255);
-            }
-            break;
-        }
+        case F_FLOODPLAIN: drawFloodplain(x, y, sx, sy); break;
+        case F_MARSH: drawMarsh(x, y, sx, sy); break;
         case F_OASIS: {
             cv->fillEllipseA(PX(0), PY(2), u * 4 / 10, u / 5, rgb(214, 190, 120), 200);  // damp sand
             cv->fillCircleGrad(PX(0), PY(2), u * 3 / 10, rgb(90, 180, 200), 255, rgb(30, 100, 150), 255, PX(-1), PY(1));

@@ -88,17 +88,6 @@ static void tri(Canvas* cv, int x0, int y0, int x1, int y1, int x2, int y2, Colo
 
 static const int EDGE[6][2] = {{0, 1}, {5, 0}, {4, 5}, {3, 4}, {2, 3}, {1, 2}};  // hex corners on each side
 
-// a mound: half an ellipse with a vertical gradient (lit top, darker foot)
-static void bumpGrad(Canvas* cv, int cx, int cy, int w, int h, Color top, Color foot) {
-    int xy[26];
-    for (int i = 0; i <= 12; i++) {
-        double a = 3.14159265 * i / 12;
-        xy[i * 2] = cx - (int)(std::cos(a) * w / 2);
-        xy[i * 2 + 1] = cy - (int)(std::sin(a) * h);
-    }
-    cv->fillPolyGrad(xy, 13, top, 255, foot, 255, cx - w / 6, cy - h, cx + w / 8, cy);
-}
-
 Color GameUI::groundColor(int x, int y) const {
     const Game& g = *game;
     const Tile& t = g.at(x, y);
@@ -110,7 +99,7 @@ Color GameUI::groundColor(int x, int y) const {
     if (t.feature == F_MARSH) base = blend(base, rgb(76, 104, 76), 0.5f);
     if (t.feature == F_OASIS) base = blend(base, rgb(150, 168, 90), 0.35f);
     int v = (int)(h % 9) - 4;
-    if (water) v /= 2;
+    if (water) v /= 4;  // the sea is one body of water, not a honeycomb
     base = rgb(base.r + v, base.g + v, base.b + v);
     if (t.veg == V_FOREST) base = blend(base, rgb(70, 110, 58), 0.35f);
     if (t.veg == V_JUNGLE) base = blend(base, rgb(50, 118, 60), 0.45f);
@@ -178,54 +167,11 @@ void GameUI::drawTile(int x, int y, int sx, int sy, bool visible) {
     // soft blotches of light and shade that spill over the hex edges, so the ground does not look tiled
     if (hs >= 14) {
         int bx = PX((int)(h % 9) - 4), by = PY((int)((h >> 4) % 9) - 4);
-        cv->glowEllipse(bx, by, u * 8 / 10, u * 6 / 10, (h >> 8) & 1 ? lighten(base, 0.35f) : darken(base, 0.6f), water ? 34 : 50);
+        cv->glowEllipse(bx, by, u * 8 / 10, u * 6 / 10, (h >> 8) & 1 ? lighten(base, 0.35f) : darken(base, 0.6f), water ? 14 : 50);
         int cx2 = PX((int)((h >> 12) % 11) - 5), cy2 = PY((int)((h >> 16) % 11) - 5);
-        cv->glowEllipse(cx2, cy2, u * 6 / 10, u * 4 / 10, (h >> 20) & 1 ? lighten(base, 0.3f) : darken(base, 0.65f), water ? 26 : 40);
+        cv->glowEllipse(cx2, cy2, u * 6 / 10, u * 4 / 10, (h >> 20) & 1 ? lighten(base, 0.3f) : darken(base, 0.65f), water ? 10 : 40);
     }
-    // ground texture
-    if (hs >= 22 && !t.mountain) {
-        int lw = std::max(1, u / 18);
-        if (water) {
-            for (int k = 0; k < 2; k++) {
-                int wx = PX((int)((h >> (k * 5)) % 9) - 4), wy = PY((int)((h >> (k * 5 + 3)) % 9) - 4);
-                int wv[8] = {wx - u / 6, wy, wx - u / 12, wy - u / 20, wx, wy, wx + u / 12, wy - u / 20};
-                cv->polylineA(wv, 4, rgb(220, 240, 255), lw, 34);
-            }
-        } else if (t.veg == V_NONE && !t.hills && t.feature == F_NONE) {
-            switch (t.terrain) {
-                case T_GRASS:
-                    for (int k = 0; k < 4; k++) {
-                        int gx = PX((int)((h >> (k * 4)) % 13) - 6), gy = PY((int)((h >> (k * 4 + 2)) % 11) - 5);
-                        cv->lineA(gx, gy, gx - u / 20, gy - u / 10, rgb(40, 90, 30), lw, 110);
-                        cv->lineA(gx, gy, gx + u / 20, gy - u / 10, rgb(40, 90, 30), lw, 110);
-                        cv->lineA(gx, gy, gx, gy - u / 8, rgb(150, 200, 100), lw, 90);
-                    }
-                    break;
-                case T_PLAINS:
-                    for (int k = 0; k < 5; k++) {
-                        int gx = PX((int)((h >> (k * 3)) % 13) - 6), gy = PY((int)((h >> (k * 3 + 1)) % 11) - 5);
-                        cv->lineA(gx, gy, gx + u / 9, gy, k % 2 ? rgb(120, 110, 50) : rgb(210, 200, 120), lw, 100);
-                    }
-                    break;
-                case T_DESERT:
-                    for (int k = 0; k < 2; k++) {
-                        int dx = PX(k ? 2 : -3), dy = PY(k ? -2 : 3);
-                        cv->lineA(dx - u / 4, dy, dx, dy - u / 9, rgb(250, 235, 190), lw + 1, 120);
-                        cv->lineA(dx, dy - u / 9, dx + u / 4, dy, rgb(160, 130, 80), lw + 1, 90);
-                    }
-                    break;
-                case T_TUNDRA:
-                    for (int k = 0; k < 6; k++)
-                        cv->fillCircleA(PX((int)((h >> (k * 3)) % 13) - 6), PY((int)((h >> (k * 3 + 2)) % 11) - 5), std::max(1, u / 22),
-                                        k % 2 ? rgb(230, 235, 240) : rgb(80, 85, 70), 110);
-                    break;
-                case T_SNOW:
-                    for (int k = 0; k < 3; k++)
-                        cv->fillCircleA(PX((int)((h >> (k * 4)) % 11) - 5), PY((int)((h >> (k * 4 + 2)) % 9) - 4), u / 7, rgb(190, 210, 235), 70);
-                    break;
-            }
-        }
-    }
+    drawGroundTexture(x, y, sx, sy, base);
     drawRoads(x, y, sx, sy);
     bool special = t.feature == F_VOLCANO || t.feature == F_WONDER;
     bool keepHills = t.feature == F_WONDER && t.natural >= 0 && g_naturals[t.natural].site == WS_FALLS;
@@ -258,53 +204,11 @@ void GameUI::drawTile(int x, int y, int sx, int sy, bool visible) {
         peak(PX(1), PY(5), PX(1) + u / 20, PY(-6), u * 6 / 10, true);
         if (h & 4) peak(PX(5), PY(6), PX(5), PY(1), u * 3 / 10, coldPeak);
     } else if (t.hills) {
-        Color dark = darken(base, 0.7f), lit = lighten(base, 0.22f);
-        cv->glowEllipse(PX(1), PY(5), u * 7 / 10, u / 5, rgb(0, 0, 0), 60);
-        bumpGrad(cv, PX(-3), PY(4), u * 7 / 10, u * 4 / 10, lit, dark);
-        bumpGrad(cv, PX(3), PY(2), u * 8 / 10, u * 5 / 10, lit, dark);
-        if (hs >= 26) bumpGrad(cv, PX(0), PY(6), u * 6 / 10, u * 3 / 10, lighten(base, 0.12f), darken(base, 0.78f));
+        drawHills(x, y, sx, sy, base);
     }
     // vegetation
-    if (t.veg == V_FOREST && !t.mountain) {
-        bool conifer = t.terrain == T_TUNDRA || t.terrain == T_SNOW || t.hills || (h & 1);
-        const int P[7][2] = {{-4, 1}, {3, 0}, {0, -4}, {-2, 5}, {4, 5}, {-6, -2}, {6, -3}};
-        int n = hs >= 34 ? 7 : hs >= 26 ? 5 : 3;
-        for (int k = 0; k < n; k++) {
-            int tx = PX(P[k][0]), ty = PY(P[k][1]);
-            cv->fillEllipseA(tx + u / 12, ty + u / 4, u / 6, u / 16, rgb(0, 0, 0), 70);  // shadow
-            if (conifer) {
-                Color c1 = t.terrain == T_TUNDRA || t.terrain == T_SNOW ? rgb(52, 96, 78) : rgb(42, 104, 54), c2 = darken(c1, 0.62f);
-                cv->line(tx, ty + u / 8, tx, ty + u / 4, rgb(90, 60, 30), std::max(1, u / 16));
-                const int TW[2] = {u / 6, u / 8}, TT[2] = {ty - u / 8, ty - u / 4 - u / 20}, TB[2] = {ty + u / 7, ty + u / 40};
-                for (int tier = 0; tier < 2; tier++) {  // two tiers of branches
-                    tri(cv, tx - TW[tier], TB[tier], tx, TT[tier], tx, TB[tier], lighten(c1, 0.08f * tier));
-                    tri(cv, tx, TT[tier], tx + TW[tier], TB[tier], tx, TB[tier], c2);
-                }
-                if (t.terrain == T_SNOW || t.terrain == T_TUNDRA)
-                    tri(cv, tx - u / 22, TT[1] + u / 10, tx, TT[1], tx + u / 22, TT[1] + u / 10, rgb(236, 240, 246));
-            } else {
-                cv->line(tx, ty, tx, ty + u / 4, rgb(100, 70, 40), std::max(1, u / 14));
-                int r = u / 6 + (int)((h >> k) & 1) * u / 30;
-                cv->fillCircleGrad(tx, ty, r, rgb(132, 190, 92), 255, rgb(34, 92, 42), 255, tx - r / 3, ty - r / 2);
-            }
-        }
-    } else if (t.veg == V_JUNGLE && !t.mountain) {
-        const int P[7][2] = {{-4, 2}, {3, 2}, {-1, -3}, {1, 5}, {5, -2}, {-5, -2}, {-2, 6}};
-        int n = hs >= 30 ? 7 : 6;
-        for (int k = 0; k < n; k++) {
-            int tx = PX(P[k][0]), ty = PY(P[k][1]), r = u / 6 + (int)((h >> (k + 3)) & 1) * u / 24;
-            cv->fillEllipseA(tx + u / 14, ty + r, r, r / 3, rgb(0, 0, 0), 60);
-            cv->fillCircleGrad(tx, ty, r, rgb(96, 170, 72), 255, rgb(14, 70, 34), 255, tx - r / 3, ty - r / 2);
-        }
-        if (hs >= 26) {  // a palm poking out of the canopy
-            int px2 = PX(2), py2 = PY(-5);
-            cv->line(px2, py2 + u / 4, px2 + u / 30, py2, rgb(110, 80, 44), std::max(1, u / 20));
-            for (int f = 0; f < 5; f++) {
-                double a = -2.6 + f * 0.55;
-                cv->lineA(px2, py2, px2 + (int)(std::cos(a) * u / 5), py2 + (int)(std::sin(a) * u / 7) + u / 16, rgb(40, 130, 56), std::max(2, u / 16), 255);
-            }
-        }
-    }
+    if (t.veg == V_FOREST && !t.mountain) drawForest(x, y, sx, sy);
+    else if (t.veg == V_JUNGLE && !t.mountain) drawJungle(x, y, sx, sy);
     drawFeature(x, y, sx, sy);
     if (t.river) {  // the river over the ground and plants, and any road over the river on a bridge
         drawRiver(x, y, sx, sy);
@@ -313,38 +217,7 @@ void GameUI::drawTile(int x, int y, int sx, int sy, bool visible) {
     drawResourceScene(x, y, sx, sy);
     if (t.feature == F_WONDER) drawNatural(x, y, sx, sy);
     if (t.site >= 0) drawHumanSite(x, y, sx, sy, true);
-    // improvements
-    if (t.imp != IMP_NONE && hs >= 16) {
-        int ix = PX(-4), iy = PY(4);
-        switch (t.imp) {
-            case IMP_FARM: {
-                int fxy[8] = {ix - u / 4, iy, ix, iy - u / 8, ix + u / 4, iy, ix, iy + u / 8};
-                cv->fillPoly(fxy, 4, rgb(196, 170, 70));
-                for (int k = -1; k <= 1; k++) cv->line(ix - u / 6 + k * u / 12, iy + k * u / 24 + u / 24, ix + u / 12 + k * u / 12, iy - u / 12 + k * u / 24 + u / 24, rgb(120, 140, 40), 1);
-                break;
-            }
-            case IMP_MINE:
-                tri(cv, ix - u / 5, iy + u / 10, ix, iy - u / 5, ix + u / 5, iy + u / 10, rgb(60, 48, 36));
-                cv->fillCircle(ix, iy + u / 24, u / 14, rgb(20, 16, 12));
-                cv->line(ix - u / 8, iy - u / 4, ix + u / 8, iy - u / 10, rgb(210, 210, 210), 2);
-                break;
-            case IMP_LUMBER:
-                for (int k = 0; k < 3; k++) {
-                    cv->fillRect(ix - u / 5 + (k % 2) * u / 16, iy - k * u / 12, u * 2 / 5, u / 12, rgb(140 - k * 10, 90, 45));
-                    cv->fillCircle(ix + u / 5 + (k % 2) * u / 16, iy - k * u / 12 + u / 24, u / 24, rgb(210, 170, 110));
-                }
-                break;
-            case IMP_TRADEPOST:
-                tri(cv, ix - u / 5, iy + u / 10, ix, iy - u / 5, ix + u / 5, iy + u / 10, rgb(220, 180, 70));
-                cv->line(ix, iy - u / 5, ix, iy - u / 3, rgb(120, 80, 40), 1);
-                break;
-            case IMP_PASTURE:
-                cv->line(ix - u / 4, iy, ix + u / 4, iy, rgb(150, 110, 60), std::max(1, u / 18));
-                cv->line(ix - u / 4, iy - u / 10, ix + u / 4, iy - u / 10, rgb(150, 110, 60), std::max(1, u / 18));
-                for (int k = -1; k <= 1; k++) cv->line(ix + k * u / 6, iy - u / 6, ix + k * u / 6, iy + u / 20, rgb(120, 85, 45), std::max(1, u / 16));
-                break;
-        }
-    }
+    drawImprovement(x, y, sx, sy);
     // resource
     if (g.resourceVisible(g.player, x, y) && hs >= 10) {
         if (hs >= 16) drawResourceIcon(t.res, PX(4), PY(4), std::max(8, u * 28 / 100));
@@ -859,7 +732,7 @@ void GameUI::drawPathPreview() {
 }
 
 static const Color MAP_BG = {8, 10, 14};
-static const uint64_t TERRAIN_STYLE = 4;  // bump to invalidate cached terrain when its drawing changes
+static const uint64_t TERRAIN_STYLE = 5;  // bump to invalidate cached terrain when its drawing changes
 
 // Draws the terrain of a block of tiles in the current coordinate system: ground, then what stands on it,
 // then fog of war, the soft edge of the unexplored world, and borders.

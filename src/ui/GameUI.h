@@ -286,6 +286,14 @@ private:
     // ---- rivers, lakes, terrain features and natural wonders (UIRivers.cpp)
     void drawRiver(int x, int y, int sx, int sy);
     void drawFeature(int x, int y, int sx, int sy);
+    // terrain art (UITerrain.cpp)
+    void drawGroundTexture(int x, int y, int sx, int sy, Color base);
+    void drawHills(int x, int y, int sx, int sy, Color base);
+    void drawForest(int x, int y, int sx, int sy);
+    void drawJungle(int x, int y, int sx, int sy);
+    void drawFloodplain(int x, int y, int sx, int sy);
+    void drawMarsh(int x, int y, int sx, int sy);
+    void drawImprovement(int x, int y, int sx, int sy);
     void drawVolcanoCone(int sx, int sy, bool great);
     void drawNatural(int x, int y, int sx, int sy);
     void drawNaturalLabels(int x0, int x1, int y0, int y1);
