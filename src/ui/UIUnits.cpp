@@ -122,6 +122,7 @@ struct Body {
     Color cloth = {180, 60, 50};
     double fx = 0.42, fy = -0.12;   // front hand
     double bx = -0.3, by = 0.05;    // back hand
+    double bex = 9, bey = 9;        // back elbow, if set (else halfway, a little down)
     bool sitting = false;           // riders: legs hidden
     bool old = false;               // a grey muzzle
     bool robe = false;              // long robe to the feet
@@ -131,17 +132,23 @@ void bodyBack(Pen& p, const Species& sp, const Body& b) {
     p.place(b.x, b.y, b.sc * sp.size);
     Color fur = sp.fur, furD = darken(sp.fur, 0.72f);
     // back arm
-    p.stick(-0.06, -0.3, (b.bx - 0.06) / 2, (b.by - 0.3) / 2 + 0.06, 0.14, furD);
-    p.stick((b.bx - 0.06) / 2, (b.by - 0.3) / 2 + 0.06, b.bx, b.by, 0.13, furD);
+    double ex = b.bex < 5 ? b.bex : (b.bx - 0.06) / 2, ey = b.bey < 5 ? b.bey : (b.by - 0.3) / 2 + 0.06;
+    p.stick(-0.06, -0.3, ex, ey, 0.14, furD);
+    p.stick(ex, ey, b.bx, b.by, 0.13, furD);
+    p.dot(ex, ey, 0.065, furD);
     if (!b.sitting && !b.robe) {
-        p.poly({-0.26, 0.18, -0.04, 0.2, -0.06, 0.8, -0.3, 0.8}, furD);   // back leg
-        p.ell(-0.2, 0.82, 0.14, 0.06, darken(sp.face, 0.7f));
+        p.poly({-0.28, 0.14, -0.02, 0.16, -0.06, 0.5, -0.08, 0.8, -0.28, 0.8, -0.32, 0.5}, furD);   // back leg, knee bent
+        p.ell(-0.16, 0.82, 0.15, 0.06, darken(sp.face, 0.7f));
     }
-    if (b.robe) p.poly({-0.32, -0.25, 0.3, -0.25, 0.42, 0.84, -0.44, 0.84}, b.cloth);
+    if (b.robe) {
+        p.poly({-0.36, -0.18, -0.22, -0.38, 0.2, -0.38, 0.34, -0.2, 0.46, 0.84, -0.48, 0.84}, b.cloth, true, 0.55f);
+        p.poly({-0.47, 0.74, 0.45, 0.74, 0.46, 0.84, -0.48, 0.84}, lighten(b.cloth, 0.35f), false);  // hem
+        p.stick(-0.06, -0.34, 0.02, 0.72, 0.03, darken(b.cloth, 0.6f), false);                      // a fold
+    }
     // torso: hunched, broad-shouldered
     Color torso = b.clothes >= 3 || b.robe ? b.cloth : fur;
     if (b.clothes == 4) torso = rgb(96, 104, 114);
-    p.ell(0, -0.04, 0.37, 0.43, torso, true, 0.55f, 0.15);
+    if (!b.robe) p.ell(0, -0.04, 0.37, 0.43, torso, true, 0.55f, 0.15);
     if (sp.cape && b.clothes < 3) p.ell(0.06, -0.3, 0.3, 0.14, sp.face, false);
     if (b.clothes == 1) p.poly({-0.34, 0.12, 0.34, 0.12, 0.3, 0.34, -0.36, 0.34}, b.cloth);
     if (b.clothes == 2) {
@@ -159,8 +166,8 @@ void bodyBack(Pen& p, const Species& sp, const Body& b) {
     if (!b.sitting && !b.robe) {
         Color legC = b.clothes >= 3 ? darken(b.cloth, 0.7f) : fur;
         if (b.clothes == 4) legC = rgb(86, 92, 100);
-        p.poly({0.0, 0.18, 0.22, 0.18, 0.28, 0.8, 0.04, 0.8}, legC);  // front leg
-        p.ell(0.18, 0.82, 0.15, 0.06, b.clothes >= 3 ? BLACKMETAL : darken(sp.face, 0.8f));
+        p.poly({-0.02, 0.14, 0.26, 0.14, 0.32, 0.48, 0.26, 0.8, 0.06, 0.8, 0.06, 0.5}, legC);  // front leg, knee forward
+        p.ell(0.22, 0.82, 0.16, 0.06, b.clothes >= 3 ? BLACKMETAL : darken(sp.face, 0.8f));
     }
     // head
     double hx = 0.17, hy = -0.6, hr = 0.25;
@@ -194,6 +201,10 @@ void bodyBack(Pen& p, const Species& sp, const Body& b) {
         case 6:
             p.ell(hx, hy - 0.02, 0.29, 0.28, rgb(84, 92, 102));
             p.poly({hx + 0.04, hy - 0.1, hx + 0.3, hy - 0.08, hx + 0.28, hy + 0.04, hx + 0.04, hy + 0.04}, rgb(90, 220, 240), true, 0.4f);
+            break;
+        case 8:
+            p.ell(hx - 0.04, hy - 0.2, 0.28, 0.11, b.cloth, true, 0.6f, -0.2);
+            p.dot(hx - 0.04, hy - 0.3, 0.035, darken(b.cloth, 0.6f));
             break;
         case 7: p.poly({hx - 0.3, hy + 0.1, hx - 0.24, hy - 0.24, hx, hy - 0.33, hx + 0.22, hy - 0.22, hx + 0.26, hy - 0.06, hx + 0.08, hy - 0.16, hx - 0.06, hy + 0.2}, b.cloth); break;
     }
@@ -249,21 +260,23 @@ void kiteShield(Pen& p, double x, double y, Color face) {
     p.poly({x - 0.1, y - 0.24, x + 0.14, y - 0.24, x + 0.12, y + 0.05, x + 0.02, y + 0.26, x - 0.08, y + 0.05}, face, false, 0.6f);
 }
 void bow(Pen& p, double hx, double hy, bool drawn) {
-    p.arc(hx - 0.5, hy, 0.54, -0.95, 0.95, 0.06, WOOD);
-    double tx = hx - 0.5 + std::cos(-0.95) * 0.54, ty = hy + std::sin(-0.95) * 0.54, bx2 = tx, by2 = hy - std::sin(-0.95) * 0.54;
-    double sxp = drawn ? hx - 0.46 : tx;
+    p.arc(hx - 0.62, hy, 0.68, -1.0, 1.0, 0.07, WOOD);
+    double tx = hx - 0.62 + std::cos(-1.0) * 0.68, ty = hy + std::sin(-1.0) * 0.68, bx2 = tx, by2 = hy - std::sin(-1.0) * 0.68;
+    double sxp = drawn ? hx - 0.5 : tx;
     p.cv->line(p.X(tx), p.Y(ty), p.X(sxp), p.Y(hy), rgb(230, 220, 200), 1);
     p.cv->line(p.X(sxp), p.Y(hy), p.X(bx2), p.Y(by2), rgb(230, 220, 200), 1);
     if (drawn) {
-        p.stick(sxp, hy, hx + 0.2, hy, 0.035, rgb(210, 190, 150), false);
-        p.poly({hx + 0.28, hy, hx + 0.16, hy - 0.05, hx + 0.16, hy + 0.05}, STONE, false);
+        p.stick(sxp, hy, hx + 0.24, hy, 0.04, rgb(220, 200, 160));
+        p.poly({hx + 0.36, hy, hx + 0.2, hy - 0.07, hx + 0.2, hy + 0.07}, STONE);
+        p.poly({sxp, hy, sxp - 0.08, hy - 0.07, sxp + 0.06, hy}, rgb(230, 60, 50), false);  // fletching
     }
 }
 void crossbow(Pen& p, double hx, double hy) {
-    p.stick(hx - 0.5, hy + 0.04, hx + 0.32, hy - 0.04, 0.08, WOOD);
-    p.arc(hx + 0.62, hy - 0.06, 0.42, 2.45, 3.85, 0.05, IRON);
-    p.cv->line(p.X(hx + 0.62 + std::cos(2.45) * 0.42), p.Y(hy - 0.06 + std::sin(2.45) * 0.42), p.X(hx + 0.62 + std::cos(3.85) * 0.42),
-               p.Y(hy - 0.06 + std::sin(3.85) * 0.42), rgb(230, 220, 200), 1);
+    p.stick(hx - 0.5, hy + 0.04, hx + 0.36, hy - 0.04, 0.09, WOOD);
+    double cx = hx + 0.82, cy = hy - 0.04, r = 0.5;
+    p.cv->line(p.X(cx + std::cos(2.4) * r), p.Y(cy + std::sin(2.4) * r), p.X(cx + std::cos(3.88) * r), p.Y(cy + std::sin(3.88) * r), rgb(230, 220, 200), 1);
+    p.arc(cx, cy, r, 2.4, 3.88, 0.06, IRON);
+    p.poly({hx + 0.36, hy - 0.04, hx + 0.48, hy - 0.08, hx + 0.48, hy + 0.0}, STONE);  // the bolt's head
 }
 // a long gun held at the shoulder and aimed forward
 void rifle(Pen& p, double hx, double hy, Color stock, bool bayonet) {
@@ -278,37 +291,86 @@ void helmetFor(Body& b, int era) {
 
 // ---------------------------------------------------------------- beasts and machines
 // a four-legged mount or pack beast, facing right; returns where a rider sits
-void beast(Pen& p, Color hide, Color mane, Color armour, bool armoured, bool dog = false, double stride = 0) {
-    double s = dog ? 0.8 : 1.0, foot = dog ? 0.62 : 0.82, lw = dog ? 0.11 : 0.09;
-    Color hd = darken(hide, 0.7f);
-    // far legs
-    p.stick(-0.44 * s, 0.14, -0.5 * s - stride, foot - 0.02, lw, hd);
-    p.stick(0.34 * s, 0.14, 0.4 * s + stride, foot - 0.02, lw, hd);
-    // body
-    p.ell(-0.04, 0.06, 0.6 * s, (dog ? 0.24 : 0.27) * s, hide, true, 0.55f);
-    // neck and head
-    if (dog) {
-        p.poly({0.3, -0.06, 0.46, -0.32, 0.62, -0.3, 0.52, 0.04}, hide);
-        p.poly({0.46, -0.4, 0.78, -0.28, 0.8, -0.18, 0.5, -0.16}, hide);
-        p.poly({0.46, -0.38, 0.5, -0.56, 0.58, -0.36}, hd);  // ear
-        p.stick(-0.46, -0.02, -0.66, -0.24, 0.06, hide);   // tail
-    } else {
-        p.poly({0.32, -0.08, 0.48, -0.46, 0.62, -0.5, 0.58, -0.08}, hide);
-        p.poly({0.5, -0.56, 0.86, -0.36, 0.86, -0.24, 0.56, -0.32}, hide);
-        p.stick(0.44, -0.4, 0.34, -0.1, 0.08, mane, false);  // mane
-        p.poly({0.52, -0.54, 0.56, -0.72, 0.62, -0.54}, hd);  // ear
-        p.stick(-0.62, -0.0, -0.78, 0.36, 0.07, mane);         // tail
+// A body built from overlapping rounded masses: all their outlines first, then all their fills, so the
+// joins between them do not show.
+struct Mass { double x, y, rx, ry, rot; };
+void masses(Pen& p, std::initializer_list<Mass> ms, Color c) {
+    double e = (p.s * p.k >= 7) ? (double)p.ow / (p.s * p.k) : 0;
+    if (e > 0)
+        for (auto& m : ms) p.ell(m.x, m.y, m.rx + e, m.ry + e, INK, false, 1.0f, m.rot);
+    for (auto& m : ms) p.ell(m.x, m.y, m.rx, m.ry, c, false, 0.78f, m.rot);
+}
+// a jointed leg: upper part thick, lower part slim
+void limb(Pen& p, double x1, double y1, double x2, double y2, double x3, double y3, double w1, double w2, Color c) {
+    p.stick(x1, y1, x2, y2, w1, c);
+    p.stick(x2, y2, x3, y3, w2, c);
+    p.dot(x2, y2, w1 * 0.45, c);
+}
+
+// A riding or pack beast, facing right, hooves at y = 0.84; the rider's seat is near (0, -0.22).
+// kind: 0 plain, 1 striped (zebra), 2 barded in armour, 3 pack beast
+void mount(Pen& p, Color hide, Color mane, int kind, Color cc, double stride) {
+    Color hd = darken(hide, 0.68f);
+    // far legs and tail
+    limb(p, -0.4, 0.02, -0.5, 0.48, -0.44 - stride, 0.82, 0.12, 0.06, hd);
+    limb(p, 0.3, 0.06, 0.36, 0.48, 0.4 + stride, 0.82, 0.11, 0.06, hd);
+    // the tail hangs from the top of the rump, with a tuft
+    p.stick(-0.58, -0.16, -0.7, -0.02, 0.05, mane);
+    p.stick(-0.7, -0.02, -0.71, 0.24, 0.035, mane);
+    p.ell(-0.71, 0.3, 0.05, 0.09, mane, true);
+    // the neck, then the body masses (with thigh and shoulder), and the head
+    p.poly({0.14, -0.16, 0.46, 0.02, 0.7, -0.42, 0.5, -0.6}, hide);
+    masses(p, {{-0.36, -0.02, 0.27, 0.25, 0}, {-0.02, 0.03, 0.38, 0.22, 0}, {0.3, -0.01, 0.22, 0.23, 0}, {-0.33, 0.12, 0.17, 0.24, 0.15},
+               {0.32, 0.12, 0.13, 0.2, -0.1}}, hide);
+    p.poly({0.48, -0.6, 0.6, -0.66, 0.88, -0.38, 0.86, -0.28, 0.74, -0.26, 0.56, -0.4}, hide);  // the long head
+    p.ell(0.82, -0.32, 0.07, 0.06, darken(hide, 0.55f), false);  // muzzle
+    p.poly({0.5, -0.58, 0.5, -0.76, 0.6, -0.62}, hd);              // ear
+    p.stick(0.5, -0.62, 0.22, -0.2, 0.08, mane, false);           // mane
+    if (kind == 1) {  // stripes
+        for (int i = 0; i < 9; i++) {
+            double x = -0.56 + i * 0.13, top = std::fabs(x + 0.04) > 0.45 ? -0.12 : -0.16, bot = std::fabs(x) > 0.4 ? 0.14 : 0.2;
+            p.cv->lineA(p.X(x), p.Y(top), p.X(x + 0.04), p.Y(bot), INK, p.L(0.035), 190);
+        }
+        for (int i = 0; i < 3; i++) p.cv->lineA(p.X(0.3 + i * 0.1), p.Y(-0.12 - i * 0.13), p.X(0.42 + i * 0.1), p.Y(-0.06 - i * 0.13), INK, p.L(0.03), 180);
     }
-    if (armoured) p.poly({-0.46, -0.16, 0.36, -0.18, 0.44, 0.24, -0.5, 0.26}, armour, true, 0.5f);
+    p.cv->fillEllipseA(p.X(-0.04), p.Y(0.16), p.L(0.42), p.L(0.08), INK, 50);  // belly shade
+    if (kind == 2) {  // barding in the owner's colour, an iron face-plate
+        p.poly({-0.56, -0.16, 0.44, -0.2, 0.5, 0.18, 0.0, 0.26, -0.6, 0.18}, cc, true, 0.55f);
+        p.stick(-0.56, 0.17, 0.5, 0.17, 0.04, GOLD, false);
+        p.ell(0.68, -0.5, 0.13, 0.06, IRON, true, 0.6f, 0.55);
+    } else if (kind != 3) {  // a saddle cloth
+        p.poly({-0.24, -0.22, 0.12, -0.22, 0.1, 0.06, -0.22, 0.06}, cc, true, 0.6f);
+    }
     // near legs
-    p.stick(-0.3 * s, 0.18, -0.26 * s + stride, foot, lw + 0.01, hide);
-    p.stick(0.24 * s, 0.18, 0.2 * s - stride, foot, lw + 0.01, hide);
-    if (!dog) {  // hooves
-        p.ell(-0.26 * s + stride, foot + 0.02, 0.06, 0.035, INK, false);
-        p.ell(0.2 * s - stride, foot + 0.02, 0.06, 0.035, INK, false);
-    }
-    if (p.s >= 11 && !dog) p.dot(0.72, -0.4, 0.025, rgb(16, 12, 10));
-    if (p.s >= 11 && dog) p.dot(0.66, -0.3, 0.025, rgb(16, 12, 10));
+    limb(p, -0.3, 0.2, -0.38, 0.5, -0.3 + stride, 0.82, 0.13, 0.07, hide);
+    limb(p, 0.34, 0.2, 0.32, 0.5, 0.3 - stride, 0.82, 0.12, 0.07, hide);
+    p.ell(-0.3 + stride, 0.84, 0.06, 0.035, INK, false);
+    p.ell(0.3 - stride, 0.84, 0.06, 0.035, INK, false);
+    if (p.s * p.k >= 11) p.dot(0.64, -0.52, 0.028, rgb(16, 12, 10));
+}
+
+// A wild dog, facing right, paws at y = 0.84.
+void hound(Pen& p, Color hide, bool mutant, double stride) {
+    Color hd = darken(hide, 0.68f);
+    // stocky: short legs, deep chest; paws at y = 0.84
+    limb(p, -0.34, 0.36, -0.44, 0.62, -0.38 - stride, 0.82, 0.14, 0.07, hd);
+    limb(p, 0.24, 0.38, 0.28, 0.62, 0.32 + stride, 0.82, 0.12, 0.07, hd);
+    p.stick(-0.46, 0.26, -0.62, 0.14, 0.08, hide);
+    p.stick(-0.62, 0.14, -0.68, 0.0, 0.06, hide);  // the tail up
+    p.poly({0.14, 0.24, 0.34, 0.4, 0.52, 0.12, 0.36, -0.02}, hide);  // neck
+    masses(p, {{-0.3, 0.34, 0.19, 0.17, 0}, {-0.04, 0.36, 0.3, 0.15, 0}, {0.22, 0.34, 0.2, 0.19, 0}, {0.46, 0.08, 0.15, 0.13, 0}}, hide);
+    p.poly({0.5, 0.02, 0.8, 0.12, 0.78, 0.2, 0.5, 0.2}, hide);  // snout
+    p.dot(0.8, 0.15, 0.035, INK);
+    p.poly({0.36, 0.0, 0.38, -0.2, 0.5, -0.02}, hd);  // ear
+    if (mutant) {
+        for (int i = 0; i < 5; i++) p.poly({-0.42 + i * 0.16, 0.22, -0.36 + i * 0.16, -0.02, -0.3 + i * 0.16, 0.22}, rgb(206, 200, 172));
+        p.ell(-0.1, 0.32, 0.1, 0.06, rgb(170, 70, 60), false);  // raw patches
+        p.ell(0.2, 0.38, 0.06, 0.05, rgb(170, 70, 60), false);
+        p.dotOut(0.56, 0.06, 0.04, rgb(150, 255, 90));  // a sickly glowing eye
+        p.poly({0.56, 0.18, 0.62, 0.26, 0.66, 0.18}, rgb(240, 236, 220), false);  // a fang
+    } else if (p.s * p.k >= 11) p.dot(0.56, 0.07, 0.028, rgb(16, 12, 10));
+    limb(p, -0.22, 0.38, -0.32, 0.64, -0.24 + stride, 0.82, 0.15, 0.08, hide);
+    limb(p, 0.3, 0.4, 0.26, 0.64, 0.22 - stride, 0.82, 0.13, 0.08, hide);
 }
 
 void cartWheel(Pen& p, double x, double y, double r, Color c, bool spokes) {
@@ -451,12 +513,15 @@ void GameUI::drawUnitFigure(int type, int owner, int sx, int sy, int r, int stri
             break;
         }
         case A_CARAVAN: {
-            p.place(0.08, -0.04, 0.82);
-            beast(p, rgb(176, 150, 112), rgb(110, 86, 60), cc, false, false, st);
-            p.ell(-0.08, -0.22, 0.3, 0.2, rgb(198, 162, 104));  // packs
-            p.ell(0.18, -0.2, 0.2, 0.17, cc);
-            p.stick(-0.3, -0.16, 0.34, -0.14, 0.03, DARKWOOD, false);
-            b.x = -0.62; b.y = 0.2; b.sc = 0.62; b.clothes = 2; b.fx = 0.5; b.fy = -0.1;
+            p.place(0.14, 0.12, 0.8);
+            mount(p, rgb(176, 150, 112), rgb(110, 86, 60), 3, cc, st);
+            p.ell(-0.3, -0.3, 0.24, 0.2, rgb(198, 162, 104));  // packs
+            p.ell(0.04, -0.32, 0.22, 0.2, cc);
+            p.ell(-0.12, -0.5, 0.18, 0.12, rgb(176, 140, 90));
+            p.stick(-0.46, -0.2, 0.2, -0.22, 0.03, DARKWOOD, false);
+            b.x = -0.6; b.y = 0.22; b.sc = 0.62; b.clothes = 2; b.fx = 0.5; b.fy = -0.1;
+            p.place(0, 0, 1);
+            p.cv->lineA(p.X(-0.6 + 0.5 * 0.62), p.Y(0.22 - 0.1 * 0.62), p.X(0.14 + 0.62 * 0.8), p.Y(0.12 - 0.36 * 0.8), DARKWOOD, std::max(1, p.L(0.025)), 230);  // the lead rope
             bodyBack(p, sp, b); bodyFront(p, sp, b);
             break;
         }
@@ -488,7 +553,7 @@ void GameUI::drawUnitFigure(int type, int owner, int sx, int sy, int r, int stri
             p.cv->glowEllipse(p.X(0), p.Y(-0.2), p.L(0.95), p.L(1.05), rgb(255, 226, 120), 150);  // their renown
             b.robe = art != A_WARLEADER; b.clothes = art == A_WARLEADER ? 2 : 0; b.cloth = blend(cc, GOLD, 0.3f);
             if (art == A_WARLEADER) b.helmet = 2;
-            b.fx = 0.4; b.fy = -0.2;
+            b.fx = 0.4; b.fy = art == A_STORYTELLER ? -0.56 : -0.2;
             bodyBack(p, sp, b);
             p.place(0, 0, sp.size);
             switch (art) {
@@ -498,7 +563,14 @@ void GameUI::drawUnitFigure(int type, int owner, int sx, int sy, int r, int stri
                     p.poly({0.5, -0.72, 0.76, -0.6, 0.7, -0.48, 0.46, -0.6}, IRON);
                     break;
                 case A_MERCHANT: p.ell(0.5, 0.02, 0.17, 0.19, rgb(170, 130, 70)); p.dot(0.5, -0.02, 0.06, GOLD); break;  // a purse
-                case A_STORYTELLER: p.ell(0.52, -0.1, 0.16, 0.2, rgb(150, 100, 60)); p.ell(0.52, -0.1, 0.12, 0.16, rgb(230, 210, 170), false); break;  // a drum
+                case A_STORYTELLER: {  // a torch held high to light the tale
+                    p.stick(0.4, -0.5, 0.5, -1.0, 0.06, WOOD);
+                    double fl = animOn ? 0.9 + 0.1 * std::sin(animMs / 90.0) : 1.0;
+                    p.cv->glowEllipse(p.X(0.52), p.Y(-1.1), p.L(0.26), p.L(0.3), rgb(255, 170, 60), 200);
+                    p.poly({0.42, -1.0, 0.6, -1.0, 0.62, -1.1, 0.54, -1.0 - 0.32 * fl, 0.46, -1.12}, rgb(255, 150, 40), false);
+                    p.poly({0.47, -1.0, 0.57, -1.0, 0.53, -1.0 - 0.18 * fl}, rgb(255, 236, 140), false);
+                    break;
+                }
                 case A_WARLEADER:
                     p.stick(0.46, 0.6, 0.5, -1.04, 0.05, DARKWOOD);
                     p.poly({0.5, -1.02, 0.98, -0.9, 0.5, -0.64}, cc);
@@ -510,12 +582,14 @@ void GameUI::drawUnitFigure(int type, int owner, int sx, int sy, int r, int stri
         // -------------------------------------------------- feral beasts
         case A_DOGS: case A_HOUNDS: {
             bool mut = art == A_HOUNDS;
-            p.place(mut ? -0.04 : 0.12, mut ? 0.16 : 0.24, mut ? 1.0 : 0.82);
-            beast(p, mut ? rgb(122, 138, 92) : rgb(150, 120, 86), rgb(80, 60, 40), cc, false, true, st);
-            if (mut) for (int i = 0; i < 4; i++) p.poly({-0.36 + i * 0.18, -0.12, -0.3 + i * 0.18, -0.36, -0.24 + i * 0.18, -0.12}, rgb(200, 196, 170));
-            if (!mut) {
-                p.place(-0.42, 0.4, 0.62);
-                beast(p, rgb(110, 92, 70), rgb(70, 50, 30), cc, false, true, -st);
+            if (!mut) {  // a pack: one behind, one in front
+                p.place(-0.3, -0.1, 0.72);
+                hound(p, rgb(118, 96, 70), false, -st);
+                p.place(0.06, 0.12, 0.86);
+                hound(p, rgb(168, 134, 92), false, st);
+            } else {
+                p.place(0, 0.02, 1.08);
+                hound(p, rgb(122, 138, 92), true, st);
             }
             break;
         }
@@ -532,23 +606,26 @@ void GameUI::drawUnitFigure(int type, int owner, int sx, int sy, int r, int stri
             break;
         }
         case A_STONE: {
-            b.clothes = 1; b.fx = 0.5; b.fy = -0.24; b.bx = -0.5; b.by = -0.78;
+            b.clothes = 1; b.fx = 0.52; b.fy = -0.3; b.bx = -0.34; b.by = -0.84; b.bex = -0.5; b.bey = -0.42;
             bodyBack(p, sp, b);
             p.place(0, 0, sp.size);
-            p.dotOut(-0.54, -0.86, 0.1, STONE);  // the stone, drawn back to throw
+            p.dotOut(-0.36, -0.92, 0.11, STONE);  // the stone, drawn back to throw
+            p.dot(-0.39, -0.95, 0.03, lighten(STONE, 0.4f));
             p.ell(-0.3, 0.12, 0.12, 0.1, rgb(150, 110, 70));  // a pouch of more
             bodyFront(p, sp, b);
             break;
         }
         case A_SCOUT: case A_SONGSCOUT: {  // light-footed, shading their eyes to look far ahead
             b.clothes = 1; b.helmet = art == A_SCOUT ? 0 : 0;
-            b.fx = 0.4; b.fy = -0.72; b.bx = -0.34; b.by = 0.1;
+            if (art == A_SCOUT) { b.fx = 0.74; b.fy = -0.36; }  // pointing the way
+            else { b.fx = 0.46; b.fy = -0.5; }                  // blowing a horn
+            b.bx = -0.32; b.by = 0.08;
             bodyBack(p, sp, b);
             p.place(0, 0, sp.size);
-            p.stick(-0.5, 0.84, -0.3, -0.5, 0.05, WOOD);  // a walking stick
+            p.stick(-0.42, 0.84, -0.26, -0.56, 0.05, WOOD);  // a walking stick
             if (art == A_SONGSCOUT) {  // a horn to call across the canopy
-                p.poly({-0.22, -0.06, -0.62, -0.28, -0.66, -0.12, -0.24, 0.04}, rgb(226, 210, 170));
-                p.ell(-0.64, -0.2, 0.05, 0.1, rgb(190, 170, 130));
+                p.poly({0.36, -0.5, 0.42, -0.58, 0.74, -0.86, 0.82, -0.7}, rgb(232, 218, 180));
+                p.ell(0.79, -0.79, 0.07, 0.11, rgb(196, 176, 136), true, 0.6f, 0.6);
             }
             bodyFront(p, sp, b);
             break;
@@ -567,7 +644,7 @@ void GameUI::drawUnitFigure(int type, int owner, int sx, int sy, int r, int stri
         }
         case A_BOW: case A_PEACEKEEP: {
             soldier(era);
-            if (art == A_PEACEKEEP) { b.helmet = 4; b.cloth = blend(cc, rgb(90, 150, 220), 0.5f); }
+            if (art == A_PEACEKEEP) { b.helmet = 8; b.cloth = blend(cc, rgb(90, 150, 220), 0.5f); }
             b.fx = 0.5; b.fy = -0.3; b.bx = 0.1; b.by = -0.32;
             bodyBack(p, sp, b);
             p.place(0, 0, sp.size);
@@ -621,16 +698,18 @@ void GameUI::drawUnitFigure(int type, int owner, int sx, int sy, int r, int stri
         // -------------------------------------------------- riders
         case A_BEASTRIDER: case A_RAIDER: case A_ARMOURED: {
             bool arm = art == A_ARMOURED;
-            p.place(0.02, 0.0, 0.95);
-            beast(p, art == A_RAIDER ? rgb(150, 126, 90) : rgb(176, 134, 92), rgb(70, 50, 36), cc, arm, false, st);
-            b.sitting = true; b.x = -0.1; b.y = -0.46; b.sc = 0.74;
+            p.place(0.06, 0.06, 0.92);
+            if (art == A_BEASTRIDER) mount(p, rgb(236, 230, 214), rgb(40, 34, 30), 1, cc, st);  // a zebra
+            else if (art == A_RAIDER) mount(p, rgb(168, 122, 74), rgb(60, 44, 30), 0, cc, st);
+            else mount(p, rgb(110, 84, 60), rgb(40, 30, 22), 2, cc, st);
+            b.sitting = true; b.x = 0.02; b.y = -0.46; b.sc = 0.74;
             soldier(era);
             if (!arm) b.helmet = era >= 1 ? 1 : 0;
             b.fx = 0.4; b.fy = -0.1;
             bodyBack(p, sp, b);
             p.place(b.x, b.y, b.sc * sp.size);
-            p.poly({-0.02, 0.2, 0.22, 0.2, 0.3, 0.72, 0.1, 0.74}, b.clothes >= 3 ? darken(b.cloth, 0.7f) : sp.fur);  // a leg astride
-            p.ell(0.22, 0.76, 0.12, 0.05, darken(sp.face, 0.7f));
+            p.poly({-0.06, 0.16, 0.24, 0.16, 0.3, 0.5, 0.2, 0.78, 0.02, 0.74, 0.06, 0.48}, b.clothes >= 3 ? darken(b.cloth, 0.7f) : sp.fur);  // a leg astride
+            p.ell(0.16, 0.8, 0.13, 0.06, darken(sp.face, 0.7f));
             if (arm) {
                 p.stick(-0.3, 0.2, 1.3, -0.4, 0.07, WOOD);
                 p.poly({1.3, -0.4, 1.12, -0.28, 1.1, -0.42}, IRON);
@@ -667,15 +746,32 @@ void GameUI::drawUnitFigure(int type, int owner, int sx, int sy, int r, int stri
             break;
         }
         case A_TANK: p.place(0, 0.02, 0.92); tank(p, rgb(100, 112, 76), cc, false); break;
-        case A_NUKE: {
+        case A_NUKE: {  // a missile raised on its launcher truck
             p.place(0, 0, 1);
-            p.poly({-0.8, 0.42, 0.8, 0.42, 0.7, 0.62, -0.7, 0.62}, OLIVE);
-            cartWheel(p, -0.5, 0.66, 0.14, BLACKMETAL, false);
-            cartWheel(p, 0.5, 0.66, 0.14, BLACKMETAL, false);
-            p.poly({-0.7, 0.3, 0.6, 0.06, 0.9, 0.0, 0.62, -0.08, -0.7, 0.08}, rgb(226, 228, 230), true, 0.6f);  // the missile, raised
-            p.poly({-0.7, 0.08, -0.9, -0.12, -0.6, 0.06}, cc);
-            p.poly({-0.7, 0.3, -0.9, 0.42, -0.62, 0.28}, cc);
-            p.dotOut(0.2, 0.12, 0.08, rgb(250, 210, 40));
+            p.poly({-0.86, 0.36, 0.56, 0.36, 0.56, 0.58, -0.86, 0.58}, OLIVE);              // flatbed
+            p.poly({0.56, 0.16, 0.8, 0.16, 0.9, 0.36, 0.9, 0.58, 0.56, 0.58}, OLIVE);        // cab
+            p.poly({0.62, 0.2, 0.78, 0.2, 0.84, 0.34, 0.62, 0.34}, rgb(150, 200, 220), false);  // windscreen
+            for (double wx : {-0.62, -0.3, 0.7}) cartWheel(p, wx, 0.62, 0.13, BLACKMETAL, false);
+            double ang = -0.42, dx = std::cos(ang), dy = std::sin(ang), nx = -dy, ny = dx;
+            double ox = -0.72, oy = 0.26, w = 0.1;
+            auto at = [&](double t, double o, double& x, double& y) { x = ox + dx * t + nx * o; y = oy + dy * t + ny * o; };
+            double x1, y1, x2, y2, x3, y3, x4, y4, x5, y5;
+            p.stick(-0.2, 0.36, -0.06, 0.0, 0.05, BLACKMETAL);  // the erector arm
+            // fins at the tail
+            at(0.0, -w, x1, y1); at(-0.04, -w - 0.14, x2, y2); at(0.22, -w, x3, y3);
+            p.poly({x1, y1, x2, y2, x3, y3}, cc);
+            at(0.0, w, x1, y1); at(-0.04, w + 0.14, x2, y2); at(0.22, w, x3, y3);
+            p.poly({x1, y1, x2, y2, x3, y3}, cc);
+            // the body and the nose cone
+            at(0.0, -w, x1, y1); at(1.08, -w, x2, y2); at(1.36, 0, x3, y3); at(1.08, w, x4, y4); at(0.0, w, x5, y5);
+            p.poly({x1, y1, x2, y2, x3, y3, x4, y4, x5, y5}, rgb(228, 230, 232), true, 0.55f);
+            for (double t : {0.3, 0.98}) {  // bands in the owner's colour
+                at(t, -w, x1, y1); at(t + 0.07, -w, x2, y2); at(t + 0.07, w, x3, y3); at(t, w, x4, y4);
+                p.poly({x1, y1, x2, y2, x3, y3, x4, y4}, cc, false);
+            }
+            at(0.64, 0, x1, y1);
+            p.dotOut(x1, y1, 0.075, rgb(250, 206, 40));  // the warning mark
+            p.dot(x1, y1, 0.03, INK);
             break;
         }
         // -------------------------------------------------- boats and ships
@@ -694,12 +790,17 @@ void GameUI::drawUnitFigure(int type, int owner, int sx, int sy, int r, int stri
         }
         case A_GALLEY: case A_ARCHGALLEY: {
             p.place(0, 0.1, 1);
-            for (int i = 0; i < 4; i++) p.stick(-0.5 + i * 0.3, 0.36, -0.62 + i * 0.3, 0.7, 0.04, DARKWOOD, false);  // oars
             p.stick(0.0, 0.2, 0.0, -0.96, 0.06, DARKWOOD);
             sail(p, 0.02, -0.86, -0.08, 0.86, rgb(236, 226, 200), cc);
             hull(p, 1.8, 0.32, rgb(122, 84, 50), false);
             p.poly({0.88, 0.32, 1.06, 0.38, 0.86, 0.44}, BRONZE);  // ram
-            if (art == A_ARCHGALLEY) { Body a; a.x = -0.6; a.y = -0.04; a.sc = 0.36; a.sitting = true; a.cloth = cc; a.clothes = 2; a.helmet = 1; a.fx = 0.5; a.fy = -0.3; a.bx = 0.1; a.by = -0.32; bodyBack(p, sp, a); p.place(a.x, a.y, a.sc * sp.size); bow(p, 0.5, -0.3, true); bodyFront(p, sp, a); }
+            for (int i = 0; i < 5; i++) {  // a bank of oars dipping into the sea
+                double ox = -0.56 + i * 0.26;
+                p.dot(ox, 0.34, 0.03, INK);
+                p.cv->lineA(p.X(ox), p.Y(0.34), p.X(ox - 0.16), p.Y(0.68), DARKWOOD, std::max(1, p.L(0.03)), 255);
+                p.cv->fillEllipseA(p.X(ox - 0.17), p.Y(0.69), p.L(0.05), std::max(1, p.L(0.02)), rgb(230, 240, 250), 150);
+            }
+            if (art == A_ARCHGALLEY) { Body a; a.x = -0.6; a.y = -0.18; a.sc = 0.5; a.sitting = true; a.cloth = cc; a.clothes = 2; a.helmet = 1; a.fx = 0.5; a.fy = -0.3; a.bx = 0.1; a.by = -0.32; bodyBack(p, sp, a); p.place(a.x, a.y, a.sc * sp.size); bow(p, 0.5, -0.3, true); bodyFront(p, sp, a); }
             break;
         }
         case A_CARAVEL: case A_FRIGATE: {
@@ -719,37 +820,86 @@ void GameUI::drawUnitFigure(int type, int owner, int sx, int sy, int r, int stri
         }
         case A_FREIGHTER: case A_IRONCLAD: case A_GUNBOAT: case A_DESTROYER: case A_BATTLESHIP: {
             p.place(0, 0.12, 1);
-            Color hc = art == A_IRONCLAD ? rgb(58, 60, 66) : art == A_FREIGHTER ? rgb(150, 70, 50) : rgb(128, 136, 146);
-            Color sup = art == A_FREIGHTER ? rgb(220, 214, 200) : lighten(hc, 0.15f);
-            double len = art == A_GUNBOAT ? 1.5 : art == A_BATTLESHIP ? 2.0 : 1.9;
-            if (art == A_FREIGHTER) {
-                for (int i = 0; i < 4; i++)
-                    p.poly({-0.7 + i * 0.3, -0.02, -0.44 + i * 0.3, -0.02, -0.44 + i * 0.3, 0.2, -0.7 + i * 0.3, 0.2},
-                           i % 2 ? cc : rgb(70, 110, 150), true, 0.6f);
-                p.poly({0.52, -0.3, 0.82, -0.3, 0.82, 0.2, 0.52, 0.2}, sup);
-            } else {
-                p.poly({-0.4, -0.12, 0.42, -0.12, 0.46, 0.2, -0.44, 0.2}, sup);
-                p.poly({-0.14, -0.4, 0.2, -0.4, 0.24, -0.12, -0.16, -0.12}, sup);
-                if (art == A_IRONCLAD || art == A_GUNBOAT) p.poly({-0.08, -0.74, 0.08, -0.74, 0.1, -0.4, -0.08, -0.4}, BLACKMETAL);  // funnel
-                else p.stick(0.02, -0.4, 0.02, -0.86, 0.04, BLACKMETAL);  // mast
-                int guns = art == A_BATTLESHIP ? 2 : 1;
-                for (int i = 0; i < guns; i++) {
-                    double gx = 0.58 + i * 0.0, gx2 = -0.62;
-                    p.ell(gx, 0.08, 0.14, 0.08, sup);
-                    p.stick(gx, 0.04, gx + 0.34, 0.0, 0.05, BLACKMETAL);
-                    if (art == A_BATTLESHIP) { p.ell(gx2, 0.08, 0.14, 0.08, sup); p.stick(gx2, 0.04, gx2 - 0.34, 0.0, 0.05, BLACKMETAL); }
-                }
-            }
-            hull(p, len, 0.34, hc, true);
-            p.stick(-len / 2 + 0.06, 0.34, len / 2 - 0.08, 0.34, 0.05, cc, false);  // a stripe in the owner's colour
-            if (art != A_FREIGHTER) pennant(p, art == A_IRONCLAD || art == A_GUNBOAT ? 0.0 : 0.02, art == A_IRONCLAD || art == A_GUNBOAT ? -0.74 : -0.86, 0.26, cc);
-            if (animOn && (art == A_IRONCLAD || art == A_GUNBOAT || art == A_FREIGHTER)) {
+            const Color GREY = rgb(134, 142, 152);
+            auto turret = [&](double x, double y, double dir, int barrels, double size) {  // dir: +1 forward, -1 aft
+                for (int i = 0; i < barrels; i++)
+                    p.stick(x, y - 0.03 + i * 0.05 - (barrels - 1) * 0.025, x + dir * 0.36 * size, y - 0.06 + i * 0.05 - (barrels - 1) * 0.025, 0.035, BLACKMETAL);
+                p.poly({x - 0.13 * size, y + 0.06, x - 0.1 * size, y - 0.07, x + 0.1 * size, y - 0.07, x + 0.13 * size, y + 0.06}, lighten(GREY, 0.1f));
+            };
+            auto smoke = [&](double fx, double fy) {
+                if (!animOn) return;
                 double t = animMs / 1000.0;
                 for (int k = 0; k < 2; k++) {
                     double f = std::fmod(t * 0.5 + k * 0.5, 1.0);
-                    double fx = art == A_FREIGHTER ? 0.66 : 0.0, fy = art == A_FREIGHTER ? -0.36 : -0.78;
                     p.cv->fillCircleA(p.X(fx - f * 0.5), p.Y(fy - f * 0.4), p.L(0.08 + f * 0.1), rgb(200, 200, 204), (int)(140 * (1 - f)));
                 }
+            };
+            switch (art) {
+                case A_FREIGHTER: {  // a rusty cargo ship stacked with containers, bridge at the stern
+                    for (int i = 0; i < 4; i++)
+                        for (int j = 0; j < 2; j++)
+                            p.poly({-0.62 + i * 0.27, 0.04 - j * 0.16, -0.38 + i * 0.27, 0.04 - j * 0.16, -0.38 + i * 0.27, 0.2 - j * 0.16, -0.62 + i * 0.27, 0.2 - j * 0.16},
+                                   (i + j) % 3 == 0 ? cc : (i + j) % 3 == 1 ? rgb(70, 110, 150) : rgb(176, 120, 60), true, 0.6f);
+                    p.poly({-0.9, -0.36, -0.68, -0.36, -0.66, 0.2, -0.9, 0.2}, rgb(226, 220, 206));
+                    p.poly({-0.84, -0.3, -0.72, -0.3, -0.72, -0.24, -0.84, -0.24}, rgb(120, 170, 200), false);
+                    p.poly({-0.84, -0.56, -0.74, -0.56, -0.74, -0.36, -0.84, -0.36}, BLACKMETAL);
+                    hull(p, 1.95, 0.34, rgb(150, 70, 50), true);
+                    smoke(-0.79, -0.6);
+                    break;
+                }
+                case A_IRONCLAD: {  // low in the water: a sloping armoured casemate, gun ports, one tall funnel
+                    p.poly({-0.08, -0.74, 0.1, -0.74, 0.12, -0.1, -0.06, -0.1}, BLACKMETAL);
+                    p.poly({-0.56, 0.2, -0.38, -0.14, 0.4, -0.14, 0.58, 0.2}, rgb(70, 72, 78));
+                    for (int i = 0; i < 4; i++) p.ell(-0.34 + i * 0.22, 0.06, 0.04, 0.03, rgb(240, 200, 90), false);
+                    hull(p, 1.8, 0.24, rgb(52, 54, 60), true);
+                    pennant(p, 0.01, -0.74, 0.24, cc);
+                    smoke(0.01, -0.78);
+                    break;
+                }
+                case A_GUNBOAT: {  // small and shallow: a wheelhouse, a tall thin stack and a gun in the bow
+                    p.poly({-0.3, -0.24, 0.06, -0.24, 0.06, 0.2, -0.3, 0.2}, rgb(220, 214, 196));
+                    p.poly({-0.34, -0.3, 0.1, -0.3, 0.06, -0.24, -0.3, -0.24}, cc);
+                    p.poly({-0.22, -0.16, -0.04, -0.16, -0.04, -0.06, -0.22, -0.06}, rgb(120, 170, 200), false);
+                    p.poly({-0.52, -0.7, -0.42, -0.7, -0.42, 0.2, -0.52, 0.2}, BLACKMETAL);
+                    turret(0.42, 0.12, 1, 1, 0.9);
+                    hull(p, 1.5, 0.26, rgb(110, 116, 100), true);
+                    pennant(p, -0.47, -0.7, 0.22, cc);
+                    smoke(-0.47, -0.74);
+                    break;
+                }
+                case A_DESTROYER: {  // long, low and fast: a raked bow, a slanted funnel, a turret fore and aft
+                    p.poly({-0.2, -0.26, 0.24, -0.26, 0.3, 0.2, -0.26, 0.2}, GREY);
+                    p.poly({-0.1, -0.44, 0.16, -0.44, 0.2, -0.26, -0.12, -0.26}, lighten(GREY, 0.12f));
+                    p.poly({-0.08, -0.38, 0.12, -0.38, 0.12, -0.32, -0.08, -0.32}, rgb(120, 170, 200), false);
+                    p.poly({-0.46, -0.44, -0.32, -0.44, -0.26, 0.2, -0.44, 0.2}, darken(GREY, 0.8f));
+                    p.stick(0.04, -0.44, 0.04, -0.82, 0.03, BLACKMETAL);
+                    turret(0.56, 0.12, 1, 1, 0.9);
+                    turret(-0.66, 0.12, -1, 1, 0.9);
+                    p.place(0, 0.12, 1);
+                    p.poly({-0.98, 0.2, 1.06, 0.12, 0.84, 0.46, -0.9, 0.46}, GREY, true, 0.55f);
+                    p.stick(-0.92, 0.34, 0.94, 0.3, 0.04, cc, false);
+                    pennant(p, 0.04, -0.82, 0.24, cc);
+                    break;
+                }
+                default: {  // a battleship: huge, with a tall tower and big triple-gunned turrets
+                    p.poly({-0.36, -0.2, 0.36, -0.2, 0.42, 0.18, -0.42, 0.18}, GREY);
+                    p.poly({-0.06, -0.62, 0.16, -0.62, 0.2, -0.2, -0.1, -0.2}, lighten(GREY, 0.1f));
+                    p.poly({-0.02, -0.56, 0.12, -0.56, 0.12, -0.5, -0.02, -0.5}, rgb(120, 170, 200), false);
+                    p.poly({-0.32, -0.42, -0.18, -0.42, -0.16, -0.2, -0.32, -0.2}, darken(GREY, 0.8f));
+                    p.stick(0.05, -0.62, 0.05, -1.0, 0.035, BLACKMETAL);
+                    turret(0.6, 0.06, 1, 3, 1.15);
+                    turret(0.86, 0.12, 1, 2, 0.9);
+                    turret(-0.62, 0.06, -1, 3, 1.15);
+                    p.place(0, 0.12, 1);
+                    p.poly({-1.08, 0.18, 1.12, 0.12, 0.94, 0.5, -1.0, 0.5}, darken(GREY, 0.9f), true, 0.55f);
+                    p.stick(-1.0, 0.36, 1.0, 0.32, 0.05, cc, false);
+                    pennant(p, 0.05, -1.0, 0.26, cc);
+                    break;
+                }
+            }
+            if (art == A_FREIGHTER || art == A_IRONCLAD || art == A_GUNBOAT) {  // a stripe in the owner's colour
+                double half = art == A_GUNBOAT ? 0.66 : art == A_IRONCLAD ? 0.8 : 0.86;
+                p.stick(-half, 0.36, half - 0.04, 0.36, 0.04, cc, false);
             }
             break;
         }
