@@ -101,8 +101,8 @@ Color GameUI::groundColor(int x, int y) const {
     int v = (int)(h % 9) - 4;
     if (water) v /= 4;  // the sea is one body of water, not a honeycomb
     base = rgb(base.r + v, base.g + v, base.b + v);
-    if (t.veg == V_FOREST) base = blend(base, rgb(70, 110, 58), 0.35f);
-    if (t.veg == V_JUNGLE) base = blend(base, rgb(50, 118, 60), 0.45f);
+    if (t.veg == V_FOREST) base = blend(base, rgb(54, 94, 46), 0.5f);   // the shaded forest floor
+    if (t.veg == V_JUNGLE) base = blend(base, rgb(16, 62, 28), 0.85f);  // under a closed canopy
     if (t.hills) base = blend(base, rgb(140, 118, 84), 0.20f);
     if (t.mountain) base = blend(base, rgb(122 + v, 114 + v, 104 + v), 0.6f);
     if (t.fallout) base = blend(base, rgb(150, 168, 40), 0.16f * t.fallout);

@@ -266,7 +266,7 @@ void GameUI::drawForest(int x, int y, int sx, int sy) {
     // the shade of the forest floor gives the canopy its mass
     cv->glowEllipse(TX(0), TY(0.1), (int)(u * 0.85), (int)(u * 0.7), cold ? rgb(30, 60, 50) : rgb(26, 66, 30), 120);
     int cells = hs >= 44 ? 5 : hs >= 28 ? 4 : 3;
-    auto pts = scatter(r, cells, 0.8);
+    auto pts = scatter(r, cells, 0.88);
     if (t.imp == IMP_LUMBER)  // the camp's clearing
         pts.erase(std::remove_if(pts.begin(), pts.end(), [](const FPt& p) { return p.x < 0.05 && p.y > 0.0; }), pts.end());
     std::sort(pts.begin(), pts.end(), [](const FPt& a, const FPt& b) { return a.y < b.y; });
@@ -306,48 +306,111 @@ void GameUI::drawForest(int x, int y, int sx, int sy) {
     }
 }
 
-// ------------------------------------------------------------ jungle: dense, dark, broad-leaved, palms through the roof
+// ------------------------------------------------------------ jungle: a closed, layered rainforest canopy
+// A leaf seen from above: from its stalk at (bx, by) out along angle a, drooping under its own weight.
+static void leaf(Canvas* cv, int bx, int by, double a, double len, double wid, double droop, Color c, Color rib) {
+    double ca = std::cos(a), sa = std::sin(a), nx = -sa, ny = ca;
+    auto at = [&](double f, double side, int& ox, int& oy) {
+        ox = bx + (int)std::lround(ca * len * f + nx * side);
+        oy = by + (int)std::lround(sa * len * f + ny * side + droop * f * f);
+    };
+    int xy[12];
+    at(0, 0, xy[0], xy[1]);
+    at(0.35, wid * 0.5, xy[2], xy[3]);
+    at(0.72, wid * 0.4, xy[4], xy[5]);
+    at(1.0, 0, xy[6], xy[7]);
+    at(0.72, -wid * 0.4, xy[8], xy[9]);
+    at(0.35, -wid * 0.5, xy[10], xy[11]);
+    cv->fillPoly(xy, 6, c);
+    if (len > 8) {
+        int m1x, m1y, m2x, m2y;
+        at(0.1, 0, m1x, m1y);
+        at(0.9, 0, m2x, m2y);
+        int mid[6] = {m1x, m1y, (m1x + m2x) / 2, (m1y + m2y) / 2 + (int)(droop * 0.2), m2x, m2y};
+        cv->polylineA(mid, 3, rib, 1, 160);
+    }
+}
+
 void GameUI::drawJungle(int x, int y, int sx, int sy) {
     double u = hs;
     TRng r(tileHash(x, y, 37));
-    cv->glowEllipse(TX(0), TY(0.1), (int)(u * 0.9), (int)(u * 0.75), rgb(6, 46, 22), 160);
+    // the canopy is closed: deep green shade over the whole tile, so no open ground shows through
+    cv->glowEllipse(TX(0), TY(0.05), (int)(u * 1.0), (int)(u * 0.88), rgb(10, 52, 24), 235);
     int cells = hs >= 40 ? 5 : hs >= 26 ? 4 : 3;
-    auto pts = scatter(r, cells, 0.82);
-    std::sort(pts.begin(), pts.end(), [](const FPt& a, const FPt& b) { return a.y < b.y; });
-    double scale = hs >= 26 ? 1.0 : 1.25;
-    int k = 0;
-    for (auto& p : pts) {
-        int tx = TX(p.x), ty = TY(p.y);
-        int R = (int)(u * r.range(0.16, 0.22) * scale);
-        cv->fillEllipseA(tx + R / 4, ty + R * 2 / 3, R, R / 3, rgb(0, 0, 0), 90);
-        // a heavy, glossy, lumpy crown
-        cv->fillCircleGrad(tx, ty - R / 4, R, rgb(56, 140, 56), 255, rgb(8, 58, 28), 255, tx - R / 3, ty - R * 3 / 4);
-        int bx2 = tx + (int)(r.range(-0.6, 0.6) * R), by2 = ty - (int)(r.range(0.4, 0.8) * R);
-        cv->fillCircleGrad(bx2, by2, R * 3 / 5, rgb(84, 168, 66), 255, rgb(14, 70, 30), 255, bx2 - R / 4, by2 - R / 3);
-        if (hs >= 26) {  // broad leaves catching the light
-            for (int l = 0; l < 2; l++) {
-                int lx = tx + (int)(r.range(-0.6, 0.6) * R), ly = ty - (int)(r.range(0.2, 0.8) * R);
-                cv->fillEllipseA(lx, ly, R / 3, R / 6, rgb(120, 196, 84), 150);
-            }
+    // the understorey: dark lumps of foliage filling every gap
+    for (auto& p : scatter(r, cells + 1, 0.95)) {
+        int bx = TX(p.x), by = TY(p.y), br = (int)(u * r.range(0.08, 0.12));
+        Color c = r.chance(0.5) ? rgb(18, 74, 32) : rgb(26, 88, 38);
+        cv->fillCircle(bx, by, br, c);
+        cv->fillCircle(bx + br * 2 / 3, by + br / 3, br * 3 / 4, c);
+    }
+    // the canopy: lumpy crowns of many shades, each a cluster of leafy domes lit from the upper left
+    static const Color LIT[5] = {{132, 186, 58}, {78, 162, 72}, {104, 176, 64}, {62, 142, 70}, {150, 196, 74}};
+    static const Color DEEP[5] = {{30, 84, 26}, {14, 70, 36}, {24, 80, 30}, {10, 62, 34}, {40, 92, 30}};
+    auto crowns = scatter(r, std::max(3, cells - 1), 0.84);
+    std::sort(crowns.begin(), crowns.end(), [](const FPt& a, const FPt& b) { return a.y < b.y; });
+    double scale = hs >= 26 ? 1.0 : 1.3;
+    for (auto& p : crowns) {
+        int cx = TX(p.x), cy = TY(p.y);
+        double R = u * r.range(0.22, 0.28) * scale;
+        int pal = (int)(r.next() % 5);
+        cv->fillEllipseA(cx + (int)(R * 0.3), cy + (int)(R * 0.6), (int)(R * 1.1), (int)(R * 0.45), rgb(0, 20, 8), 110);
+        int lobes = hs >= 30 ? 7 : 5;
+        for (int l = 0; l < lobes; l++) {
+            double a = r.range(0, 6.28), d = l == 0 ? 0 : R * r.range(0.5, 0.8);
+            int lx = cx + (int)(std::cos(a) * d), ly = cy + (int)(std::sin(a) * d * 0.7) - (l == 0 ? (int)(R * 0.2) : 0);
+            int lr = (int)(R * (l == 0 ? 0.7 : r.range(0.38, 0.52)));
+            cv->fillCircleGrad(lx, ly, std::max(2, lr), LIT[pal], 255, DEEP[pal], 255, lx - lr / 2, ly - lr * 2 / 3);
         }
-        if (k++ % 3 == 1 && hs >= 22) {  // a palm through the canopy
-            int px = tx + R / 3, py = ty - R;
-            cv->line(px, py + R, px + hs / 30, py, rgb(112, 82, 46), std::max(1, hs / 24));
-            for (int f = 0; f < 6; f++) {
-                double a = -3.0 + f * 0.55;
-                int ex = px + (int)(std::cos(a) * u * 0.2), ey = py + (int)(std::sin(a) * u * 0.11) + hs / 16;
-                int mx = (px + ex) / 2, my = std::min(py, ey) - hs / 30;
-                int fr[6] = {px, py, mx, my, ex, ey};
-                cv->polylineA(fr, 3, rgb(52, 150, 58), std::max(2, hs / 18), 255);
-            }
+        if (hs >= 34 && r.chance(0.5))  // glossy highlights on the top leaves
+            cv->fillCircleA(cx - (int)(R * 0.3), cy - (int)(R * 0.5), std::max(1, (int)(R * 0.18)), lighten(LIT[pal], 0.35f), 170);
+    }
+    // broad leaves - wild banana and elephant ear - spilling out between the crowns
+    if (hs >= 22) {
+        int n = hs >= 36 ? 4 : 2;
+        for (int k = 0; k < n; k++) {
+            double fx = r.range(-0.55, 0.55), fy = r.range(-0.45, 0.55);
+            if (!inHex(fx, fy, 0.78)) continue;
+            double a = r.range(-3.0, 0.2);
+            leaf(cv, TX(fx), TY(fy), a, u * r.range(0.22, 0.3), u * r.range(0.11, 0.15), u * 0.06, rgb(96, 172, 62), rgb(40, 100, 36));
         }
     }
-    if (hs >= 32)  // flowers in the green
+    // hanging vines
+    if (hs >= 34)
+        for (int k = 0; k < 3; k++) {
+            double fx = r.range(-0.5, 0.5), fy = r.range(-0.45, 0.25);
+            if (!inHex(fx, fy, 0.7)) continue;
+            int vx = TX(fx), vy = TY(fy), len = (int)(u * r.range(0.15, 0.25));
+            int v[6] = {vx, vy, vx + len / 4, vy + len / 2, vx - len / 8, vy + len};
+            cv->polylineA(v, 3, rgb(30, 70, 24), std::max(1, hs / 34), 200);
+        }
+    // palms breaking through the roof of the forest, fronds drooping
+    if (hs >= 20) {
+        int palms = hs >= 30 ? 2 : 1;
+        for (int k = 0; k < palms; k++) {
+            double fx = r.range(-0.45, 0.45), fy = r.range(-0.4, 0.3);
+            if (!inHex(fx, fy, 0.7)) { fx *= 0.5; fy *= 0.5; }
+            int px = TX(fx), py = TY(fy);
+            int lean = (int)(u * r.range(-0.06, 0.06));
+            int tr[6] = {px, py + (int)(u * 0.2), px + lean / 2, py + (int)(u * 0.08), px + lean, py};
+            cv->polylineA(tr, 3, rgb(118, 92, 58), std::max(2, hs / 18), 255);
+            int fronds = hs >= 34 ? 8 : 6;
+            double L = u * (hs >= 30 ? 0.27 : 0.32);
+            for (int f = 0; f < fronds; f++) {
+                double a = -3.14159 + f * (6.28318 / fronds) + r.range(-0.15, 0.15);
+                leaf(cv, px + lean, py, a, L, L * 0.32, L * 0.45, f % 2 ? rgb(70, 160, 58) : rgb(52, 138, 50), rgb(30, 86, 30));
+            }
+            cv->fillCircle(px + lean, py + hs / 40, std::max(1, hs / 26), rgb(120, 86, 40));  // coconuts
+        }
+    }
+    if (hs >= 32) {  // flowers, and the humid haze of the rainforest
         for (int f = 0; f < 3; f++) {
             double fx = r.range(-0.5, 0.5), fy = r.range(-0.5, 0.5);
             static const Color FL[3] = {{236, 70, 90}, {250, 190, 60}, {240, 120, 200}};
             if (inHex(fx, fy, 0.75)) cv->fillCircleA(TX(fx), TY(fy), std::max(1, hs / 26), FL[r.next() % 3], 230);
         }
+        cv->glowEllipse(TX(r.range(-0.3, 0.3)), TY(r.range(-0.2, 0.3)), (int)(u * 0.5), (int)(u * 0.18), rgb(230, 240, 235), 26);
+    }
 }
 
 // ------------------------------------------------------------ floodplains and marshes
