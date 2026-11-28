@@ -303,6 +303,9 @@ private:
     void drawCityBanner(const City& c, int sx, int sy);
     void drawUnitToken(const Unit& u, int sx, int sy, int r);
     void drawUnitIcon(int type, int cx, int cy, int s, Color ic, Color accent);
+    void cityBox(int x, int y, int w, int h, int d, Color wall, int roof, Color roofC, int windows, Color lit);  // UICities.cpp
+    void drawUnitFigure(int type, int owner, int sx, int sy, int r, int stride = 0);  // UIUnits.cpp
+    bool unitHasFigure(int type) const;
     void drawPathPreview();
     void tileCenter(int tx, int ty, int& sx, int& sy) const;
     bool pickTile(int sx, int sy, int& tx, int& ty) const;

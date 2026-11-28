@@ -75,7 +75,7 @@ Four victories: **Rebirth** (science), **Domination**, **Cultural** and **Score*
 * **Hotseat multiplayer** for up to four players at one computer, with player names, an optional turn clock and a summary of what happened since your last turn.
 * A guided **tutorial**, four **advisors**, an empire overview, filterable messages and tooltips throughout.
 * 51 achievements to earn.
-* Illustrated, animated graphics, and music, sound effects and ambience that follow your story - including the calls of each primate species.
+* Illustrated, animated graphics - units painted as figures of their own species, and cities that grow and change with each era - and music, sound effects and ambience that follow your story - including the calls of each primate species.
 
 ## The primates
 

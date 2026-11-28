@@ -309,114 +309,6 @@ void GameUI::drawHumanSite(int x, int y, int sx, int sy, bool visible) {
     }
 }
 
-void GameUI::drawCityOnMap(const City& c, int sx, int sy) {
-    Game& g = *game;
-    int u = hs;
-    Color cc = civColor(c.owner);
-    int e = g.era(c.owner);
-    double t = animMs / 1000.0;
-    // trodden ground, growing with the city
-    int gr = u * (6 + std::min(4, c.pop / 4)) / 10;
-    cv->glowEllipse(sx, sy + u / 10, gr, gr * 7 / 10, e < 5 ? rgb(118, 92, 62) : rgb(96, 96, 98), 230);
-    // walls
-    bool walls = false;
-    for (size_t b = 0; b < g_buildings.size(); b++) if (c.has[b] && g_buildings[b].defense >= 4 && !g_buildings[b].wonder) walls = true;
-    int wxy[12];
-    hexCorners(sx, sy + u / 12, hs * 7 / 10, wxy);
-    if (walls) {
-        Color wc = e < 3 ? rgb(128, 90, 52) : rgb(176, 168, 150);
-        int wt = std::max(2, u / 11);
-        cv->polylineA(wxy, 6, darken(wc, 0.5f), wt + 2, 255, true);
-        cv->polylineA(wxy, 6, wc, wt, 255, true);
-        for (int k = 0; k < 6; k++) {  // towers on the corners
-            int tx = wxy[k * 2], ty = wxy[k * 2 + 1], tr = std::max(2, u / 12);
-            if (e < 3) {
-                cv->line(tx, ty, tx, ty - tr * 2, rgb(96, 64, 34), std::max(2, tr));
-            } else {
-                cv->fillRectGrad(tx - tr, ty - tr * 2, tr * 2, tr * 2 + tr / 2, lighten(wc, 0.2f), darken(wc, 0.7f));
-                cv->fillRect(tx - tr, ty - tr * 2 - tr / 2, tr / 2 + 1, tr / 2, wc);
-                cv->fillRect(tx + tr / 2, ty - tr * 2 - tr / 2, tr / 2 + 1, tr / 2, wc);
-            }
-        }
-    }
-    if (e <= 1) {  // the communal fire
-        double fl = 0.75 + 0.25 * std::sin(t * 9 + c.id);
-        cv->glowEllipse(sx, sy + u / 6, (int)(u / 4 * fl), (int)(u / 6 * fl), rgb(255, 170, 60), 170);
-        cv->fillCircle(sx, sy + u / 6, std::max(1, u / 22), rgb(255, 220, 120));
-    }
-    // buildings, back to front
-    static const int SPOTS[12][2] = {{0, -4}, {-3, -3}, {3, -3}, {-5, -1}, {5, -1}, {0, -1}, {-3, 1}, {3, 1}, {-5, 3}, {5, 3}, {-1, 4}, {2, 4}};
-    static const int ORDER[12] = {0, 1, 2, 5, 3, 4, 6, 7, 10, 11, 8, 9};  // which spots fill first (centre outwards)
-    int n = std::min(12, 3 + c.pop / 2);
-    bool used[12] = {};
-    for (int k = 0; k < n; k++) used[ORDER[k]] = true;
-    for (int k = 0; k < 12; k++) {
-        if (!used[k]) continue;
-        int bx = PX(SPOTS[k][0]), by = PY(SPOTS[k][1]);
-        if (e <= 1 && k == 5) continue;  // keep the fire clear
-        uint32_t hh = hashXY(c.id * 31 + k, k * 7);
-        cv->fillEllipseA(bx + u / 16, by + u / 40, u / 7, u / 20, rgb(0, 0, 0), 70);  // shadow
-        if (e < 2) {
-            // domed huts of woven branches
-            int r = u / 8 + (int)(hh % 3) * u / 40;
-            int dxy[26];
-            for (int i = 0; i <= 12; i++) {
-                double a = 3.14159265 * i / 12;
-                dxy[i * 2] = bx - (int)(std::cos(a) * r);
-                dxy[i * 2 + 1] = by - (int)(std::sin(a) * r * 9 / 10);
-            }
-            cv->fillPolyGrad(dxy, 13, rgb(196, 152, 92), 255, rgb(112, 76, 40), 255, bx - r / 2, by - r, bx + r / 2, by);
-            for (int i = 1; i < 3; i++) cv->lineA(bx - r * i / 3, by, bx - r * i / 3 + r / 6, by - r * 7 / 10, rgb(90, 60, 30), 1, 120);
-            cv->fillRect(bx - r / 5, by - r * 4 / 10, std::max(2, r * 2 / 5), r * 4 / 10, rgb(50, 30, 16));
-        } else if (e < 6) {
-            // mud-brick and stone houses with tiled roofs
-            int bw = u / 4 - (int)(hh % 2) * u / 20, bh2 = u / 7 + (int)(hh % 3) * u / 30;
-            Color wall = e < 4 ? rgb(206, 178, 132) : rgb(198, 190, 172);
-            Color roof = k == 0 ? cc : e < 4 ? rgb(176, 88, 52) : rgb(150, 70, 56);
-            cv->fillRectGrad(bx - bw / 2, by - bh2, bw / 2, bh2, lighten(wall, 0.1f), wall);
-            cv->fillRectGrad(bx, by - bh2, bw - bw / 2, bh2, darken(wall, 0.78f), darken(wall, 0.68f));
-            int rf[6] = {bx - bw / 2 - 2, by - bh2, bx, by - bh2 - u / 8, bx + bw - bw / 2 + 2, by - bh2};
-            cv->fillPolyGrad(rf, 3, lighten(roof, 0.15f), 255, darken(roof, 0.65f), 255, bx - bw / 2, by - bh2 - u / 8, bx + bw / 2, by - bh2);
-            cv->fillRect(bx - bw / 4, by - u / 14, std::max(2, u / 22), u / 14, rgb(60, 40, 30));
-            if (u >= 30) cv->fillRect(bx + bw / 6, by - bh2 + bh2 / 3, std::max(2, u / 26), std::max(2, u / 26), rgb(250, 220, 140));
-            if (k == 0 && c.pop >= 8 && e >= 4) {  // a domed hall or temple behind
-                cv->fillCircleGrad(bx, by - bh2 - u / 8, u / 9, rgb(240, 232, 210), 255, rgb(150, 140, 120), 255, bx - u / 30, by - bh2 - u / 6);
-            }
-        } else {
-            // industrial and modern blocks with lit windows; towers grow with the city and the era
-            int bw = u / 6 + (int)(hh % 2) * u / 24;
-            int bh2 = u / 5 + (int)(hh % 4) * u / 14 + (k == 0 ? u * std::min(c.pop, 20) / 60 : 0);
-            Color body = e >= 7 ? rgb(150, 176, 204) : rgb(170, 150, 136);
-            cv->fillRectGrad(bx - bw / 2, by - bh2, bw / 2, bh2, lighten(body, 0.25f), body);
-            cv->fillRectGrad(bx, by - bh2, bw - bw / 2, bh2, darken(body, 0.7f), darken(body, 0.55f));
-            if (e >= 7) cv->fillRectA(bx - bw / 2, by - bh2, bw / 2, bh2 / 3, rgb(255, 255, 255), 50);  // glass glint
-            int step = std::max(3, u / 10);
-            for (int wy = by - bh2 + step / 2; wy < by - 2; wy += step)
-                for (int wx = bx - bw / 2 + 2; wx < bx + bw / 2 - 1; wx += std::max(3, u / 12))
-                    if ((hashXY(wx * 3 + k, wy) & 3) != 0) cv->fillRect(wx, wy, std::max(1, u / 30), std::max(1, u / 22), rgb(255, 226, 140));
-            if (e == 6 && (k == 1 || k == 4)) {  // a factory chimney with drifting smoke
-                int cx2 = bx + bw / 3, top = by - bh2 - u / 5;
-                cv->fillRect(cx2 - u / 36, top, std::max(2, u / 18), u / 5, rgb(120, 70, 56));
-                if (animOn)
-                    for (int p = 0; p < 3; p++) {
-                        double f = std::fmod(t * 0.35 + p / 3.0 + k * 0.13, 1.0);
-                        int pr = (int)(u / 16 + f * u / 8);
-                        cv->fillCircleA(cx2 + (int)(f * u / 3), top - (int)(f * u / 2), pr, rgb(190, 190, 196), (int)(110 * (1 - f)));
-                    }
-            }
-        }
-    }
-    if (c.capital) {
-        // a pennant in the civilisation's colour, fluttering
-        int fx2 = PX(0) + u / 10, fy2 = PY(-5);
-        cv->line(fx2, fy2, fx2, fy2 - u / 3, rgb(60, 40, 30), std::max(1, u / 20));
-        double wv = animOn ? std::sin(t * 4 + c.id) : 0;
-        int tipY = fy2 - u / 4 + (int)(wv * u / 24);
-        int fl[8] = {fx2, fy2 - u / 3, fx2 + u / 8, fy2 - u / 3 + u / 30 + (int)(wv * u / 40), fx2 + u / 4, tipY, fx2, fy2 - u / 6};
-        cv->fillPolyGrad(fl, 4, lighten(cc, 0.2f), 255, darken(cc, 0.7f), 255, fx2, fy2 - u / 3, fx2 + u / 4, fy2 - u / 6);
-    }
-}
-
 void GameUI::drawCityBanner(const City& c, int sx, int sy) {
     Game& g = *game;
     int u = hs;
@@ -618,25 +510,27 @@ void GameUI::drawUnitToken(const Unit& u, int sx, int sy, int r) {
     Color cc = civColor(u.owner);
     bool light = (cc.r * 3 + cc.g * 5 + cc.b * 2) / 10 > 150;
     Color ic = light ? rgb(24, 24, 28) : rgb(255, 255, 255);
-    cv->glowEllipse(sx + r / 5, sy + r, r * 13 / 10, r * 5 / 10, rgb(0, 0, 0), 150);  // shadow on the ground
-    if (d.civilian()) {
-        // civilians carry a shield-shaped flag
-        int sxy[10] = {sx - r - 1, sy - r, sx + r + 1, sy - r, sx + r + 1, sy + r / 4, sx, sy + r + 3, sx - r - 1, sy + r / 4};
-        if (d.cls == UnitClass::Great)  // Great Primates carry a golden one
-            cv->fillPolyGrad(sxy, 5, rgb(255, 236, 150), 255, rgb(170, 118, 30), 255, sx, sy - r, sx, sy + r + 3);
-        else cv->fillPolyGrad(sxy, 5, rgb(238, 226, 190), 255, rgb(120, 104, 70), 255, sx, sy - r, sx, sy + r + 3);
-        int ixy[10] = {sx - r + 1, sy - r + 2, sx + r - 1, sy - r + 2, sx + r - 1, sy + r / 4 - 1, sx, sy + r, sx - r + 1, sy + r / 4 - 1};
-        cv->fillPolyGrad(ixy, 5, lighten(cc, 0.3f), 255, darken(cc, 0.62f), 255, sx - r / 2, sy - r, sx + r / 2, sy + r);
-        cv->fillRectA(sx - r + 2, sy - r + 3, 2 * r - 4, r / 2, rgb(255, 255, 255), 40);
+    if (r >= 11 && unitHasFigure(u.type)) {  // zoomed far out, the plain badge reads better
+        // a painted figure on a base in its owner's colour; it strides while moving
+        int stride = glides.count(u.id) ? ((animMs / 120) % 2 ? 1 : -1) : 0;
+        drawUnitFigure(u.type, u.owner, sx, sy, r, stride);
     } else {
-        // a medallion: bronze rim, then a domed disc in the owner's colour with a glossy highlight
-        cv->fillCircleGrad(sx, sy, r + 2, rgb(250, 236, 196), 255, rgb(110, 84, 46), 255, sx - r / 2, sy - r / 2);
-        cv->fillCircleGrad(sx, sy, r, lighten(cc, 0.32f), 255, darken(cc, 0.58f), 255, sx - r / 3, sy - r / 2);
-        cv->glowEllipse(sx - r / 6, sy - r / 2, r * 6 / 10, r * 3 / 10, rgb(255, 255, 255), 90);  // sheen
+        cv->glowEllipse(sx + r / 5, sy + r, r * 13 / 10, r * 5 / 10, rgb(0, 0, 0), 150);  // shadow on the ground
+        if (d.civilian()) {
+            // civilians carry a shield-shaped flag
+            int sxy[10] = {sx - r - 1, sy - r, sx + r + 1, sy - r, sx + r + 1, sy + r / 4, sx, sy + r + 3, sx - r - 1, sy + r / 4};
+            if (d.cls == UnitClass::Great)  // Great Primates carry a golden one
+                cv->fillPolyGrad(sxy, 5, rgb(255, 236, 150), 255, rgb(170, 118, 30), 255, sx, sy - r, sx, sy + r + 3);
+            else cv->fillPolyGrad(sxy, 5, rgb(238, 226, 190), 255, rgb(120, 104, 70), 255, sx, sy - r, sx, sy + r + 3);
+            int ixy[10] = {sx - r + 1, sy - r + 2, sx + r - 1, sy - r + 2, sx + r - 1, sy + r / 4 - 1, sx, sy + r, sx - r + 1, sy + r / 4 - 1};
+            cv->fillPolyGrad(ixy, 5, lighten(cc, 0.3f), 255, darken(cc, 0.62f), 255, sx - r / 2, sy - r, sx + r / 2, sy + r);
+        } else {
+            cv->fillCircleGrad(sx, sy, r + 2, rgb(250, 236, 196), 255, rgb(110, 84, 46), 255, sx - r / 2, sy - r / 2);
+            cv->fillCircleGrad(sx, sy, r, lighten(cc, 0.32f), 255, darken(cc, 0.58f), 255, sx - r / 3, sy - r / 2);
+        }
+        int iy = sy - (d.civilian() ? r / 10 : 0), is = r * 7 / 10;
+        drawUnitIcon(u.type, sx, iy, is, ic, cc);
     }
-    int iy = sy - (d.civilian() ? r / 10 : 0), is = r * 7 / 10;
-    if (r >= 12) drawUnitIcon(u.type, sx + 1, iy + 1, is, darken(cc, light ? 0.85f : 0.3f), darken(cc, 0.3f));  // engraved shadow
-    drawUnitIcon(u.type, sx, iy, is, ic, cc);
     if (u.hp < 100) {
         int hw = 2 * r, hx = sx - r, hy = sy + r + 4;
         cv->fillRoundRectGrad(hx - 1, hy - 1, hw + 2, 6, 3, rgb(10, 10, 12), rgb(30, 30, 34), 200);
@@ -646,7 +540,7 @@ void GameUI::drawUnitToken(const Unit& u, int sx, int sy, int r) {
     if (d.military() && r >= 9 && game) {  // experience: gold chevrons for each level, a glowing ring when a promotion waits
         int lv = Game::unitLevel(u);
         if (u.owner == game->player && game->canPromote(u)) {
-            cv->circle(sx, sy, r + 4, rgb(255, 214, 90), 2);
+            cv->glowEllipse(sx, sy + r * 8 / 10, r + 4, r / 2 + 3, rgb(255, 214, 90), 170);
             cv->fillCircle(sx - r, sy + r - 2, std::max(4, r / 3), rgb(255, 214, 90));
             cv->text(sx - r, sy + r - 2 - std::max(8, r / 2) / 2 - 1, "+", std::max(8, r / 2), rgb(60, 40, 10), AL_CENTER, true);
         } else if (lv > 0) {
@@ -991,7 +885,7 @@ void GameUI::renderMap() {
         drawCityOnMap(c, sx, sy);
     }
     // pass 4: units
-    int r = std::max(7, hs * 4 / 10);
+    int r = std::max(7, hs * 47 / 100);
     for (auto& u : g.units) {
         if (!u.alive || !me.visible[g.idx(u.x, u.y)]) continue;
         if (u.x < x0 || u.x > x1 || u.y < y0 || u.y > y1) continue;
@@ -1003,15 +897,21 @@ void GameUI::renderMap() {
         bool shared = false;
         for (auto& o : g.units) if (o.alive && o.id != u.id && o.x == u.x && o.y == u.y && o.carrier < 0) shared = true;
         int rr = r;
-        if (u.carrier >= 0) { sx -= hs / 3; sy -= hs / 3; rr = r * 2 / 3; }
+        if (g.cityAt(u.x, u.y) && u.carrier < 0) {  // a garrison stands at the gate, leaving the city in view
+            sx += hs * 45 / 100 - (shared && civil ? hs * 85 / 100 : 0);
+            sy += hs * 40 / 100;
+            rr = r * 4 / 5;
+        }
+        else if (u.carrier >= 0) { sx -= hs / 3; sy -= hs / 3; rr = r * 2 / 3; }
         else if (shared && civil) { sx -= hs / 3; sy += hs / 3; rr = r * 3 / 4; }
         else if (shared && naval) { sx += hs / 3; sy += hs / 4; rr = r * 4 / 5; }
         else if (shared) { sx += hs / 8; sy -= hs / 8; }
         else if (civil) rr = r * 7 / 8;
         if (u.id == selUnit) {
             double pulse = 0.5 + 0.5 * std::sin(animMs / 160.0);
-            cv->fillCircleA(sx, sy, rr + 7, rgb(255, 230, 120), 40 + (int)(50 * pulse));
-            cv->circle(sx, sy, rr + 5, blend(rgb(255, 255, 255), rgb(255, 210, 60), (float)pulse), 2);
+            int fy = sy + rr * 8 / 10;  // a glowing ring on the ground at the unit's feet
+            cv->glowEllipse(sx, fy, rr + 9, rr / 2 + 6, rgb(255, 230, 120), 90 + (int)(80 * pulse));
+            cv->fillEllipseA(sx, fy, rr + 3, rr / 3 + 3, blend(rgb(255, 255, 255), rgb(255, 210, 60), (float)pulse), 200);
         }
         drawUnitToken(u, sx, sy, rr);
         if (naval && rr >= 9) {

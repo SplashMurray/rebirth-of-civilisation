@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(RebirthOfCivilisation VERSION 0.28.0 LANGUAGES C CXX)
+project(RebirthOfCivilisation VERSION 0.29.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -48,6 +48,8 @@ add_library(rebirth_game STATIC
   src/ui/UIReligion.cpp
   src/ui/UICouncil.cpp
   src/ui/UITerrain.cpp
+  src/ui/UIUnits.cpp
+  src/ui/UICities.cpp
   src/ui/UISound.cpp
 )
 target_include_directories(rebirth_game PUBLIC src)
